@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
-## Unreleased
+## 0.4.0 (2026-11-14)
 
 - The gate hook finds the repository a commit names, from `git -C <path>` or `cd <path> &&` in the command, resolved
   from the hook's folder, so that a session started in a folder of several repositories is gated too. Before, from such
