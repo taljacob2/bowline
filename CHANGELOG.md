@@ -4,6 +4,14 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
+## 0.5.1 (2026-11-14)
+
+- bowline has an icon: a bowline knot in off-white on a navy tile, made by the author with recraft.ai.
+  `assets/icon.svg` is its source, and `assets/icon.png`, 1024 pixels with transparent corners, is the file the
+  manifest's `icon` field names for Anthropic's plugin directory. Claude Code itself does not show it.
+- The README shows the icon at its top. On a page in dark mode GitHub shows `assets/icon-for-dark-pages.svg`
+  instead, the same knot with the two colours swapped, because the navy tile's edge fades into a dark page.
+
 ## 0.5.0 (2026-11-14)
 
 - `init` from a folder of repositories scaffolds the folder itself: its own `CLAUDE.md` from `templates/CLAUDE.md.folder.md`,

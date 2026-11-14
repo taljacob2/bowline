@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/icon-for-dark-pages.svg">
+    <img src="assets/icon.svg" width="128" height="128" alt="The bowline icon: a bowline knot in off-white on a navy tile">
+  </picture>
+</p>
+
 # bowline
 
 Claude Code reads less of your `CLAUDE.md` than you think. A nested one is cut at a fixed size and the rest is never
