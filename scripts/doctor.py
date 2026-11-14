@@ -360,8 +360,8 @@ def main(argv=None):
         except Exception:
             return 0
         if urgent:
-            whose = "this folder's repositories" if survey.workspace else "this repository's"
-            print(f"bowline found {len(urgent)} thing(s) about {whose} instructions or memory worth a look; run /bowline:doctor for the report. The first:")
+            whose = "the instructions or the memory of this folder's repositories" if survey.workspace else "this repository's instructions or memory"
+            print(f"bowline found {len(urgent)} thing(s) worth a look about {whose}; run /bowline:doctor for the report. The first:")
             for finding in urgent[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
         return 0
