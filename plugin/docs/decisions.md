@@ -175,3 +175,28 @@ from the repository's own file as its owners change it. The first user accepted 
 now. Also known and left as it is: a session started inside one of the repositories reads the folder's CLAUDE.md, but
 Claude Code looks for skills only up to the repository's root, and does not document whether it reads the folder's
 rules, so the folder's files serve sessions started in the folder.
+
+## 2026-11-14: bowline is not submitted to Anthropic's plugin directory, for now
+
+**The question.** bowline 0.7.0 passed the directory's validation with no blocking issue. The last step of the
+submission asks the author to agree to the Software Directory Terms and the Directory Policy, and to state that "the
+plugin does not exfiltrate credentials or execute code outside its declared MCP servers". Can the author agree?
+
+**What the documents say.** The Directory Policy, section 1, item G, with no exception: "Software must not query or
+extract data from Claude's memory, chat history, conversation summaries, or user-generated or uploaded files and must
+not persistently store or use conversation content to build user profiles or attempt to make any changes to Claude's
+behavior across sessions." bowline's memory backup extracts Claude Code's memory folder and pushes it to a remote, its
+curation reads and rewrites the memory, and its purpose is how Claude behaves across sessions. By submitting, the
+author warrants that the software's ordinary use complies with the Policy. bowline declares no MCP servers, and its
+hooks and skills run Python on the user's machine, so the statement about code is not true of it either. The
+validation had already said that the directory will later accept command hooks only from Verified organizations.
+
+**The decision.** The first user's words: "let's don't release for now ... we just use the marketplace and it's
+enough for now". bowline reaches people through its own marketplace, which none of these rules govern. Nothing built
+for the directory is undone: the plugin's own folder, the hooks in program-and-arguments form, the privacy policy and
+the `release` branch stay, because each is right for the marketplace too and keeps a later submission one step away.
+
+**Not chosen.** Cutting bowline down to fit: without the memory features much of its value is gone, and its hooks would
+still run code. Agreeing on a generous reading of the statement: an attestation is a promise, and this one would not
+be true. Asking Anthropic first remains open to the author, for whether a plugin that manages CLAUDE.md files and backs
+up Claude Code's memory at the user's request is acceptable, and how a plugin with command hooks should answer.

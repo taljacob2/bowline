@@ -47,10 +47,12 @@ python -I bowline/plugin/scripts/bowline.py memory setup git@github.com:<you>/<p
 | `assets/` | The icon's vector sources, for this page. The image the plugin ships is in `plugin/assets/`. |
 | `CHANGELOG.md` | Every version, with what changed and why. |
 
-A version reaches people in two ways. bowline's own marketplace serves `plugin/` from the main branch, and Claude Code
-installs it when its version changes. Anthropic's plugin directory follows the `release` branch, which moves only when
-a version is released. The `release` skill under `.claude/skills/` is the procedure, and `plugin/docs/decisions.md`
-says why.
+A version reaches people through bowline's own marketplace, which serves `plugin/` from the main branch; Claude Code
+installs it when its version changes. bowline is not in Anthropic's plugin directory: its Directory Policy forbids
+software that reads Claude's memory, which bowline's memory backup does, and its submission asks the author to state
+that the plugin runs no code outside its MCP servers, which bowline's hooks do. The `release` branch, which moves only
+when a version is released, is kept ready in case that changes. The `release` skill under `.claude/skills/` is the
+procedure, and `plugin/docs/decisions.md` says why.
 
 ## Tests
 

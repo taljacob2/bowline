@@ -1,20 +1,22 @@
 ---
 name: release
-description: Release a version of bowline so that `claude plugin update` and Anthropic's plugin directory pick it up - the checks, the version in the plugin manifest, the changelog heading, the strict validation, one commit, the push to main, a plain git tag named after the version, the release branch the directory follows, and the proof on this machine. Use when a round is merged on main and ready for people to install.
+description: Release a version of bowline so that `claude plugin update` picks it up - the checks, the version in the plugin manifest, the changelog heading, the strict validation, one commit, the push to main, a plain git tag named after the version, the release branch kept ready for Anthropic's directory, and the proof on this machine. Use when a round is merged on main and ready for people to install.
 ---
 
 # Release a version
 
-bowline reaches people through two channels, and a release feeds both.
+bowline reaches people through its own marketplace; the second channel, Anthropic's plugin directory, is kept ready
+but not used.
 
 - **bowline's own marketplace.** Claude Code reads no release page and no tag. A person's
   `claude plugin update bowline@bowline` fetches the default branch of this repository and installs its `plugin/`
   folder, the source the marketplace file names, when the `version` in `plugin/.claude-plugin/plugin.json` differs from
   the one they have. So changing that field is the release, and a commit pushed without it reaches nobody.
-- **Anthropic's plugin directory.** It follows the `release` branch, not main, with `plugin` as the plugin's path, and
-  checks every new commit there, scans it and, by default, has an Anthropic reviewer publish it. The `release` branch
-  moves only at the end of a release (step 5), so the directory sees the released versions and nothing in between.
-  Until a new version is published there, the directory keeps serving the last one.
+- **Anthropic's plugin directory: not submitted.** The author decided on 2026-11-14 not to submit bowline, because the
+  Directory Policy forbids reading Claude's memory and the submission asks for a statement that the plugin runs no code
+  outside its MCP servers; `plugin/docs/decisions.md` has the reasoning. The `release` branch is kept ready all the
+  same: step 5 still moves it at the end of every release, so that a submission, if the answer ever changes, would
+  follow it with `plugin` as the plugin's path and see only released versions.
 
 The git tag is for people and for history.
 
@@ -59,17 +61,16 @@ here, the repository's name already says which, and the tag is read by people, n
 git push origin "X.Y.Z^{commit}:refs/heads/release"
 ```
 
-This moves `release` to the commit the tag names, and Anthropic's directory picks it up from there. The quotes keep
-the braces intact in PowerShell too. git refuses the push when it would move `release` backward or sideways, and that
-refusal is the safeguard: never force it, never push anything to `release` but a tagged release, and never delete
-the branch, because the directory's listing follows it. Running the command twice changes nothing.
+This moves `release` to the commit the tag names, where a directory listing would pick it up if bowline were ever
+submitted. The quotes keep the braces intact in PowerShell too. git refuses the push when it would move `release`
+backward or sideways, and that refusal is the safeguard: never force it, never push anything to `release` but a tagged
+release, and never delete the branch. Running the command twice changes nothing.
 
 ## 6. Prove that it arrived
 
 On your own machine, `claude plugin update bowline@bowline` prints "updated from <the old version> to X.Y.Z". Restart
 Claude Code; the first session shows the new hooks at work, starting with the one line at its start. Say in the reply
-which version is installed now. The directory's portal, claude.ai/directory/manage, lists the new commit on the
-listing's Versions tab with the result of its checks; it goes live there when it is published.
+which version is installed now.
 
 ## What the marketplace does not need
 
@@ -78,8 +79,10 @@ source with no `ref`, so the default branch is what people get; pin a `ref` to a
 wanted. Third-party directories, such as claudemarketplaces.com, crawl GitHub on their own schedule and are not part of
 a release.
 
-## What the directory does not need
+## If bowline is ever submitted to the directory
 
-No resubmission. After the first submission, the directory checks the `release` branch on a schedule, and at once on
-a push when the repository has the directory's GitHub push webhook. A version that fails a check, or waits for a
-reviewer, leaves the last published one live. The portal is needed only when a version is held or a setting changes.
+The portal is claude.ai/directory/manage: the plugin's path is `plugin`, and "Branch or tag" is `release`. After the
+first submission, the directory checks the `release` branch on a schedule, and at once on a push when the repository
+has the directory's GitHub push webhook, so no version is resubmitted; a version that fails a check, or waits for a
+reviewer, leaves the last published one live. Before submitting, read `plugin/docs/decisions.md`: the reasons it was
+not submitted on 2026-11-14 must have changed first.
