@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
-## Unreleased
+## 0.5.0 (2026-11-14)
 
 - `init` from a folder of repositories scaffolds the folder itself: its own `CLAUDE.md` from `templates/CLAUDE.md.folder.md`,
   an index with a table of the repositories (a line for each, taken from its own `CLAUDE.md`), what applies to every
