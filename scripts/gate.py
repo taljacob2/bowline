@@ -159,7 +159,7 @@ def commit_repository(command, start):
     commit moves the folder on from the hook's working folder; the result is that folder's repository, or None."""
     where = start
     before = re.split(r"\bcommit\b", command, maxsplit=1)[0]
-    for match in re.finditer(r"(?:\b(?:cd|pushd)\s+|\bgit\s+-C\s*)(\"[^\"]+\"|'[^']+'|\S+)", before):
+    for match in re.finditer(r"(?:\b(?:cd|pushd)\s+|\bgit\s+-C\s*)(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", before):
         path = match.group(1).strip("\"'")
         where = path if os.path.isabs(path) else os.path.join(where, path)
     return common.repo_root(where)
