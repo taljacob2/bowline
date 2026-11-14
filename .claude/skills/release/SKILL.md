@@ -64,7 +64,10 @@ git push origin "X.Y.Z^{commit}:refs/heads/release"
 This moves `release` to the commit the tag names, where a directory listing would pick it up if bowline were ever
 submitted. The quotes keep the braces intact in PowerShell too. git refuses the push when it would move `release`
 backward or sideways, and that refusal is the safeguard: never force it, never push anything to `release` but a tagged
-release, and never delete the branch. Running the command twice changes nothing.
+release, and never delete the branch. Running the command twice changes nothing. GitHub enforces the same for `main`
+and `release` alike: the repository's ruleset "main and release only move forward" (since 2026-11-14) refuses a
+force-push and a deletion of either branch, with no one able to bypass it, so a refused push there means the push
+would have rewritten history, not that something is broken.
 
 ## 6. Prove that it arrived
 
