@@ -10,6 +10,19 @@ import sys
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = ".claude/bowline.json"
+# Claude Code reads both of these as the project's instructions, whole, at a session's start (docs/facts.md).
+ROOT_CLAUDE_MD = ("CLAUDE.md", ".claude/CLAUDE.md")
+
+
+def is_root_claude_md(path):
+    """Whether a CLAUDE.md, by its path relative to the repository or the folder, is a root file: one of the two places
+    Claude Code reads whole at a session's start and again after a compaction, never cut on demand like a nested one."""
+    return path.replace("\\", "/") in ROOT_CLAUDE_MD
+
+
+def root_claude_md(root):
+    """The root CLAUDE.md files that exist under a repository or a folder, by their path relative to it."""
+    return [path for path in ROOT_CLAUDE_MD if os.path.isfile(os.path.join(root, path))]
 
 
 def run_git(args, cwd=None, check=True):

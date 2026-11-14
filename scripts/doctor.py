@@ -66,9 +66,8 @@ def claude_md_findings(root, config, facts):
     small, large = limits["onDemandCutoffSmallWindow"], limits["onDemandCutoffLargeWindow"]
     findings = []
     for path, lines, chars in facts["claudeMd"]:
-        nested = os.path.dirname(path) != ""
-        if not nested:
-            continue
+        if common.is_root_claude_md(path):
+            continue        # a root file loads whole at a session's start; only a nested one is cut
         text = common.read_text(os.path.join(root, path))
         for cutoff, window in ((small, "a 200K context window"), (large, "a 1M context window")):
             cut = cut_point(text, cutoff)
@@ -92,22 +91,26 @@ def claude_md_findings(root, config, facts):
 
 def root_claude_md_findings(root, facts):
     findings = []
-    roots = [p for p, _, _ in facts["claudeMd"] if os.path.dirname(p) == ""]
+    measured = {p.replace("\\", "/") for p, _, _ in facts["claudeMd"]}
+    roots = [p for p in common.ROOT_CLAUDE_MD if p in measured]        # named in the order Claude Code's docs give
     if not roots:
         findings.append(common.Finding(
             "warning", "The repository has no root CLAUDE.md.",
             "The root CLAUDE.md is the one file every session loads whole and re-reads after a compaction; without it nothing standing survives a summary.",
             "Create one with the writing rules, where decisions are recorded, and a Compact Instructions section: /bowline:init."))
         return findings
-    text = common.read_text(os.path.join(root, roots[0]))
+    # CLAUDE.md and .claude/CLAUDE.md both load whole, so a section in either one counts.
+    text = "\n".join(common.read_text(os.path.join(root, path)) for path in roots)
+    name = " and ".join(roots)
+    has, says = ("has", "does not say") if len(roots) == 1 else ("have", "do not say")
     if not re.search(r"^#+\s*compact instructions", text, re.IGNORECASE | re.MULTILINE):
         findings.append(common.Finding(
-            "warning", f"{roots[0]} has no \"Compact Instructions\" section.",
+            "warning", f"{name} {has} no \"Compact Instructions\" section.",
             "Claude Code replaces a long conversation with a summary, when the context fills and after about an hour of quiet; this section tells every summary what to keep.",
             "Add the section: /bowline:init offers the text, or see docs/conventions.md."))
     if not re.search(r"^#+\s*memory between sessions", text, re.IGNORECASE | re.MULTILINE):
         findings.append(common.Finding(
-            "note", f"{roots[0]} does not say what the memory folder is for.",
+            "note", f"{name} {says} what the memory folder is for.",
             "A session that knows the index loads only to 200 lines keeps it short; one that does not fills it until the newest notes fall off.",
             "Add the section: /bowline:init offers the text."))
     return findings
@@ -246,7 +249,7 @@ def repository_findings(root, config):
 
 def workspace_findings(workspace, facts):
     """The folder's own CLAUDE.md, the file that loads whole at the start of a session started in the folder."""
-    roots = [p for p, _, _ in facts["claudeMd"] if os.path.dirname(p) == ""]
+    roots = [p for p, _, _ in facts["claudeMd"] if common.is_root_claude_md(p)]
     if not roots:
         return [common.Finding(
             "note", "The folder itself has no CLAUDE.md.",

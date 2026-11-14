@@ -4,6 +4,19 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
+## 0.5.2 (2026-11-14)
+
+- `claude plugin validate . --strict` passes, which Anthropic's plugin directory asks of a submission. It failed on one
+  warning, "CLAUDE.md at the plugin root is not loaded as project context": the file is bowline's own instructions for
+  people working on bowline, not context the plugin ships. It moved to `.claude/CLAUDE.md`, the other place Claude Code
+  documents for a project's instructions, so contributors' sessions read it as before.
+- The doctor, autosplit and init treat `.claude/CLAUDE.md` as a root file, like `CLAUDE.md`, in every repository they
+  measure. The doctor no longer says such a repository has no root `CLAUDE.md`, checks the Compact Instructions and
+  memory sections there, and never reports it as cut on demand. Autosplit never counts it as cut either. init appends
+  the missing sections to it instead of creating a second file beside it, and a folder's table takes a repository's
+  line from it. When both files exist, a section in either one counts. `docs/facts.md` has the row, with the
+  documentation's words.
+
 ## 0.5.1 (2026-11-14)
 
 - bowline has an icon: a bowline knot in off-white on a navy tile, made by the author with recraft.ai.

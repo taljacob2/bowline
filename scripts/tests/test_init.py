@@ -49,6 +49,20 @@ class InitTests(ScratchRepo):
         self.assertTrue(os.path.isfile(os.path.join(self.repo, ".claude", "bowline.json")))
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".claude", "README.md")))
 
+    def test_a_root_file_in_the_claude_folder_gets_the_sections_and_no_second_file(self):
+        write(os.path.join(self.repo, ".claude", "CLAUDE.md"), "# My project\n\nIt does things.\n\n## Compact Instructions\n\nKeep.\n")
+        code, out, err = self.run_script("init", "--only", "claude-md")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn(".claude/CLAUDE.md", out)
+        self.assertIn("append sections: Where the rest of the rules are, Memory between sessions", out)
+        code, out, err = self.run_script("init", "--write", "--only", "claude-md")
+        self.assertEqual(code, 0, out + err)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "CLAUDE.md")))
+        text = read(os.path.join(self.repo, ".claude", "CLAUDE.md"))
+        self.assertTrue(text.startswith("# My project"))
+        self.assertEqual(text.count("## Compact Instructions"), 1)
+        self.assertIn("## Memory between sessions", text)
+
     def test_local_copies_run_on_their_own(self):
         self.run_script("init", "--write", "--only", "scripts")
         # The copy lives in the scratch repository; run it directly to check it finds its defaults beside itself.

@@ -51,6 +51,24 @@ class DoctorTests(ScratchRepo):
         self.assertIn("No commit gate is installed", out)
         self.assertIn("0 problem(s)", out)
 
+    def test_a_root_file_in_the_claude_folder_is_the_root_file(self):
+        # Claude Code reads .claude/CLAUDE.md whole, like CLAUDE.md: it is never cut, and its sections count.
+        wide = "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n\n## Wide\n\n"
+        write(os.path.join(self.repo, ".claude", "CLAUDE.md"), wide + ("words " * 400 + "\n") * 20)
+        code, out, err = self.run_script("doctor", "--no-memory")
+        self.assertEqual(code, 0, out + err)
+        self.assertNotIn("no root CLAUDE.md", out)
+        self.assertNotIn("is cut at line", out)
+        self.assertNotIn('"Compact Instructions" section', out)
+        self.assertNotIn("what the memory folder is for", out)
+        write(os.path.join(self.repo, ".claude", "CLAUDE.md"), "# Root\n\nShort.\n")
+        code, out, _ = self.run_script("doctor", "--no-memory")
+        self.assertIn('.claude/CLAUDE.md has no "Compact Instructions" section', out)
+        write(os.path.join(self.repo, "CLAUDE.md"), "# Also root\n\n## Compact Instructions\n\nKeep.\n")
+        code, out, _ = self.run_script("doctor", "--no-memory")
+        self.assertNotIn('"Compact Instructions" section', out)
+        self.assertIn("CLAUDE.md and .claude/CLAUDE.md do not say what the memory folder is for", out)
+
     def test_memory_checks(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n")
         code, out, _ = self.run_script("doctor")

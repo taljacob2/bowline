@@ -82,6 +82,9 @@ class AutosplitTests(ScratchRepo):
         self.assertIn("cut at 40,000", over[0][3])
         write(os.path.join(self.repo, "sub", "CLAUDE.md"), "# Sub\n\nShort.\n")
         self.assertEqual(autosplit.oversized(self.repo, config), [])
+        # A root file in .claude/ loads whole, like CLAUDE.md: wide is not cut there, only long is too long.
+        write(os.path.join(self.repo, ".claude", "CLAUDE.md"), "# Root\n\n## Wide\n\n" + ("words " * 400 + "\n") * 20)
+        self.assertEqual(autosplit.oversized(self.repo, config), [])
 
     def test_hook_does_nothing_when_off_when_the_file_is_dirty_or_inside_the_worker(self):
         code, out, err = self.hook()

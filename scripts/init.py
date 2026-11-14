@@ -5,7 +5,8 @@
 
 Items, each a file or a set of files under the repository:
   claude-md      the root CLAUDE.md gets three sections (appended when missing, the file created when absent):
-                 Where the rest of the rules are; Compact Instructions; Memory between sessions
+                 Where the rest of the rules are; Compact Instructions; Memory between sessions. A repository
+                 whose root file is .claude/CLAUDE.md, the other place Claude Code reads, gets them there
   claude-readme  .claude/README.md: what the folder holds, when Claude Code reads each part, the sizes and why
   rules          .claude/rules/before-a-commit.md and recording-decisions.md, two unscoped starter rules
   skills         .claude/skills/full-checks/SKILL.md and .claude/skills/push/SKILL.md, starters with placeholders
@@ -91,21 +92,25 @@ def build(root, config, only):
     wanted = set(only) if only else set(ITEMS)
 
     if "claude-md" in wanted:
-        path = os.path.join(root, "CLAUDE.md")
-        existing = common.read_text(path) if os.path.isfile(path) else ""
+        found = common.root_claude_md(root)
+        relative = found[0] if found else "CLAUDE.md"
+        path = os.path.join(root, relative)
+        # Both root files load whole, so a section in either one is had; what is missing goes into the first.
+        existing = "\n".join(common.read_text(os.path.join(root, p)) for p in found)
         have = {title.lower() for title, _ in sections_of(existing)}
         missing = [(t, b) for t, b in sections_of(template("CLAUDE.md.sections.md")) if t.lower() not in have]
-        if not existing:
+        if not found:
             head = template("CLAUDE.md.head.md")
             body = head + "\n" + "\n".join(b for _, b in missing)
             plan.file("claude-md", "CLAUDE.md", body)
         elif missing:
-            def do(path=path, existing=existing, missing=missing):
+            current = common.read_text(path)
+            def do(path=path, current=current, missing=missing):
                 with open(path, "w", encoding="utf-8", newline="\n") as handle:
-                    handle.write(existing.rstrip("\n") + "\n\n" + "\n".join(b for _, b in missing))
-            plan.add("claude-md", "CLAUDE.md", "append sections: " + ", ".join(t for t, _ in missing), do)
+                    handle.write(current.rstrip("\n") + "\n\n" + "\n".join(b for _, b in missing))
+            plan.add("claude-md", relative, "append sections: " + ", ".join(t for t, _ in missing), do)
         else:
-            plan.add("claude-md", "CLAUDE.md", "kept (has every section)")
+            plan.add("claude-md", relative, "kept (has every section)")
 
     if "claude-readme" in wanted:
         plan.file("claude-readme", ".claude/README.md", template("claude-readme.md"))
@@ -140,9 +145,9 @@ def build(root, config, only):
 def repository_row(root):
     """A row of the folder's table: the repository's name and the first line of its own CLAUDE.md that is not a heading."""
     words = "(say in a line what it is)"
-    path = os.path.join(root, "CLAUDE.md")
-    if os.path.isfile(path):
-        for line in common.read_text(path).split("\n"):
+    found = common.root_claude_md(root)
+    if found:
+        for line in common.read_text(os.path.join(root, found[0])).split("\n"):
             line = line.strip()
             if line and not line.startswith("#") and not line.startswith("<!--") and not line.startswith("|"):
                 words = line[:100].rstrip() + ("..." if len(line) > 100 else "")
@@ -159,20 +164,23 @@ def build_folder(folder, roots, only):
         compact = "".join(body for title, body in sections_of(template("CLAUDE.md.sections.md")) if title.lower() == "compact instructions")
         text = (template("CLAUDE.md.folder.md").replace("{count}", str(len(roots)))
                 .replace("{rows}", "\n".join(repository_row(root) for root in roots)).replace("{compact}", compact + "\n"))
-        path = os.path.join(folder, "CLAUDE.md")
-        existing = common.read_text(path) if os.path.isfile(path) else ""
-        if not existing:
+        found = common.root_claude_md(folder)
+        relative = found[0] if found else "CLAUDE.md"
+        path = os.path.join(folder, relative)
+        if not found:
             plan.file("claude-md", "CLAUDE.md", text)
         else:
+            existing = "\n".join(common.read_text(os.path.join(folder, p)) for p in found)
             have = {title.lower() for title, _ in sections_of(existing)}
             missing = [(t, b) for t, b in sections_of(text) if t.lower() not in have]
             if missing:
-                def do(path=path, existing=existing, missing=missing):
+                current = common.read_text(path)
+                def do(path=path, current=current, missing=missing):
                     with open(path, "w", encoding="utf-8", newline="\n") as handle:
-                        handle.write(existing.rstrip("\n") + "\n\n" + "\n".join(b for _, b in missing))
-                plan.add("claude-md", "CLAUDE.md", "append sections: " + ", ".join(t for t, _ in missing), do)
+                        handle.write(current.rstrip("\n") + "\n\n" + "\n".join(b for _, b in missing))
+                plan.add("claude-md", relative, "append sections: " + ", ".join(t for t, _ in missing), do)
             else:
-                plan.add("claude-md", "CLAUDE.md", "kept (has every section)")
+                plan.add("claude-md", relative, "kept (has every section)")
     if "config" in wanted:
         plan.file("config", common.CONFIG_FILE, template("bowline.json"))
     return plan

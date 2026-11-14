@@ -138,7 +138,7 @@ def oversized(root, config, facts=None):
         _, facts = budget.measure(root, config)
     out = []
     for path, lines, chars in facts["claudeMd"]:
-        nested = os.path.dirname(path) != ""
+        nested = not common.is_root_claude_md(path)
         if lines >= limits["claudeMdLines"]:
             out.append((path, lines, chars, f"{lines} lines, over the target of {limits['claudeMdLines']}"))
         elif nested and chars > limits["onDemandCutoffSmallWindow"]:

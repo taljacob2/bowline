@@ -10,6 +10,7 @@ whether it was observed on a machine.
 | Fact | Value | Documented or observed | Source |
 |---|---|---|---|
 | The root `CLAUDE.md`, and every `CLAUDE.md` in a folder above the working directory, load whole at the start of a session, up to a ceiling | 4 MiB per file; a file over it is skipped entirely | Documented | memory.md |
+| Where the root `CLAUDE.md` can be | `./CLAUDE.md` or `./.claude/CLAUDE.md`; bowline treats both as the root file, counts a section in either, and names both when both exist | Documented: "A project CLAUDE.md can be stored in either `./CLAUDE.md` or `./.claude/CLAUDE.md`", and unscoped rules "are loaded at launch with the same priority as `.claude/CLAUDE.md`"; what happens when both exist is not documented | memory.md |
 | A `CLAUDE.md` in a subfolder loads on demand, when a file under that folder is read or edited | | Documented ("a `Loaded` line appears") | memory.md |
 | A nested `CLAUDE.md` or a scoped rule that loads on demand is cut | 40,000 characters on a 200K context window; 150,000 characters on a 1M window with current models (200,000 on some older ones) | Documented; the text past the cut is not dropped silently: Claude gets a note that it may read the rest with the Read tool, "and until Claude chooses to, the later instructions aren't in its context" | memory.md |
 | The size the documentation recommends for any `CLAUDE.md` | under 200 lines; "files over 200 lines consume more context and may reduce adherence" | Documented; a startup warning and `/status` warn above it | memory.md |
