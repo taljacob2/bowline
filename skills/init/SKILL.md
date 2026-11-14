@@ -56,7 +56,7 @@ person's.
 ## From a folder of repositories
 
 When the session runs in a folder that is not a repository but holds several, `init --plan` plans the folder's own
-scaffold: `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/folder-CLAUDE.md`, an index with a table of the
+scaffold: `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.folder.md`, an index with a table of the
 repositories, what applies to every repository, the Compact Instructions and a memory section that says the memory is
 one for the whole folder; and the shared `.claude/bowline.json`, the layer every repository's own lies over. Show the
 template, write with `--write`, then fill the table with the person: a line for each repository and how they call one

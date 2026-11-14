@@ -6,7 +6,7 @@ change together and the entry here says which.
 
 ## Unreleased
 
-- `init` from a folder of repositories scaffolds the folder itself: its own `CLAUDE.md` from `templates/folder-CLAUDE.md`,
+- `init` from a folder of repositories scaffolds the folder itself: its own `CLAUDE.md` from `templates/CLAUDE.md.folder.md`,
   an index with a table of the repositories (a line for each, taken from its own `CLAUDE.md`), what applies to every
   repository, the Compact Instructions and a memory section that says the memory is one for the whole folder; and the
   shared `.claude/bowline.json`. `init --each` plans or writes the repository scaffold in every repository of the folder.

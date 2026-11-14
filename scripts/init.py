@@ -157,7 +157,7 @@ def build_folder(folder, roots, only):
     wanted = set(only) if only else set(FOLDER_ITEMS)
     if "claude-md" in wanted:
         compact = "".join(body for title, body in sections_of(template("CLAUDE.md.sections.md")) if title.lower() == "compact instructions")
-        text = (template("folder-CLAUDE.md").replace("{count}", str(len(roots)))
+        text = (template("CLAUDE.md.folder.md").replace("{count}", str(len(roots)))
                 .replace("{rows}", "\n".join(repository_row(root) for root in roots)).replace("{compact}", compact + "\n"))
         path = os.path.join(folder, "CLAUDE.md")
         existing = common.read_text(path) if os.path.isfile(path) else ""

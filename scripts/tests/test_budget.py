@@ -57,6 +57,13 @@ class BudgetTests(ScratchRepo):
         self.assertEqual(code, 1, out)
         self.assertIn("unscoped rules load", out)
 
+    def test_only_files_named_exactly_claude_md_count(self):
+        write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n")
+        write(os.path.join(self.repo, "notes", "old-CLAUDE.md"), "# Not loaded by Claude Code\n" + "line\n" * 300)
+        code, out, err = self.run_script("budget")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("1 CLAUDE.md file(s)", out)
+
 
 if __name__ == "__main__":
     unittest.main()

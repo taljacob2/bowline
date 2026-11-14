@@ -70,6 +70,8 @@ def measure(root, config):
     facts = {"claudeMd": [], "rules": [], "areas": {}, "unscoped": 0, "skills": []}
 
     for path in common.tracked_files(root, "*CLAUDE.md"):
+        if os.path.basename(path) != "CLAUDE.md":
+            continue        # Claude Code loads files named exactly CLAUDE.md; a template or a note named like one is not read
         text = common.read_text(os.path.join(root, path))
         lines = common.count_lines(text)
         facts["claudeMd"].append((path, lines, len(text)))
