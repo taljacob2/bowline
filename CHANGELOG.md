@@ -11,6 +11,13 @@ change together and the entry here says which.
   a folder it exited with code 2, "not inside a git repository", and for a PreToolUse hook that code means block: every
   commit Claude issued there was refused. When the gate cannot tell which repository is meant, it now lets the command
   through and says nothing; it never blocks on its own confusion.
+- A folder of repositories, as with services cloned side by side, is a place bowline works from. The doctor, the
+  one-line finding at a session's start, the budget and the gate's plain mode measure the folder's own `CLAUDE.md` and
+  every repository directly under it and name the repository in each finding; the memory is the folder's, keyed as
+  Claude Code keys it; autosplit and the reminders run across the repositories, each split on a branch of its own
+  repository; a `.claude/bowline.json` in the folder is the layer every repository shares, under its own. `move` takes
+  the repository from the file it is given; `init` says to run it inside each repository. `docs/decisions.md` has the
+  shape and what was left out: depths beyond one level, and a scaffold for the folder itself.
 - A `release` skill under `.claude/skills/`: the checks, the version in the plugin manifest (the only thing Claude Code
   reads to decide that an update exists), the changelog heading, `claude plugin validate`, one commit, the push to main,
   a plain `X.Y.Z` tag and the proof on this machine. `docs/decisions.md` says why the tag is plain and not the

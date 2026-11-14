@@ -137,20 +137,37 @@ def measure(root, config):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Refuses an instruction file over the sizes Claude Code reads.")
-    parser.add_argument("--repo", help="a path inside the repository (default: the current folder)")
+    parser.add_argument("--repo", help="a path inside the repository, or a folder of repositories (default: the current folder)")
     options = parser.parse_args(argv)
-    root = common.repo_root(options.repo)
-    if not root:
-        print("bowline budget: not inside a git repository.", file=sys.stderr)
+    workspace, roots = common.roots_for(options.repo)
+    if not roots:
+        print("bowline budget: not inside a git repository, and this folder holds none.", file=sys.stderr)
         return 2
-    config = common.load_config(root)
-    findings, facts = measure(root, config)
+    if workspace is None:
+        config = common.load_config(roots[0])
+        findings, facts = measure(roots[0], config)
+        if findings:
+            problems = common.print_findings(findings, "bowline budget")
+            return 1 if problems else 0
+        areas = ", ".join(f"{name} {chars:,}" for name, chars in sorted(facts["areas"].items())) or "none"
+        print(f"bowline budget: within limits. Scoped rules per area: {areas}; unscoped, every session: {facts['unscoped']:,}; "
+              f"{len(facts['claudeMd'])} CLAUDE.md file(s), {len(facts['skills'])} skill(s).")
+        return 0
+    findings, summaries = [], []
+    for root in [workspace] + roots:
+        name = os.path.basename(root)
+        found, facts = measure(root, common.load_config(root))
+        for finding in found:
+            finding.what = f"{name}: {finding.what}"
+        findings += found
+        areas = ", ".join(f"{area} {chars:,}" for area, chars in sorted(facts["areas"].items())) or "none"
+        summaries.append(f"  {name}: {len(facts['claudeMd'])} CLAUDE.md file(s); scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; {len(facts['skills'])} skill(s)")
     if findings:
         problems = common.print_findings(findings, "bowline budget")
         return 1 if problems else 0
-    areas = ", ".join(f"{name} {chars:,}" for name, chars in sorted(facts["areas"].items())) or "none"
-    print(f"bowline budget: within limits. Scoped rules per area: {areas}; unscoped, every session: {facts['unscoped']:,}; "
-          f"{len(facts['claudeMd'])} CLAUDE.md file(s), {len(facts['skills'])} skill(s).")
+    print(f"bowline budget: within limits across the folder and its {len(roots)} repositories.")
+    for line in summaries:
+        print(line)
     return 0
 
 

@@ -1,6 +1,7 @@
 """What bowline's scripts share: where the repository and Claude Code's folders are, the configuration, and how a finding
 is printed. Standard library only; Python 3.8 or later; Windows, Linux and macOS alike."""
 
+import fnmatch
 import json
 import os
 import re
@@ -32,8 +33,34 @@ def repo_root(start=None):
     return os.path.normpath(result.stdout.decode("utf-8", "replace").strip())
 
 
+def child_repositories(folder):
+    """The git repositories directly under a folder: every child that holds a .git entry (a folder, or a worktree's file)."""
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return []
+    return [os.path.normpath(os.path.join(folder, name)) for name in names
+            if not name.startswith(".") and os.path.isdir(os.path.join(folder, name))
+            and os.path.exists(os.path.join(folder, name, ".git"))]
+
+
+def roots_for(start=None):
+    """Where bowline works from a path, as (folder of repositories or None, repository roots). Inside a repository:
+    (None, [its root]). In a folder that is not a repository but holds repositories, as with services cloned side by
+    side: (the folder, their roots). Anywhere else: (None, [])."""
+    root = repo_root(start)
+    if root:
+        return None, [root]
+    folder = os.path.normpath(os.path.abspath(start or os.getcwd()))
+    repos = child_repositories(folder)
+    return (folder if repos else None), repos
+
+
 def main_checkout(start=None):
-    """The repository's main checkout, even from a worktree: Claude Code keys the memory folder on it."""
+    """The repository's main checkout, even from a worktree: Claude Code keys the memory folder on it. Outside a
+    repository, the folder itself: Claude Code keys the memory of a session started there on that folder."""
+    if repo_root(start) is None:
+        return os.path.normpath(os.path.abspath(start or os.getcwd()))
     out = run_git(["-C", start or os.getcwd(), "rev-parse", "--path-format=absolute", "--git-common-dir"]).strip()
     common = os.path.normpath(out)
     if os.path.basename(common) == ".git":
@@ -86,24 +113,49 @@ def defaults_path():
 
 
 def load_config(root):
-    """The plugin's defaults, with the repository's .claude/bowline.json laid over them when it exists."""
+    """The plugin's defaults, with the repository's .claude/bowline.json laid over them when it exists. A repository that
+    sits in a folder of repositories gets that folder's .claude/bowline.json laid in between, as the layer they share."""
     with open(defaults_path(), encoding="utf-8") as handle:
         config = json.load(handle)
-    if root:
-        path = os.path.join(root, CONFIG_FILE)
+    if not root:
+        return config
+    layers = []
+    parent = os.path.dirname(os.path.normpath(root))
+    if parent and parent != os.path.normpath(root) and os.path.isfile(os.path.join(parent, CONFIG_FILE)) and repo_root(parent) is None:
+        layers.append(os.path.join(parent, CONFIG_FILE))
+    layers.append(os.path.join(root, CONFIG_FILE))
+    for path in layers:
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as handle:
                 try:
                     config = deep_merge(config, json.load(handle))
                 except json.JSONDecodeError as problem:
-                    print(f"bowline: {CONFIG_FILE} is not valid JSON ({problem}); using the defaults.", file=sys.stderr)
+                    print(f"bowline: {path} is not valid JSON ({problem}); using what is below it.", file=sys.stderr)
     return config
 
 
 def tracked_files(root, pattern):
-    """Files matching the pattern that git tracks or would add: committed, staged and untracked, ignored ones left out."""
+    """Files matching the pattern that git tracks or would add: committed, staged and untracked, ignored ones left out.
+    In a folder that is not a repository, the files on disk under it, leaving out its child repositories (each is
+    measured on its own), .git folders and node_modules."""
+    if repo_root(root) is None:
+        return walk_files(root, pattern)
     out = run_git(["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", pattern])
     return sorted({p for p in out.split("\0") if p})
+
+
+def walk_files(root, pattern):
+    """The files under a folder whose path, relative to it, matches a git-style pattern ('.' means every file); child
+    repositories, .git folders and node_modules are not entered."""
+    found = []
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in (".git", "node_modules") and not os.path.exists(os.path.join(folder, d, ".git")))
+        rel_folder = os.path.relpath(folder, root).replace("\\", "/")
+        for name in files:
+            rel = name if rel_folder == "." else rel_folder + "/" + name
+            if pattern == "." or fnmatch.fnmatchcase(rel, pattern):
+                found.append(rel)
+    return sorted(found)
 
 
 def read_text(path):

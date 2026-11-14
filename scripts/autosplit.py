@@ -190,17 +190,16 @@ def do_hook(options):
             cwd = facts.get("cwd") or None
     except Exception:
         cwd = None
-    root = common.repo_root(cwd or options.repo or os.getcwd())
-    if not root:
-        return 0
-    config = common.load_config(root)
-    if not settings(config).get("enabled"):
-        return 0
-    for path, lines, chars, why in oversized(root, config):
-        if load_state(root, path) is not None or waiting_reason(root, config, path):
+    _, roots = common.roots_for(cwd or options.repo or os.getcwd())
+    for root in roots:
+        config = common.load_config(root)
+        if not settings(config).get("enabled"):
             continue
-        if claim(root, path):
-            start_worker(root, path, lines, chars, why)
+        for path, lines, chars, why in oversized(root, config):
+            if load_state(root, path) is not None or waiting_reason(root, config, path):
+                continue
+            if claim(root, path):
+                start_worker(root, path, lines, chars, why)
     return 0
 
 
@@ -729,7 +728,14 @@ def main(argv=None):
         return 2
     root = common.repo_root(options.repo or os.getcwd())
     if not root:
-        print("bowline autosplit: not inside a git repository.", file=sys.stderr)
+        workspace, roots = common.roots_for(options.repo or os.getcwd())
+        if roots and options.command == "status":
+            for root in roots:
+                do_status(root, common.load_config(root))
+                print()
+            return 0
+        hint = " From a folder of repositories, pass --repo <one of them>." if roots else ", and this folder holds none."
+        print("bowline autosplit: not inside a git repository" + (hint if roots else hint), file=sys.stderr)
         return 2
     config = common.load_config(root)
     if options.command == "status":

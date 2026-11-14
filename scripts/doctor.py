@@ -16,6 +16,9 @@ For each finding it prints three lines: what it found, why it matters, what to d
   whether the repository has a .claude/bowline.json;
 - a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
   not started, when the repository turned autosplit on.
+From a folder that is not a repository but holds several, as with services cloned side by side, it measures the
+folder's own CLAUDE.md and every repository directly under it, names the repository in each finding, and reads the
+one memory folder Claude Code keeps for a session started there.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run. The three hook modes always exit 0.
 
@@ -191,17 +194,74 @@ def layout_findings(root):
     return findings
 
 
-def urgent_findings(root, config, no_memory):
-    """The problems and warnings that the brief, the watch and the reminders share, measured as the full doctor measures."""
+class Survey:
+    """What the doctor finds from a path. `workspace` is the folder of repositories when the path is in one and not in a
+    repository, else None; `roots` the repository roots; `parts` (name, root, facts, config) for the sizes, the name
+    None for a single repository; `findings` every finding, each prefixed with its repository's name when there are
+    several, or None when the path is in no repository and holds none."""
+
+    def __init__(self, start, no_memory):
+        self.workspace, self.roots = common.roots_for(start)
+        self.parts, self.findings = [], None
+        if not self.roots:
+            return
+        if self.workspace is None:
+            root = self.roots[0]
+            config = common.load_config(root)
+            findings, facts = repository_findings(root, config)
+            if not no_memory:
+                findings += memory_findings(root, config)
+            self.findings = findings
+            self.parts.append((None, root, facts, config))
+            return
+        self.findings = []
+        shared = common.load_config(self.workspace)
+        budget_findings, facts = budget.measure(self.workspace, shared)
+        own = workspace_findings(self.workspace, facts) + budget_findings
+        self.findings += label(own, os.path.basename(self.workspace))
+        self.parts.append((os.path.basename(self.workspace), self.workspace, facts, shared))
+        for root in self.roots:
+            config = common.load_config(root)
+            findings, facts = repository_findings(root, config)
+            self.findings += label(findings, os.path.basename(root))
+            self.parts.append((os.path.basename(root), root, facts, config))
+        if not no_memory:
+            self.findings += memory_findings(self.workspace, shared)
+
+    def urgent(self):
+        return [f for f in self.findings or [] if f.level in ("problem", "warning")]
+
+
+def repository_findings(root, config):
+    """One repository's findings, in the doctor's order, and the sizes measured on the way."""
     budget_findings, facts = budget.measure(root, config)
-    findings = [f for f in autosplit.findings(root, config, facts) if f.level != "note"]
-    findings += claude_md_findings(root, config, facts)
-    findings += [f for f in budget_findings if f.level == "problem"]
-    findings += [f for f in root_claude_md_findings(root, facts) if f.level != "note"]
-    if not no_memory:
-        findings += [f for f in memory_findings(root, config) if f.level != "note"]
+    findings = claude_md_findings(root, config, facts)
+    findings += autosplit.findings(root, config, facts)
+    findings += budget_findings
+    findings += root_claude_md_findings(root, facts)
+    findings += layout_findings(root)
     autosplit.adjust(findings, root)
-    return [f for f in findings if f.level in ("problem", "warning")]
+    return findings, facts
+
+
+def workspace_findings(workspace, facts):
+    """The folder's own CLAUDE.md, the file that loads whole at the start of a session started in the folder."""
+    roots = [p for p, _, _ in facts["claudeMd"] if os.path.dirname(p) == ""]
+    if not roots:
+        return [common.Finding(
+            "note", "The folder itself has no CLAUDE.md.",
+            "A session started in the folder loads a CLAUDE.md there whole, at its start; it is the place to say in a few lines what the repositories are and how they relate.",
+            "Write one by hand, under 200 lines; bowline init does not scaffold a folder of repositories yet.")]
+    return root_claude_md_findings(workspace, facts)
+
+
+def label(findings, name):
+    """Prefixes each finding with its repository's name, and names the repository in the commands a fix gives."""
+    for finding in findings:
+        finding.what = f"{name}: {finding.what}"
+        if finding.fix and "--file " in finding.fix:
+            finding.fix = re.sub(r"(--file \S+)", lambda m: f"{m.group(1)} --repo {name}", finding.fix)
+    return findings
 
 
 def finding_key(finding):
@@ -209,19 +269,22 @@ def finding_key(finding):
     return re.sub(r"\d[\d,.]*", "#", finding.what)
 
 
-def watch_path(root):
-    return os.path.join(os.path.dirname(autosplit.state_dir(root)), "watch.json")
+def watch_file(workspace, roots):
+    """Where the reminders' record lives: beside the autosplit records in the repository's git folder, or, for a folder
+    of repositories, in Claude Code's project folder for it, the same place its memory lives."""
+    if workspace:
+        return os.path.join(common.project_folder(workspace), "bowline", "watch.json")
+    return os.path.join(os.path.dirname(autosplit.state_dir(roots[0])), "watch.json")
 
 
-def load_watch(root):
-    data = autosplit.read_json(watch_path(root))
+def load_watch(path):
+    data = autosplit.read_json(path)
     if data is None:
         return None
     return {"told": list(data.get("told") or []), "pending": list(data.get("pending") or [])}
 
 
-def save_watch(root, watch):
-    path = watch_path(root)
+def save_watch(path, watch):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     temp = path + ".tmp"
     with open(temp, "w", encoding="utf-8", newline="\n") as handle:
@@ -242,24 +305,25 @@ def hook_cwd(default):
 
 def do_watch(options):
     """The Stop hook (--watch) and the UserPromptSubmit hook (--pending). Prints nothing when there is nothing new."""
-    root = common.repo_root(hook_cwd(options.repo or os.getcwd()))
-    if not root:
+    start = hook_cwd(options.repo or os.getcwd())
+    workspace, roots = common.roots_for(start)
+    if not roots:
         return 0
-    watch = load_watch(root)
+    path = watch_file(workspace, roots)
+    watch = load_watch(path)
     if options.pending:
         if watch and watch["pending"]:
             print("bowline found this during the session, after the last reply; tell the person in a sentence and name the skill that fixes it:")
             for line in watch["pending"]:
                 print(f"- {line}")
             watch["pending"] = []
-            save_watch(root, watch)
+            save_watch(path, watch)
         return 0
-    config = common.load_config(root)
-    urgent = urgent_findings(root, config, options.no_memory)
+    urgent = Survey(start, options.no_memory).urgent()
     keys = [finding_key(f) for f in urgent]
     if watch is None:
         # No record yet: the session's start said whatever was there, so nothing counts as new this time.
-        save_watch(root, {"told": keys, "pending": []})
+        save_watch(path, {"told": keys, "pending": []})
         return 0
     told = set(watch["told"])
     new = [f for f, key in zip(urgent, keys) if key not in told]
@@ -268,13 +332,13 @@ def do_watch(options):
         lines = [f"{f.what} Fix: {f.fix or 'run /bowline:doctor'}" for f in new]
         watch["pending"] = (watch["pending"] + lines)[-10:]
         print(json.dumps({"systemMessage": "bowline: " + "\n".join(lines)}))
-    save_watch(root, watch)
+    save_watch(path, watch)
     return 0
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Measures a repository and this machine against what Claude Code reads.")
-    parser.add_argument("--repo", help="a path inside the repository (default: the current folder)")
+    parser.add_argument("--repo", help="a path inside the repository, or a folder of repositories (default: the current folder)")
     parser.add_argument("--no-memory", action="store_true", help="skip the memory folder checks (for CI)")
     parser.add_argument("--brief", action="store_true",
                         help="one line per problem or warning and nothing when clean; always exit 0 (for a SessionStart hook)")
@@ -286,46 +350,45 @@ def main(argv=None):
             return do_watch(options)
         except BaseException:  # noqa: BLE001 - a hook must never fail a reply or a prompt
             return 0
-    root = common.repo_root(options.repo)
-    if not root:
-        if options.brief:
-            return 0
-        print("bowline doctor: not inside a git repository.", file=sys.stderr)
-        return 2
-    config = common.load_config(root)
     if options.brief:
         try:
-            urgent = urgent_findings(root, config, options.no_memory)
-            save_watch(root, {"told": [finding_key(f) for f in urgent], "pending": []})
+            survey = Survey(options.repo, options.no_memory)
+            if survey.findings is None:
+                return 0
+            urgent = survey.urgent()
+            save_watch(watch_file(survey.workspace, survey.roots), {"told": [finding_key(f) for f in urgent], "pending": []})
         except Exception:
             return 0
         if urgent:
-            print(f"bowline found {len(urgent)} thing(s) about this repository's instructions or memory worth a look; run /bowline:doctor for the report. The first:")
+            whose = "this folder's repositories" if survey.workspace else "this repository's"
+            print(f"bowline found {len(urgent)} thing(s) about {whose} instructions or memory worth a look; run /bowline:doctor for the report. The first:")
             for finding in urgent[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
         return 0
-    print(f"bowline doctor: {root}")
-    print(f"limits from defaults.json (facts checked against the Claude Code docs on {config.get('checkedAgainstDocs')})"
-          + (f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(root, common.CONFIG_FILE)) else ""))
-    print()
 
-    budget_findings, facts = budget.measure(root, config)
-    findings = []
-    findings += claude_md_findings(root, config, facts)
-    findings += autosplit.findings(root, config, facts)
-    findings += [f for f in budget_findings if "names a path" in f.what or "lines; the target" in f.what or "characters" in f.what]
-    findings += root_claude_md_findings(root, facts)
-    if not options.no_memory:
-        findings += memory_findings(root, config)
-    findings += layout_findings(root)
-
-    for path, lines, chars in facts["claudeMd"]:
-        print(f"  {path}: {lines} lines, {chars:,} characters")
-    areas = ", ".join(f"{name} {chars:,}" for name, chars in sorted(facts["areas"].items())) or "none"
-    print(f"  scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; skills: {len(facts['skills'])}")
+    survey = Survey(options.repo, options.no_memory)
+    if survey.findings is None:
+        print("bowline doctor: not inside a git repository, and this folder holds none.", file=sys.stderr)
+        return 2
+    config = survey.parts[0][3]
+    if survey.workspace:
+        names = ", ".join(os.path.basename(r) for r in survey.roots)
+        print(f"bowline doctor: {survey.workspace}, a folder of {len(survey.roots)} repositories: {names}")
+        with_config = [name for name, root, _, _ in survey.parts if os.path.isfile(os.path.join(root, common.CONFIG_FILE))]
+        suffix = f", with {common.CONFIG_FILE} in {', '.join(with_config)}" if with_config else ""
+    else:
+        print(f"bowline doctor: {survey.roots[0]}")
+        suffix = f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(survey.roots[0], common.CONFIG_FILE)) else ""
+    print(f"limits from defaults.json (facts checked against the Claude Code docs on {config.get('checkedAgainstDocs')})" + suffix)
     print()
-    autosplit.adjust(findings, root)
-    problems = common.print_findings(findings, "bowline doctor")
+    for name, root, facts, _ in survey.parts:
+        head = f"{name}: " if name else ""
+        for path, lines, chars in facts["claudeMd"]:
+            print(f"  {head}{path}: {lines} lines, {chars:,} characters")
+        areas = ", ".join(f"{area} {chars:,}" for area, chars in sorted(facts["areas"].items())) or "none"
+        print(f"  {head}scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; skills: {len(facts['skills'])}")
+    print()
+    problems = common.print_findings(survey.findings, "bowline doctor")
     return 1 if problems else 0
 
 

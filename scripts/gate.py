@@ -165,6 +165,27 @@ def commit_repository(command, start):
     return common.repo_root(where)
 
 
+def run_many(roots, options):
+    """The gate over every repository in a folder of them, each with its own policy, the repository named in every line."""
+    total = 0
+    what = "tracked lines" if options.all else "added lines"
+    for root in roots:
+        name = os.path.basename(root)
+        policy = Policy(common.load_config(root), options.never_commit)
+        problems, warnings, checked = run(root, policy, options.all)
+        for line in warnings:
+            print(f"warning: {name}: {line}")
+        for line in problems:
+            print(f"{name}: {line}")
+        print(f"{name}: {checked} {what} checked, {len(problems)} problem(s), {len(warnings)} warning(s).")
+        total += len(problems)
+    if total:
+        print(f"bowline gate: {total} problem(s) across {len(roots)} repositories. Fix them before committing.")
+        return 1
+    print(f"bowline gate: nothing found across {len(roots)} repositories.")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Refuses a commit whose added lines hold what must never be committed.")
     parser.add_argument("--all", action="store_true", help="check every tracked text file instead of the staged diff")
@@ -187,7 +208,10 @@ def main(argv=None):
     else:
         root = common.repo_root(options.repo)
         if not root:
-            print("bowline gate: not inside a git repository. From a folder of repositories, pass --repo <one of them>.", file=sys.stderr)
+            workspace, roots = common.roots_for(options.repo)
+            if roots:
+                return run_many(roots, options)
+            print("bowline gate: not inside a git repository, and this folder holds none.", file=sys.stderr)
             return 2
     config = common.load_config(root)
     policy = Policy(config, options.never_commit)

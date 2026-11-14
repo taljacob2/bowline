@@ -138,7 +138,10 @@ def main(argv=None):
     options = parser.parse_args(argv)
     root = common.repo_root(options.repo)
     if not root:
-        print("bowline init: not inside a git repository.", file=sys.stderr)
+        _, repos = common.roots_for(options.repo)
+        hint = (f" This folder holds {len(repos)} repositories ({', '.join(os.path.basename(r) for r in repos)}): run init inside each;"
+                " a scaffold for the folder itself is not here yet.") if repos else ", and this folder holds none."
+        print("bowline init: not inside a git repository" + hint, file=sys.stderr)
         return 2
     only = [i.strip() for i in options.only.split(",")] if options.only else None
     if only and any(i not in ITEMS for i in only):

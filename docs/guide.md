@@ -146,6 +146,19 @@ to the end sets `deliver` to `merge`, and the worker takes the two commits onto 
 clean, and the doctor says what landed until you acknowledge it. Autosplit is off until a repository turns it on in
 `.claude/bowline.json`, and the doctor says at every stage what is happening and why.
 
+## A folder of repositories
+
+Claude Code can be started in a folder that is not a repository but holds several, as with services cloned side by
+side. Its documentation says how such a session loads: the folder's own `CLAUDE.md` loads whole at the start; each
+repository's `CLAUDE.md`, and the rules under its `.claude/rules/`, load on demand, when a file under that repository is
+read or edited; and the memory is one folder for the whole workspace, keyed on the folder, because "outside a git repo,
+the project root is used instead". bowline follows the same shape. The doctor, the budget, the one-line finding at a
+session's start and the reminders measure the folder's own `CLAUDE.md` and every repository directly under it, and name
+the repository in each finding. The gate finds the repository a commit names. Autosplit works per repository, each
+split on a branch of its own repository, and a `.claude/bowline.json` in the folder is the layer every repository
+shares, under its own. `init` and `move` work inside one repository at a time; from the folder, `move` takes the
+repository from the file it is given, and `init` says to run it inside each repository.
+
 ## What bowline does, and what it leaves to you
 
 The mechanics are automatic: the memory push after every reply, the gate before a commit, the one-line finding at a

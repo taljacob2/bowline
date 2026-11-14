@@ -140,7 +140,7 @@ def do_setup(options, words):
         raise SystemExit(
             f"bowline memory: Claude Code has not made a project folder for {checkout} yet (expected {project}).\n"
             "Start Claude Code once inside the repository, then run this again.")
-    print(f"repository: {checkout}")
+    print(f"{'repository' if common.repo_root(checkout) else 'folder'}: {checkout}")
     print(f"memory folder: {memory}")
     tie(memory, options.remote, options.dry_run)
     if options.no_hook:
@@ -154,7 +154,7 @@ def do_setup(options, words):
 def do_status(options):
     repo = options.repo or os.getcwd()
     checkout, memory = memory_for(repo)
-    print(f"repository: {checkout}")
+    print(f"{'repository' if common.repo_root(checkout) else 'folder'}: {checkout}")
     print(f"memory folder: {memory}")
     if not os.path.isdir(memory):
         print("state: the folder does not exist yet; Claude Code makes it at the first memory it keeps.")

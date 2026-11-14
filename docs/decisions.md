@@ -72,3 +72,21 @@ and the four tags that exist are plain. The procedure is the `release` skill und
 **Not chosen.** `claude plugin tag`, which also validates the manifests, because its tag name cannot be changed;
 `claude plugin validate .` gives the same check inside the skill. Pinning the marketplace entry to a tag with `ref`,
 which would make a stable channel: not wanted while every version is meant to be the one people run.
+
+## 2026-11-14: a folder of repositories is one place with several repositories in it
+
+**The question.** The first user keeps services as repositories cloned side by side under one folder and starts
+Claude Code in that folder. bowline assumed a single repository: from such a folder every command stopped at "not
+inside a git repository", and the gate's hook, exiting with code 2 there, blocked every commit Claude issued.
+
+**The decision.** The folder is a place bowline works from, with the shape Claude Code's own loading gives it: the
+folder's own CLAUDE.md is the root that loads whole, each repository directly under it is measured on its own and named
+in every finding, the memory is the folder's one memory as Claude Code keeps it, and a .claude/bowline.json in the
+folder is the layer every repository shares, under its own. Autosplit runs per repository, on a branch of that
+repository. The gate's hook works out which repository a commit names and, when it cannot, lets the command through: a
+hook that blocks on its own confusion costs more than the check it skips, and git refuses a commit outside a repository
+anyway.
+
+**Not chosen.** Looking deeper than one level: a repository inside a repository is that repository's business, and a
+folder of folders of repositories is rare enough to wait for someone who has one. Scaffolding the folder itself with
+init: the folder's CLAUDE.md is a few lines naming the repositories, written by hand for now. Both can come when asked.

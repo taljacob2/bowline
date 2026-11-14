@@ -60,6 +60,17 @@ python -I bowline/scripts/bowline.py memory setup git@github.com:<you>/<private 
 | `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
 | `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `deliver` chooses between that branch (the default) and merging onto your branch on its own when your tree is clean. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
 
+## A folder of repositories
+
+Claude Code can be started in a folder that is not a repository but holds several, as with services cloned side by
+side. bowline works there too. The doctor, the budget, the one-line finding at a session's start and the reminders
+measure the folder's own `CLAUDE.md` and every repository directly under it, and name the repository in each finding.
+The gate finds the repository a commit names (`git -C repo1 commit`, `cd repo1 && git commit`). The memory is the
+folder's one memory, as Claude Code keeps it. Autosplit works per repository, each split on a branch of its own
+repository, and a `.claude/bowline.json` in the folder is the layer every repository shares, under its own. `init` and
+`move` work inside one repository at a time: from the folder, `move` takes the repository from the file it is given,
+and `init` says to run it inside each repository.
+
 ## The skills, for Claude Code
 
 `skills/` holds the six procedures Claude runs these tools through, with the person in the loop: `doctor`, `init`,

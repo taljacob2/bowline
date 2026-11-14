@@ -7,7 +7,8 @@ description: Measure this repository and this machine against what Claude Code a
 
 The doctor changes nothing. It measures and says, for each finding, what it found, why it matters and what to do.
 The one line at a session's start, and a reminder during a session when something crosses a limit, are the same
-findings in short; this skill is the full report.
+findings in short; this skill is the full report. From a folder of repositories, each finding starts with the
+repository's name, and the memory finding is the folder's.
 
 ## Run it
 

@@ -312,8 +312,10 @@ def main(argv=None):
     p = sub.add_parser("place"); p.add_argument("--spec", required=True); p.add_argument("--check", action="store_true")
     p.add_argument("--allow-unknown", action="store_true"); p.add_argument("--repo")
     options = parser.parse_args(argv)
+    if not options.repo and getattr(options, "file", None):
+        options.repo = os.path.dirname(os.path.abspath(options.file)) or None     # the file's own repository, from any folder
     if not common.repo_root(options.repo):
-        print("bowline move: not inside a git repository.", file=sys.stderr)
+        print("bowline move: not inside a git repository. From a folder of repositories, pass --repo <the one the files are in>.", file=sys.stderr)
         return 2
     commands = {"plan": do_plan, "run": do_run, "find-pointers": do_find_pointers, "pointers": do_pointers, "place": do_place}
     return commands[options.command](options)
