@@ -73,6 +73,28 @@ drawn), [`docs/facts.md`](docs/facts.md) (what bowline measures against, with so
 [`docs/compared.md`](docs/compared.md) (how it differs from doing it by hand, from `claude-md-management`, and from
 Claude Code's own features) and [`docs/decisions.md`](docs/decisions.md) (the design questions that settled, and why).
 
+## What bowline reads, writes and sends
+
+bowline runs no service of its own, collects no telemetry and keeps no data anywhere but on your machine and in the
+places you name. Two features send data off the machine, and each one starts only when you turn it on:
+
+- **The memory backup.** Once you run `/bowline:memory-backup` with a git remote of your choosing, the plugin's hooks
+  push Claude Code's memory folder for the repository to that remote with git, after every reply and when a session
+  ends. The memory holds the notes Claude Code keeps about your work and about you, such as your role, your preferences
+  and your links, so it can hold personal data. Use a private repository; the skill says why. Nothing is pushed before
+  you set it up, and `memory status` shows where the backup goes.
+- **Autosplit.** When a repository turns `autosplit` on in its `.claude/bowline.json`, bowline starts a headless Claude
+  Code session on your machine to prepare the split of a `CLAUDE.md` that outgrew the limits. That session works like
+  any Claude Code session: it signs in as you, and what it reads of the repository goes to Anthropic. It never starts in
+  a repository that has not turned it on.
+
+What bowline reads: the repository's instruction files (`CLAUDE.md` files, rules and skills), the staged lines before a
+commit, Claude Code's memory folder for the repository, and a private list of words never to commit, at
+`~/.claude/private/never-commit.txt`, when that file exists. What it writes: the files `init` creates when you ask; the
+state of autosplit and of the reminders in the repository's own git folder, or, for a folder of repositories, in Claude
+Code's project folder for it; the commits of the memory backup in the memory folder; and, only when you run
+`memory setup` without the plugin, a hook entry in Claude Code's settings file. Nothing else is read, written or sent.
+
 ## Requirements
 
 Python 3.8 or later (standard library only), git, and Node.js on the PATH: Claude Code starts the plugin's hooks with

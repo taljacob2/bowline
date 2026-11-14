@@ -4,6 +4,14 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.6.1 (2026-11-14)
+
+- The plugin's README has a section, "What bowline reads, writes and sends", for the data-handling questions of
+  Anthropic's plugin directory. It names the two features that send data off the machine, both off until a person turns
+  them on: the memory backup, which pushes Claude Code's memory folder with git to a remote the person names, and
+  autosplit, whose headless Claude Code session talks to Anthropic as any session does. It lists what bowline reads and
+  writes, and says that nothing else is read, written or sent. The code is unchanged.
+
 ## 0.6.0 (2026-11-14)
 
 What Anthropic's plugin directory asked when it validated 0.5.3: the validation passed, with three holds for a
