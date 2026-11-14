@@ -149,7 +149,8 @@ clean, and the doctor says what landed until you acknowledge it. Autosplit is of
 ## What bowline does, and what it leaves to you
 
 The mechanics are automatic: the memory push after every reply, the gate before a commit, the one-line finding at a
-session's start when something is over budget or unbacked. Every change to your knowledge is a skill you or Claude
+session's start when something is over budget or unbacked, and one reminder during a session when something crosses
+a limit, said once and heard by Claude at your next message. Every change to your knowledge is a skill you or Claude
 invoke, with a plan you approve before anything moves: scaffolding the layout, sorting the memory, splitting a file,
 adopting a convention. A tool that rewrote the rules you work from in the background would be the one thing bowline
 exists to prevent, and autosplit keeps to that: it prepares the split of an oversized `CLAUDE.md` while you work, on a

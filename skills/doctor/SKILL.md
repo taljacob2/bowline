@@ -6,6 +6,8 @@ description: Measure this repository and this machine against what Claude Code a
 # The doctor
 
 The doctor changes nothing. It measures and says, for each finding, what it found, why it matters and what to do.
+The one line at a session's start, and a reminder during a session when something crosses a limit, are the same
+findings in short; this skill is the full report.
 
 ## Run it
 

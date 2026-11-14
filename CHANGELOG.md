@@ -33,6 +33,12 @@ background, on a branch of its own, and the person reviews and merges.
   with it, because an unattended session cannot write under `.claude/` itself: Claude Code treats that as a
   sensitive-file edit that only a person may approve, which the first live run found (`docs/facts.md` has the row, and
   `docs/decisions.md` says why the worker was not given `bypassPermissions` instead).
+- Reminders during a session. The doctor's `--watch` runs from the Stop hook after every reply: it measures again and,
+  when a finding appears that was not there before (a `CLAUDE.md` that crossed the line target, a rules area over its
+  budget, the memory index at its cap), shows the person one line in the doctor's words, once, not again as the file
+  keeps growing. `--pending` runs from a new UserPromptSubmit hook and hands the same line to Claude at the next
+  prompt, so "do it" means something. `--brief` records what it said at the session's start, so nothing is said twice.
+  The record is `<git dir>/bowline/watch.json`.
 - `autosplit.deliver` chooses how the result arrives: `branch` (the default) leaves the two commits for the person to
   review and cherry-pick; `merge` has the worker cherry-pick them onto the current branch as soon as they are ready,
   only onto a clean tree and only when they apply without a conflict, and the doctor says what landed until `done`.

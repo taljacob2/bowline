@@ -1,6 +1,9 @@
 """The doctor: measures a repository and this machine against what Claude Code reads, and says what to do.
 
     python -I scripts/doctor.py [--repo <path>] [--no-memory]
+    python -I scripts/doctor.py --brief [--no-memory]      one line per problem or warning, nothing when clean (the SessionStart hook)
+    python -I scripts/doctor.py --watch                    after a reply: one reminder to the person when something new crosses a limit (the Stop hook)
+    python -I scripts/doctor.py --pending                  before a prompt: the same reminder, once, for Claude (the UserPromptSubmit hook)
 
 For each finding it prints three lines: what it found, why it matters, what to do and which skill does it. It reports:
 - every CLAUDE.md against the line target, and for a nested one how much of it is never read on a 200K and on a 1M
@@ -14,7 +17,14 @@ For each finding it prints three lines: what it found, why it matters, what to d
 - a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
   not started, when the repository turned autosplit on.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
-script could not run.
+script could not run. The three hook modes always exit 0.
+
+The reminders during a session: --brief records what it said at the session's start under <git dir>/bowline/watch.json.
+--watch measures again after every reply and, when a finding appears that was not there before (a CLAUDE.md that
+crossed the line target, a rules area over its budget, the memory index at its cap), prints it once as a hook
+systemMessage, which Claude Code shows to the person, and keeps it pending for Claude. --pending prints what is pending
+as plain text, which Claude Code adds to Claude's context at the person's next prompt, and clears it. A finding's
+identity is its words with the numbers blanked, so a file that keeps growing is one reminder, not one per reply.
 """
 
 import argparse
@@ -181,13 +191,101 @@ def layout_findings(root):
     return findings
 
 
+def urgent_findings(root, config, no_memory):
+    """The problems and warnings that the brief, the watch and the reminders share, measured as the full doctor measures."""
+    budget_findings, facts = budget.measure(root, config)
+    findings = [f for f in autosplit.findings(root, config, facts) if f.level != "note"]
+    findings += claude_md_findings(root, config, facts)
+    findings += [f for f in budget_findings if f.level == "problem"]
+    findings += [f for f in root_claude_md_findings(root, facts) if f.level != "note"]
+    if not no_memory:
+        findings += [f for f in memory_findings(root, config) if f.level != "note"]
+    autosplit.adjust(findings, root)
+    return [f for f in findings if f.level in ("problem", "warning")]
+
+
+def finding_key(finding):
+    """A finding's identity across replies: its words with every number blanked, so a file that keeps growing is one."""
+    return re.sub(r"\d[\d,.]*", "#", finding.what)
+
+
+def watch_path(root):
+    return os.path.join(os.path.dirname(autosplit.state_dir(root)), "watch.json")
+
+
+def load_watch(root):
+    data = autosplit.read_json(watch_path(root))
+    if data is None:
+        return None
+    return {"told": list(data.get("told") or []), "pending": list(data.get("pending") or [])}
+
+
+def save_watch(root, watch):
+    path = watch_path(root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    temp = path + ".tmp"
+    with open(temp, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(watch, handle, indent=2)
+        handle.write("\n")
+    os.replace(temp, path)
+
+
+def hook_cwd(default):
+    """The working folder a hook's JSON names on standard input, or the default when there is none to read."""
+    try:
+        if sys.stdin is not None and not sys.stdin.isatty():
+            return json.load(sys.stdin).get("cwd") or default
+    except Exception:
+        pass
+    return default
+
+
+def do_watch(options):
+    """The Stop hook (--watch) and the UserPromptSubmit hook (--pending). Prints nothing when there is nothing new."""
+    root = common.repo_root(hook_cwd(options.repo or os.getcwd()))
+    if not root:
+        return 0
+    watch = load_watch(root)
+    if options.pending:
+        if watch and watch["pending"]:
+            print("bowline found this during the session, after the last reply; tell the person in a sentence and name the skill that fixes it:")
+            for line in watch["pending"]:
+                print(f"- {line}")
+            watch["pending"] = []
+            save_watch(root, watch)
+        return 0
+    config = common.load_config(root)
+    urgent = urgent_findings(root, config, options.no_memory)
+    keys = [finding_key(f) for f in urgent]
+    if watch is None:
+        # No record yet: the session's start said whatever was there, so nothing counts as new this time.
+        save_watch(root, {"told": keys, "pending": []})
+        return 0
+    told = set(watch["told"])
+    new = [f for f, key in zip(urgent, keys) if key not in told]
+    watch["told"] = keys
+    if new:
+        lines = [f"{f.what} Fix: {f.fix or 'run /bowline:doctor'}" for f in new]
+        watch["pending"] = (watch["pending"] + lines)[-10:]
+        print(json.dumps({"systemMessage": "bowline: " + "\n".join(lines)}))
+    save_watch(root, watch)
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Measures a repository and this machine against what Claude Code reads.")
     parser.add_argument("--repo", help="a path inside the repository (default: the current folder)")
     parser.add_argument("--no-memory", action="store_true", help="skip the memory folder checks (for CI)")
     parser.add_argument("--brief", action="store_true",
                         help="one line per problem or warning and nothing when clean; always exit 0 (for a SessionStart hook)")
+    parser.add_argument("--watch", action="store_true", help="after a reply: one reminder when something new crosses a limit (the Stop hook)")
+    parser.add_argument("--pending", action="store_true", help="before a prompt: the pending reminder for Claude, once (the UserPromptSubmit hook)")
     options = parser.parse_args(argv)
+    if options.watch or options.pending:
+        try:
+            return do_watch(options)
+        except BaseException:  # noqa: BLE001 - a hook must never fail a reply or a prompt
+            return 0
     root = common.repo_root(options.repo)
     if not root:
         if options.brief:
@@ -197,17 +295,10 @@ def main(argv=None):
     config = common.load_config(root)
     if options.brief:
         try:
-            budget_findings, facts = budget.measure(root, config)
-            findings = [f for f in autosplit.findings(root, config, facts) if f.level != "note"]
-            findings += claude_md_findings(root, config, facts)
-            findings += [f for f in budget_findings if f.level == "problem"]
-            findings += [f for f in root_claude_md_findings(root, facts) if f.level != "note"]
-            if not options.no_memory:
-                findings += [f for f in memory_findings(root, config) if f.level != "note"]
-            autosplit.adjust(findings, root)
+            urgent = urgent_findings(root, config, options.no_memory)
+            save_watch(root, {"told": [finding_key(f) for f in urgent], "pending": []})
         except Exception:
             return 0
-        urgent = [f for f in findings if f.level in ("problem", "warning")]
         if urgent:
             print(f"bowline found {len(urgent)} thing(s) about this repository's instructions or memory worth a look; run /bowline:doctor for the report. The first:")
             for finding in urgent[:3]:
