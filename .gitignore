@@ -1,0 +1,9 @@
+# Python's compiled files and caches; the scripts run from source.
+__pycache__/
+*.pyc
+
+# A person's own Claude Code settings for this repository, never the team's.
+.claude/settings.local.json
+.claude/worktrees/
+
+# Scratch folders the tests make are under the system's temp folder, never here.
