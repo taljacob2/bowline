@@ -23,6 +23,17 @@ def write(path, text):
         handle.write(text)
 
 
+def read(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def load_json(path):
+    import json
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 class ScratchRepo(unittest.TestCase):
     """A test case with a fresh git repository (one committed file) and a fresh CLAUDE_CONFIG_DIR."""
 

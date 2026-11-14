@@ -1,0 +1,36 @@
+# keel's tests on the three systems it supports. While the repository is private, every minute is billed and a macOS
+# minute costs ten Linux minutes, so a push runs Linux and Windows and macOS runs by hand (Actions, Run workflow).
+# When the repository is public the minutes are free and macOS joins the push matrix.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            manual: true
+    runs-on: ${{ matrix.os }}
+    if: ${{ !matrix.manual || github.event_name == 'workflow_dispatch' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Run the tests on scratch repositories
+        run: python -I -m unittest discover -s scripts/tests -p "test_*.py" -v
+      - name: keel's own gate over every tracked file
+        run: python -I scripts/keel.py gate --all
+      - name: keel's own budget and doctor
+        run: |
+          python -I scripts/keel.py budget
+          python -I scripts/keel.py doctor --no-memory || true

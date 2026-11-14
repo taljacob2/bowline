@@ -3,6 +3,8 @@
     python -I scripts/keel.py doctor [--repo <path>] [--no-memory]
     python -I scripts/keel.py gate [--all | --hook] [--never-commit <file>]
     python -I scripts/keel.py budget [--repo <path>]
+    python -I scripts/keel.py memory setup|restore <remote> [--no-hook] | status | push [--hook]
+    python -I scripts/keel.py init [--plan | --write] [--only item,item]
 
 Each command is its own module beside this file and can be run directly with the same arguments.
 """
@@ -16,10 +18,10 @@ COMMANDS = {
     "doctor": ("doctor", "measure a repository and this machine against what Claude Code reads"),
     "gate": ("gate", "refuse a commit whose added lines hold what must never be committed"),
     "budget": ("budget", "refuse an instruction file over the sizes Claude Code reads"),
+    "memory": ("memory", "back up the memory folder: setup <remote>, restore <remote>, status, push"),
+    "init": ("init", "scaffold the repository side: --plan to see, --write to do"),
 }
 LATER = {
-    "memory": "round 2 of keel's plan brings the memory backup (setup, status, restore, push)",
-    "init": "round 2 brings the scaffolding of the repository side",
     "move": "round 3 brings the move of an oversized CLAUDE.md into pages and rules",
 }
 

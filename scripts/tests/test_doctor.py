@@ -72,10 +72,14 @@ class DoctorTests(ScratchRepo):
                                 capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("within limits", result.stdout)
-        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "memory"], cwd=self.repo,
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "move"], cwd=self.repo,
                                 capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         self.assertEqual(result.returncode, 2)
         self.assertIn("not here yet", result.stderr)
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "nonsense"], cwd=self.repo,
+                                capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unknown command", result.stderr)
 
 
 if __name__ == "__main__":

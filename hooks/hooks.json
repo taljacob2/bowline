@@ -1,0 +1,40 @@
+{
+  "description": "Pushes the memory folder's backup after every reply and when a session ends (only when the folder is a git repository), and runs the commit gate before a git commit that Claude issues, blocking it on a hit.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" memory push --hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" memory push --hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" gate --hook",
+            "if": "Bash(git commit*)",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

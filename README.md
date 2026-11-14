@@ -27,9 +27,17 @@ The doctor prints three lines per finding: what it found, why it matters, and wh
 | `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap and its backup, and the repository against the layout. |
 | `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
 | `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
+| `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. |
+| `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/keel.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. |
 
-The skills that scaffold a repository, back up the memory, curate it and split an oversized file follow in the next
-rounds (see `CHANGELOG.md`). The facts everything rests on, with sources and the date checked, are in
+```
+python -I keel/scripts/keel.py init --repo <your repository> --plan
+python -I keel/scripts/keel.py init --repo <your repository> --write
+python -I keel/scripts/keel.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
+```
+
+The skills that curate the memory and split an oversized file, and the plugin packaging, follow in the next rounds
+(see `CHANGELOG.md`). The facts everything rests on, with sources and the date checked, are in
 [`docs/facts.md`](docs/facts.md).
 
 ## Requirements

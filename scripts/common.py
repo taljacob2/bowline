@@ -75,9 +75,19 @@ def deep_merge(base, over):
     return out
 
 
+def defaults_path():
+    """defaults.json beside the plugin, or beside the scripts when they are a repository-local copy."""
+    for folder in (PLUGIN_ROOT, os.path.dirname(os.path.abspath(__file__))):
+        path = os.path.join(folder, "defaults.json")
+        if os.path.isfile(path):
+            return path
+    print("keel: defaults.json was not found beside the scripts.", file=sys.stderr)
+    sys.exit(2)
+
+
 def load_config(root):
     """The plugin's defaults, with the repository's .claude/keel.json laid over them when it exists."""
-    with open(os.path.join(PLUGIN_ROOT, "defaults.json"), encoding="utf-8") as handle:
+    with open(defaults_path(), encoding="utf-8") as handle:
         config = json.load(handle)
     if root:
         path = os.path.join(root, CONFIG_FILE)
