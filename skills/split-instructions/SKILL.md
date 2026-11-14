@@ -120,3 +120,8 @@ was made: resolve it by hand, or `git cherry-pick --abort` and `autosplit discar
 autosplit prepares a fresh one after the next reply. When the person does not want the split, `discard` deletes the
 branch and the record. A failed split says why in the doctor and keeps its log under the repository's `.git` folder;
 read the log with the person, then split by hand with the steps above, or `discard` to let autosplit try again.
+
+When the repository sets `deliver` to `merge`, the two commits land on the current branch on their own, and the doctor
+says so until `done`. The review is then of what landed: `show` prints the commits, and the `git revert` it names
+undoes them if the person disagrees. When the tree was not clean or the cherry-pick did not apply, the split waits on
+its branch as above, and `status` says why it was not merged.

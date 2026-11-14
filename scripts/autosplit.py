@@ -418,13 +418,13 @@ def run_split(root, path, config, say):
     state["base"] = base
     code, _ = git(root, "rev-parse", "--verify", "-q", "refs/heads/" + branch)
     if code == 0:
-        return finish(root, path, state, Outcome(False, f"the branch {branch} already exists", keep_branch=True), say)
+        return finish(root, path, state, Outcome(False, f"the branch {branch} already exists", keep_branch=True), config, say)
     temp = tempfile.mkdtemp(prefix="bowline-split-")
     worktree = os.path.join(temp, slug_of(path))
     code, out = git(root, "worktree", "add", "-q", "-b", branch, worktree, "HEAD")
     if code != 0:
         shutil.rmtree(temp, ignore_errors=True)
-        return finish(root, path, state, Outcome(False, "git worktree add failed: " + out.strip()), say)
+        return finish(root, path, state, Outcome(False, "git worktree add failed: " + out.strip()), config, say)
     state["worktree"] = worktree
     save_state(root, path, state)
     say(f"autosplit: the branch {branch} from {base[:12]}, in the worktree {worktree}")
@@ -437,15 +437,17 @@ def run_split(root, path, config, say):
         git(root, "worktree", "prune")
         shutil.rmtree(temp, ignore_errors=True)
     state.pop("worktree", None)
-    return finish(root, path, state, outcome, say)
+    return finish(root, path, state, outcome, config, say)
 
 
-def finish(root, path, state, outcome, say):
+def finish(root, path, state, outcome, config, say):
     state.update(outcome.details)
     state["finished"] = now()
     if outcome.ok:
         state["state"] = "ready"
         state.pop("reason", None)
+        if settings(config).get("deliver") == "merge":
+            deliver(root, state)
         save_state(root, path, state)
         say(f"autosplit: {describe(state)}")
         return state
@@ -459,6 +461,37 @@ def finish(root, path, state, outcome, say):
     return state
 
 
+def deliver(root, state):
+    """With deliver set to merge: takes the split's commits onto the person's current branch, when nothing stands in
+    the way. Otherwise the split stays on its branch and the record says why."""
+    branch, base = state["branch"], state["base"]
+    _, dirty = git(root, "status", "--porcelain")
+    if dirty.strip():
+        state["undelivered"] = "the working tree had uncommitted changes when the split was ready"
+        return
+    _, head = git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    head = head.strip()
+    if not head or head == "HEAD":
+        state["undelivered"] = "HEAD was not on a branch when the split was ready"
+        return
+    count = len(state.get("commits") or [])
+    code, out = git(root, "cherry-pick", f"{base}..{branch}")
+    if code != 0:
+        git(root, "cherry-pick", "--abort")
+        state["undelivered"] = f"the cherry-pick onto {head} did not apply cleanly: " + " ".join(out.split())[:200]
+        return
+    _, log = git(root, "log", "--format=%H%x09%s", f"-{count}")
+    merged = []
+    for line in log.strip().splitlines():
+        parts = line.split("\t", 1)
+        merged.append({"hash": parts[0], "subject": parts[1] if len(parts) > 1 else ""})
+    state["merged"] = list(reversed(merged))
+    state["merged_onto"] = head
+    state["state"] = "merged"
+    state.pop("undelivered", None)
+    git(root, "branch", "-D", branch)
+
+
 def describe(state):
     """One sentence on where a split stands, for the doctor, the status and the log."""
     kind = state.get("state")
@@ -466,12 +499,18 @@ def describe(state):
     after = (state.get("after") or {}).get("lines")
     if kind in ("starting", "running"):
         return f"being prepared in the background since {state.get('started')}; the log is {state.get('log')}"
+    if kind == "merged":
+        hashes = ", ".join(c["hash"][:8] for c in state.get("merged") or [])
+        return (f"merged onto {state.get('merged_onto')} at {state.get('finished')}: commits {hashes}, from {before} lines "
+                f"to {after}; the branch {state.get('branch')} is deleted")
     if kind == "ready":
         files = state.get("files") or {}
         words = (f"ready on the branch {state.get('branch')}: {len(state.get('commits') or [])} commit(s), "
                  f"from {before} lines to {after}, {files.get('pages', 0)} page(s) and {files.get('rules', 0)} rule file(s) added")
         if state.get("cost_usd") is not None:
             words += f"; the session cost about ${float(state['cost_usd']):.2f}"
+        if state.get("undelivered"):
+            words += f"; not merged on its own because {state['undelivered']}"
         return words
     if kind == "failed":
         kept = f"; the branch {state.get('branch')} keeps what was done" if state.get("branch_kept") else ""
@@ -512,13 +551,18 @@ def findings(root, config, facts):
                 "note", f"A split of {state['file']} waits on the branch {state['branch']}, but the file is already within the limits.",
                 "Either the split was merged by hand, or the file was shortened another way.",
                 f"If it was merged: bowline autosplit done --file {state['file']}. Otherwise: bowline autosplit discard --file {state['file']}."))
-        elif state.get("state") in ("starting", "running", "failed"):
+        elif state.get("state") in ("starting", "running", "failed", "merged"):
             out.append(state_finding(state))
     return out
 
 
 def state_finding(state):
     path, kind = state["file"], state.get("state")
+    if kind == "merged":
+        return common.Finding(
+            "warning", f"autosplit merged the split of {path}: {describe(state)}.",
+            "This repository sets autosplit.deliver to merge, so the result landed on the current branch as soon as it was ready and the tree was clean; the instruction files changed without a review.",
+            f"Read what landed: bowline autosplit show --file {path}. Keep it, or revert the commits as show says; then bowline autosplit done --file {path} to clear this notice.")
     if kind == "ready":
         return common.Finding(
             "warning", f"A split of {path} is {describe(state)}.",
@@ -565,7 +609,7 @@ def do_run(root, config, path, foreground):
             print(f"bowline autosplit: cannot start: {reason}.", file=sys.stderr)
             return 1
     final = run_split(root, path, config, functools.partial(print, flush=True))
-    return 0 if final.get("state") == "ready" else 1
+    return 0 if final.get("state") in ("ready", "merged") else 1
 
 
 def do_status(root, config):
@@ -607,7 +651,20 @@ def do_show(root, path):
         _, stat = git(root, "diff", "--stat", f"{base}..{branch}")
         print(stat.rstrip())
         print()
-    if state.get("state") == "ready":
+    if state.get("state") == "merged":
+        hashes = [c["hash"] for c in state.get("merged") or []]
+        for commit in hashes:
+            _, log = git(root, "show", "-s", "--format=commit %h%n%B", commit)
+            print(log.strip())
+            print()
+        if hashes:
+            _, stat = git(root, "diff", "--stat", f"{hashes[0]}^..{hashes[-1]}")
+            print(stat.rstrip())
+            print()
+            print(f"The commits are on {state.get('merged_onto')}. To undo them:")
+            print(f"  git revert {hashes[0]}^..{hashes[-1]}")
+        print(f"Then clear this record: bowline autosplit done --file {path}")
+    elif state.get("state") == "ready":
         print("To take the split onto the current branch, with its two commits as they are:")
         print(f"  git cherry-pick {base}..{branch}")
         print("then forget the split and delete its branch:")
@@ -643,6 +700,9 @@ def do_forget(root, path, merged):
     if exists and code != 0:
         print(f"bowline autosplit: the split of {path} is {words}, but git could not delete the branch {branch}: {out.strip()}")
         return 1
+    if state.get("state") == "merged":
+        print(f"bowline autosplit: the record of the split of {path} is cleared; its commits stay on {state.get('merged_onto')}.")
+        return 0
     print(f"bowline autosplit: the split of {path} is {words}; " + (f"the branch {branch} is deleted." if exists else f"there was no branch {branch} to delete."))
     return 0
 

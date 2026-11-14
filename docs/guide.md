@@ -141,7 +141,9 @@ flowchart TB
 Autocompact is the one thing Claude Code does to your work unasked, and it can, because a conversation's context is
 nobody else's input. A `CLAUDE.md` is every future session's input, so autosplit borrows the trigger, a limit crossed
 and noticed by the hook that already runs after every reply, but not the silence: the whole split happens while you
-work, on a branch of its own, and the one step left to you is the merge. It is off until a repository turns it on in
+work, on a branch of its own, and the one step left to you is the merge. A repository that wants the autocompact feel
+to the end sets `deliver` to `merge`, and the worker takes the two commits onto your branch itself when your tree is
+clean, and the doctor says what landed until you acknowledge it. Autosplit is off until a repository turns it on in
 `.claude/bowline.json`, and the doctor says at every stage what is happening and why.
 
 ## What bowline does, and what it leaves to you

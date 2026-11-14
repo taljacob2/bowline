@@ -56,6 +56,7 @@
   },
   "autosplit": {
     "enabled": false,
+    "deliver": "branch",
     "command": "claude",
     "maxBudgetUsd": 20,
     "timeoutMinutes": 60,
@@ -64,6 +65,7 @@
   },
   "autosplitWhy": {
     "enabled": "Off by default: a background worker spends tokens and makes a branch, so each repository opts in, in its own .claude/bowline.json, where every contributor sees that it did.",
+    "deliver": "How the result arrives. branch, the default: the two commits wait on their branch for the person to review and cherry-pick. merge: the worker cherry-picks them onto the current branch itself as soon as the split is ready, only onto a clean working tree and only when they apply without a conflict (otherwise the split stays on its branch and the doctor says why), never with a push; the doctor then says what landed until the person runs autosplit done.",
     "command": "The program that starts a headless Claude Code session: a name on the path or a full path, or a list for a program with its arguments. The worker adds what makes the session unattended: -p, acceptEdits, no permission prompts, an allowlist of tools, a JSON result.",
     "maxBudgetUsd": "The most one split may spend, passed as --max-budget-usd; a session that reaches it stops, and the split is reported as failed with its log, rather than running on. One turn of the largest model with its system prompt cost about half a dollar when this was measured, and a split with condensing subagents takes dozens.",
     "timeoutMinutes": "The worker stops the session after this long and reports the split as failed, so a hung session cannot run forever.",
