@@ -6,6 +6,11 @@ change together and the entry here says which.
 
 ## Unreleased
 
+- The gate hook finds the repository a commit names, from `git -C <path>` or `cd <path> &&` in the command, resolved
+  from the hook's folder, so that a session started in a folder of several repositories is gated too. Before, from such
+  a folder it exited with code 2, "not inside a git repository", and for a PreToolUse hook that code means block: every
+  commit Claude issued there was refused. When the gate cannot tell which repository is meant, it now lets the command
+  through and says nothing; it never blocks on its own confusion.
 - A `release` skill under `.claude/skills/`: the checks, the version in the plugin manifest (the only thing Claude Code
   reads to decide that an update exists), the changelog heading, `claude plugin validate`, one commit, the push to main,
   a plain `X.Y.Z` tag and the proof on this machine. `docs/decisions.md` says why the tag is plain and not the

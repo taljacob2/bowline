@@ -90,6 +90,34 @@ class GateTests(ScratchRepo):
                 self.assertIn("new.txt:1: a GitHub token", result.stderr)
                 self.assertNotIn(FAKE_TOKEN, result.stdout + result.stderr)
 
+    def test_hook_finds_the_repository_a_commit_names_from_a_folder_of_repositories(self):
+        import subprocess
+        import sys
+        from support import SCRIPTS
+
+        def hook(command, cwd):
+            payload = json.dumps({"cwd": cwd, "tool_name": "Bash", "tool_input": {"command": command}})
+            result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "gate.py"), "--hook"], input=payload, cwd=cwd,
+                                    capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
+            return result.returncode, result.stdout, result.stderr
+
+        workspace = os.path.join(self.root, "workspace")           # a folder that holds repositories and is not one
+        repo = os.path.join(workspace, "repo1")
+        os.makedirs(repo)
+        git(repo, "init", "-q", "-b", "main")
+        write(os.path.join(repo, "new.txt"), "token " + FAKE_TOKEN + "\n")
+        git(repo, "add", "new.txt")
+        for command in ("git -C repo1 commit -m x", "cd repo1 && git commit -m x", 'git -C "repo1" commit -m x', "cd repo1; git commit -m x"):
+            code, out, err = hook(command, workspace)
+            self.assertEqual(code, 2, command + ": " + out + err)
+            self.assertIn("blocked", err)
+        code, out, err = hook("git commit -m x", workspace)                            # no repository named: the gate steps aside
+        self.assertEqual((code, out, err), (0, "", ""))
+        code, out, err = hook("git -C repo2 commit -m x", workspace)                   # a folder that is not a repository
+        self.assertEqual((code, out, err), (0, "", ""))
+        code, out, err = hook("git -C " + repo + " commit -m x", self.root)            # an absolute path works from anywhere
+        self.assertEqual(code, 2, out + err)
+
 
 if __name__ == "__main__":
     unittest.main()

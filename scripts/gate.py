@@ -11,6 +11,11 @@ The policies come from defaults.json, laid over by the repository's .claude/bowl
 token-shaped strings, control bytes, a byte-order mark, a carriage return when the repository is LF only, characters
 outside ASCII (ignored, warned about or refused), and the words of a private never-commit list that lives outside every
 repository. Exit codes: 0 fine, 1 at least one problem, 2 the script could not run.
+
+As a hook, the gate works out which repository the commit is for from the command itself, `git -C <path>` or
+`cd <path> &&` before `commit`, resolved from the hook's working folder, so that a session started in a folder that
+holds several repositories is gated too. When it cannot tell which repository is meant, it lets the command through and
+says nothing: for a PreToolUse hook exit code 2 means "block", and the gate never blocks on its own confusion.
 """
 
 import argparse
@@ -149,6 +154,17 @@ def run(root, policy, everything=False):
     return problems, warnings, checked
 
 
+def commit_repository(command, start):
+    """The repository a `git ... commit` command would commit in: every `cd <path>` and `git -C <path>` before the word
+    commit moves the folder on from the hook's working folder; the result is that folder's repository, or None."""
+    where = start
+    before = re.split(r"\bcommit\b", command, maxsplit=1)[0]
+    for match in re.finditer(r"(?:\b(?:cd|pushd)\s+|\bgit\s+-C\s*)(\"[^\"]+\"|'[^']+'|\S+)", before):
+        path = match.group(1).strip("\"'")
+        where = path if os.path.isabs(path) else os.path.join(where, path)
+    return common.repo_root(where)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Refuses a commit whose added lines hold what must never be committed.")
     parser.add_argument("--all", action="store_true", help="check every tracked text file instead of the staged diff")
@@ -156,13 +172,6 @@ def main(argv=None):
     parser.add_argument("--hook", action="store_true", help="run as a Claude Code PreToolUse hook (JSON on stdin, exit 2 to block)")
     parser.add_argument("--repo", help="a path inside the repository (default: the current folder)")
     options = parser.parse_args(argv)
-
-    root = common.repo_root(options.repo)
-    if not root:
-        print("bowline gate: not inside a git repository.", file=sys.stderr)
-        return 2
-    config = common.load_config(root)
-    policy = Policy(config, options.never_commit)
 
     if options.hook:
         try:
@@ -172,6 +181,16 @@ def main(argv=None):
         command = str((facts.get("tool_input") or {}).get("command") or "")
         if not re.search(r"\bgit\b.*\bcommit\b", command):
             return 0
+        root = commit_repository(command, options.repo or facts.get("cwd") or os.getcwd())
+        if not root:
+            return 0
+    else:
+        root = common.repo_root(options.repo)
+        if not root:
+            print("bowline gate: not inside a git repository. From a folder of repositories, pass --repo <one of them>.", file=sys.stderr)
+            return 2
+    config = common.load_config(root)
+    policy = Policy(config, options.never_commit)
 
     problems, warnings, checked = run(root, policy, options.all)
     what = "tracked lines" if options.all else "added lines"
