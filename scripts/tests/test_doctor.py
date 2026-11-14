@@ -30,7 +30,7 @@ class DoctorTests(ScratchRepo):
         self.assertIn("on a 200K context window", out)
         self.assertIn('inside the section "First"', out)
         self.assertIn("never read: Second, Third", out)
-        self.assertIn("/keel:split-instructions", out)
+        self.assertIn("/bowline:split-instructions", out)
 
     def test_brief_says_nothing_when_clean_and_one_line_per_problem(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n")
@@ -39,7 +39,7 @@ class DoctorTests(ScratchRepo):
         write(os.path.join(self.repo, "sub", "CLAUDE.md"), "# Sub\n\n## First\n\n" + ("words " * 20 + "\n") * 400 + "## Second\n\nx\n")
         code, out, err = self.run_script("doctor", "--brief", "--no-memory")
         self.assertEqual(code, 0, out + err)
-        self.assertIn("run /keel:doctor", out)
+        self.assertIn("run /bowline:doctor", out)
         self.assertIn("sub/CLAUDE.md is cut at line", out)
         self.assertLessEqual(len(out.strip().splitlines()), 4)
 
@@ -79,11 +79,11 @@ class DoctorTests(ScratchRepo):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n")
         from support import SCRIPTS
         import sys
-        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "budget"], cwd=self.repo,
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "bowline.py"), "budget"], cwd=self.repo,
                                 capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("within limits", result.stdout)
-        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "nonsense"], cwd=self.repo,
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "bowline.py"), "nonsense"], cwd=self.repo,
                                 capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         self.assertEqual(result.returncode, 2)
         self.assertIn("unknown command", result.stderr)

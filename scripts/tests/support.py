@@ -41,7 +41,7 @@ class ScratchRepo(unittest.TestCase):
         # The real path, because git reports real paths: on macOS the temp folder is behind a symlink (/var is
         # /private/var) and on Windows it may be a short name (RUNNER~1), and the scripts name the memory folder from
         # what git says.
-        self.root = os.path.realpath(tempfile.mkdtemp(prefix="keel-test-"))
+        self.root = os.path.realpath(tempfile.mkdtemp(prefix="bowline-test-"))
         self.repo = os.path.join(self.root, "repo")
         os.makedirs(self.repo)
         git(self.repo, "init", "-q", "-b", "main")

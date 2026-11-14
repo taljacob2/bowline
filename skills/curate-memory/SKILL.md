@@ -11,8 +11,8 @@ goes. Nothing moves before the person approves the map.
 
 ## 1. Take stock
 
-Run `"${CLAUDE_PLUGIN_ROOT}/bin/keel" memory status`. Confirm the folder is backed up (the history then keeps every
-deleted note); if not, offer `/keel:memory-backup` first and stop until it is. List the notes with their sizes and
+Run `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory status`. Confirm the folder is backed up (the history then keeps every
+deleted note); if not, offer `/bowline:memory-backup` first and stop until it is. List the notes with their sizes and
 their `description` lines from the front matter.
 
 ## 2. Sort, with the rubric
@@ -49,8 +49,8 @@ approve deleting, or write anything flagged as personal into the repository.
 - Trim, merge and delete the notes as approved. A merged note keeps its sources' dates where a date carries meaning.
 - Rewrite `MEMORY.md` with one line per remaining note: a link and a hook sentence, nothing else. Keep it far under 200
   lines and 25 KB.
-- Run `"${CLAUDE_PLUGIN_ROOT}/bin/keel" memory push` so the backup records the change, and
-  `"${CLAUDE_PLUGIN_ROOT}/bin/keel" doctor` to show the index's new size.
+- Run `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory push` so the backup records the change, and
+  `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" doctor` to show the index's new size.
 
 ## 5. Report
 

@@ -10,7 +10,7 @@ For each finding it prints three lines: what it found, why it matters, what to d
 - the memory folder Claude Code keeps for this repository on this machine: its index against the cap, whether the
   folder is a git repository with a remote, and whether the push hook is installed;
 - whether the root CLAUDE.md has a compaction section, whether the gate and the budget check are installed, and
-  whether the repository has a .claude/keel.json.
+  whether the repository has a .claude/bowline.json.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run.
 """
@@ -66,11 +66,11 @@ def claude_md_findings(root, config, facts):
                 "problem",
                 f"{path} is cut at line {line} on {window}, {where}: about {share}% of the file is never read there{lost}.",
                 config["limitsWhy"]["onDemandCutoffSmallWindow" if cutoff == small else "onDemandCutoffLargeWindow"],
-                "Move the long form into docs pages and the rules into .claude/rules/ scoped by path, and keep this file an index: /keel:split-instructions."))
+                "Move the long form into docs pages and the rules into .claude/rules/ scoped by path, and keep this file an index: /bowline:split-instructions."))
             break
         if chars >= limits["skippedFileBytes"]:
             findings.append(common.Finding("problem", f"{path} is over 4 MiB and is skipped entirely.",
-                                           config["limitsWhy"]["skippedFileBytes"], "Split it: /keel:split-instructions."))
+                                           config["limitsWhy"]["skippedFileBytes"], "Split it: /bowline:split-instructions."))
     return findings
 
 
@@ -81,19 +81,19 @@ def root_claude_md_findings(root, facts):
         findings.append(common.Finding(
             "warning", "The repository has no root CLAUDE.md.",
             "The root CLAUDE.md is the one file every session loads whole and re-reads after a compaction; without it nothing standing survives a summary.",
-            "Create one with the writing rules, where decisions are recorded, and a Compact Instructions section: /keel:init."))
+            "Create one with the writing rules, where decisions are recorded, and a Compact Instructions section: /bowline:init."))
         return findings
     text = common.read_text(os.path.join(root, roots[0]))
     if not re.search(r"^#+\s*compact instructions", text, re.IGNORECASE | re.MULTILINE):
         findings.append(common.Finding(
             "warning", f"{roots[0]} has no \"Compact Instructions\" section.",
             "Claude Code replaces a long conversation with a summary, when the context fills and after about an hour of quiet; this section tells every summary what to keep.",
-            "Add the section: /keel:init offers the text, or see docs/conventions.md."))
+            "Add the section: /bowline:init offers the text, or see docs/conventions.md."))
     if not re.search(r"^#+\s*memory between sessions", text, re.IGNORECASE | re.MULTILINE):
         findings.append(common.Finding(
             "note", f"{roots[0]} does not say what the memory folder is for.",
             "A session that knows the index loads only to 200 lines keeps it short; one that does not fills it until the newest notes fall off.",
-            "Add the section: /keel:init offers the text."))
+            "Add the section: /bowline:init offers the text."))
     return findings
 
 
@@ -119,27 +119,27 @@ def memory_findings(root, config):
             findings.append(common.Finding(
                 "problem", f"MEMORY.md has {lines} lines and {size:,} bytes; only the first {limits['memoryIndexLines']} lines or {limits['memoryIndexBytes']:,} bytes load.",
                 config["limitsWhy"]["memoryIndexLines"],
-                "Fold finished items into one line each and promote project knowledge into the repository: /keel:curate-memory."))
+                "Fold finished items into one line each and promote project knowledge into the repository: /bowline:curate-memory."))
         elif lines >= int(limits["memoryIndexLines"] * 0.8) or size >= int(limits["memoryIndexBytes"] * 0.8):
             findings.append(common.Finding(
                 "warning", f"MEMORY.md is at {lines} lines and {size:,} bytes, near the cap of {limits['memoryIndexLines']} lines or {limits['memoryIndexBytes']:,} bytes.",
-                config["limitsWhy"]["memoryIndexLines"], "Curate before it passes the cap: /keel:curate-memory."))
+                config["limitsWhy"]["memoryIndexLines"], "Curate before it passes the cap: /bowline:curate-memory."))
     if not os.path.isdir(os.path.join(folder, ".git")):
         findings.append(common.Finding(
             "warning", f"The memory folder {folder} is not backed up.",
             "Memory is per person and per machine, outside the repository; a lost or reinstalled machine loses every note.",
-            "Make it a git repository pushed to a private remote after every reply: /keel:memory-backup setup <remote>."))
+            "Make it a git repository pushed to a private remote after every reply: /bowline:memory-backup setup <remote>."))
     else:
         remote = common.run_git(["-C", folder, "remote", "get-url", "origin"], check=False).strip()
         if not remote:
             findings.append(common.Finding("warning", "The memory folder is a git repository with no remote.",
-                                           "A local repository is lost with the machine like the folder itself.", "/keel:memory-backup setup <remote>."))
+                                           "A local repository is lost with the machine like the folder itself.", "/bowline:memory-backup setup <remote>."))
         hooked = hook_installed()
         if not hooked:
             findings.append(common.Finding(
                 "warning", "No hook pushes the memory folder after a reply.",
                 "Without the hook the backup is only as fresh as the last push someone remembered to make.",
-                "/keel:memory-backup setup <remote> installs it for this machine."))
+                "/bowline:memory-backup setup <remote> installs it for this machine."))
     return findings
 
 
@@ -156,7 +156,7 @@ def hook_installed():
         for group in (settings.get("hooks") or {}).get(event, []) or []:
             for hook in group.get("hooks", []) or []:
                 text = str(hook.get("command", "")) + " " + " ".join(str(a) for a in hook.get("args", []) or [])
-                if "push-memory" in text or "keel" in text:
+                if "push-memory" in text or "bowline" in text:
                     return True
     return False
 
@@ -167,14 +167,14 @@ def layout_findings(root):
         findings.append(common.Finding(
             "note", f"The repository has no {common.CONFIG_FILE}; the defaults apply.",
             "The file holds the repository's own limits and gate policy, so every contributor measures against the same numbers.",
-            "/keel:init writes it with the defaults and their reasons."))
+            "/bowline:init writes it with the defaults and their reasons."))
     gate_local = os.path.isfile(os.path.join(root, ".claude", "scripts", "gate.py")) or os.path.isfile(os.path.join(root, ".githooks", "pre-commit"))
     hooks_path = common.run_git(["-C", root, "config", "--get", "core.hooksPath"], check=False).strip()
     if not gate_local and not hooks_path:
         findings.append(common.Finding(
             "note", "No commit gate is installed for this repository.",
             "A gate reads the staged lines before every commit and refuses a token, a stray byte or a word that must never be committed; a pushed secret cannot be taken back.",
-            "/keel:init installs a repository-local copy and the pre-commit hook; the keel plugin's hook runs it from Claude Code too."))
+            "/bowline:init installs a repository-local copy and the pre-commit hook; the bowline plugin's hook runs it from Claude Code too."))
     return findings
 
 
@@ -189,7 +189,7 @@ def main(argv=None):
     if not root:
         if options.brief:
             return 0
-        print("keel doctor: not inside a git repository.", file=sys.stderr)
+        print("bowline doctor: not inside a git repository.", file=sys.stderr)
         return 2
     config = common.load_config(root)
     if options.brief:
@@ -204,11 +204,11 @@ def main(argv=None):
             return 0
         urgent = [f for f in findings if f.level in ("problem", "warning")]
         if urgent:
-            print(f"keel found {len(urgent)} thing(s) about this repository's instructions or memory worth a look; run /keel:doctor for the report. The first:")
+            print(f"bowline found {len(urgent)} thing(s) about this repository's instructions or memory worth a look; run /bowline:doctor for the report. The first:")
             for finding in urgent[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
         return 0
-    print(f"keel doctor: {root}")
+    print(f"bowline doctor: {root}")
     print(f"limits from defaults.json (facts checked against the Claude Code docs on {config.get('checkedAgainstDocs')})"
           + (f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(root, common.CONFIG_FILE)) else ""))
     print()
@@ -227,7 +227,7 @@ def main(argv=None):
     areas = ", ".join(f"{name} {chars:,}" for name, chars in sorted(facts["areas"].items())) or "none"
     print(f"  scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; skills: {len(facts['skills'])}")
     print()
-    problems = common.print_findings(findings, "keel doctor")
+    problems = common.print_findings(findings, "bowline doctor")
     return 1 if problems else 0
 
 

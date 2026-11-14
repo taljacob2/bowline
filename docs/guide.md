@@ -1,4 +1,4 @@
-# The guide: why keel exists, and how it thinks
+# The guide: why bowline exists, and how it thinks
 
 This page is for someone who has used Claude Code for a month, keeps a `CLAUDE.md`, and wonders why it seems to be
 ignored more as it grows. It gives the problem in a page, the three homes knowledge can live in, the budgets and where
@@ -17,7 +17,7 @@ A `CLAUDE.md` in a subfolder, and a rules file scoped to paths, load on demand, 
 edited. They are cut at a fixed size: 40,000 characters on a 200K context window, 150,000 on a 1M window. Past the cut,
 Claude gets a note that it may read the rest with the Read tool, and in practice it does not. A repository whose web
 UI conventions have grown to 465 KB in one file is applying the first third of them, and nothing says so. That was the
-real number in the repository keel came from, and the sections past the cut held the owner's own visual standards for
+real number in the repository bowline came from, and the sections past the cut held the owner's own visual standards for
 the product.
 
 The memory Claude keeps about your project is a folder per person per machine, outside the repository. At a session's
@@ -29,7 +29,7 @@ A long conversation is summarized when the context fills, and after about an hou
 the summary what to keep, the state of the work is kept or lost at the summary's discretion.
 
 None of this is hidden; it is spread over six documentation pages, and nobody measures their own repository against it.
-keel measures, and says what to do.
+bowline measures, and says what to do.
 
 ## Three homes, by kind
 
@@ -46,8 +46,8 @@ The fix is not to write less. It is to put each kind of knowledge where the tool
 The budgets follow from the cuts: every `CLAUDE.md` under 200 lines; every rules file under 200 lines and 40,000
 characters, so it loads whole for everyone; the scoped rules of one area under 40,000 characters together, about
 10,000 tokens, the price of touching a file there; the rules every session loads under 10,000 characters, because
-those are the most expensive per character. `keel budget` checks these, `keel doctor` explains each finding, and
-`defaults.json` carries every number with its reason, laid over by a repository's `.claude/keel.json`.
+those are the most expensive per character. `bowline budget` checks these, `bowline doctor` explains each finding, and
+`defaults.json` carries every number with its reason, laid over by a repository's `.claude/bowline.json`.
 
 ## The four flows
 
@@ -108,32 +108,32 @@ state before a round closes makes sure there is something to keep.
 
 ```mermaid
 flowchart TB
-  A[git clone the repository] --> B[.claude/: rules, skills, scripts, keel.json come with it]
-  A --> C[claude plugin install keel@keel]
+  A[git clone the repository] --> B[.claude/: rules, skills, scripts, bowline.json come with it]
+  A --> C[claude plugin install bowline@bowline]
   C --> D[The hooks: a session-start finding, the memory push, the gate]
-  C --> E[The skills: /keel:doctor and the rest]
+  C --> E[The skills: /bowline:doctor and the rest]
   B --> F[The first session reads the root CLAUDE.md and the unscoped rules]
-  G[The owner, on a new machine] --> H[/keel:memory-backup restore remote/]
+  G[The owner, on a new machine] --> H[/bowline:memory-backup restore remote/]
   H --> I[Their personal notes are back]
   J[A new contributor] --> K[Their own memory starts empty and fills as they work]
-  K --> L[/keel:memory-backup setup their own private remote/]
+  K --> L[/bowline:memory-backup setup their own private remote/]
 ```
 
 The repository carries everything the project needs every contributor to know. The memory carries what is personal,
 and each person's goes to that person's private remote. Nothing personal is ever shared by copying a memory; what the
-project needs is promoted into the repository, written for a contributor, by `/keel:curate-memory`.
+project needs is promoted into the repository, written for a contributor, by `/bowline:curate-memory`.
 
-## What keel does, and what it leaves to you
+## What bowline does, and what it leaves to you
 
 The mechanics are automatic: the memory push after every reply, the gate before a commit, the one-line finding at a
 session's start when something is over budget or unbacked. Every change to your knowledge is a skill you or Claude
 invoke, with a plan you approve before anything moves: scaffolding the layout, sorting the memory, splitting a file,
-adopting a convention. A tool that rewrote your rules or your notes in the background would be the one thing keel
+adopting a convention. A tool that rewrote your rules or your notes in the background would be the one thing bowline
 exists to prevent.
 
 ## Where to start
 
-1. `claude plugin marketplace add taljacob2/keel` and `claude plugin install keel@keel`.
-2. In a repository, `/keel:doctor`. Read the report; each finding names the skill that fixes it.
-3. `/keel:init` for the layout, `/keel:memory-backup` for the backup, and `/keel:split-instructions` when a
-   `CLAUDE.md` is over the line. `/keel:conventions` when decisions keep getting lost.
+1. `claude plugin marketplace add taljacob2/bowline` and `claude plugin install bowline@bowline`.
+2. In a repository, `/bowline:doctor`. Read the report; each finding names the skill that fixes it.
+3. `/bowline:init` for the layout, `/bowline:memory-backup` for the backup, and `/bowline:split-instructions` when a
+   `CLAUDE.md` is over the line. `/bowline:conventions` when decisions keep getting lost.

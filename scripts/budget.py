@@ -3,7 +3,7 @@ repository.
 
     python -I scripts/budget.py [--repo <path>]
 
-Checks, with the limits from defaults.json laid over by the repository's .claude/keel.json:
+Checks, with the limits from defaults.json laid over by the repository's .claude/bowline.json:
 - every CLAUDE.md (the root and any nested one) is under the line target;
 - every rules file under .claude/rules/ is under the line target and the per-file character cutoff;
 - the scoped rules that load together for one area (the first folder of a rule's `paths:` glob, or its file type for
@@ -77,7 +77,7 @@ def measure(root, config):
             findings.append(common.Finding(
                 "problem", f"{path} has {lines} lines; the target is under {limits['claudeMdLines']}.",
                 config["limitsWhy"]["claudeMdLines"],
-                "Move what is only for part of the code into scoped rules, procedures into skills, and history into docs: /keel:split-instructions."))
+                "Move what is only for part of the code into scoped rules, procedures into skills, and history into docs: /bowline:split-instructions."))
         if outside and outside.search(text):
             findings.append(common.Finding(
                 "problem", f"{path} names a path outside the repository.", config["outsidePathsWhy"],
@@ -141,15 +141,15 @@ def main(argv=None):
     options = parser.parse_args(argv)
     root = common.repo_root(options.repo)
     if not root:
-        print("keel budget: not inside a git repository.", file=sys.stderr)
+        print("bowline budget: not inside a git repository.", file=sys.stderr)
         return 2
     config = common.load_config(root)
     findings, facts = measure(root, config)
     if findings:
-        problems = common.print_findings(findings, "keel budget")
+        problems = common.print_findings(findings, "bowline budget")
         return 1 if problems else 0
     areas = ", ".join(f"{name} {chars:,}" for name, chars in sorted(facts["areas"].items())) or "none"
-    print(f"keel budget: within limits. Scoped rules per area: {areas}; unscoped, every session: {facts['unscoped']:,}; "
+    print(f"bowline budget: within limits. Scoped rules per area: {areas}; unscoped, every session: {facts['unscoped']:,}; "
           f"{len(facts['claudeMd'])} CLAUDE.md file(s), {len(facts['skills'])} skill(s).")
     return 0
 

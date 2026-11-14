@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs the commit gate on the staged changes (keel). Opt in once with: git config core.hooksPath .githooks
+# Runs the commit gate on the staged changes (bowline). Opt in once with: git config core.hooksPath .githooks
 root="$(git rev-parse --show-toplevel)"
 if command -v python3 >/dev/null 2>&1; then py=python3; else py=python; fi
 exec "$py" -I "$root/.claude/scripts/gate.py"

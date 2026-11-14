@@ -4,15 +4,15 @@ This file is read whole at the start of every session and again after every comp
 where the rest is. Write everything a person reads, here and in the code's messages, in full sentences and plain words,
 so that a first-time reader understands it without guessing.
 
-## What keel is
+## What bowline is
 
-keel is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads:
+bowline is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads:
 `docs/facts.md` holds the limits with their sources, `defaults.json` the same as settings, `scripts/` the tools
 (`doctor`, `gate`, `budget`, `memory`, `init`; `move` in round 3), `skills/` the procedures Claude runs them through,
 `hooks/hooks.json` the plugin's hooks, `templates/` what `init` writes into a repository, and `scripts/tests/` the tests
-on scratch repositories. keel is its own first user: this file and `.claude/` were written by `keel init`. Every file
+on scratch repositories. bowline is its own first user: this file and `.claude/` were written by `bowline init`. Every file
 here is ASCII only, written for a stranger, Python 3.8 standard library only, with no dependency and no server.
-Before a push: `python -I -m unittest discover -s scripts/tests -p "test_*.py"`, then `python -I scripts/keel.py gate`
+Before a push: `python -I -m unittest discover -s scripts/tests -p "test_*.py"`, then `python -I scripts/bowline.py gate`
 and `budget`. The plan and its rounds are in the commit messages and `CHANGELOG.md`.
 
 ## Where the rest of the rules are
@@ -57,5 +57,5 @@ loaded, and only its first 200 lines or 25 KB, whichever comes first; the files 
   round, so that a compaction or a fresh session at any moment finds it.
 - **The repository is the record; the memory is the working notes.** The memory folder is not part of the repository
   and is not backed up with it. A decision is durable only once it is in the repository's documents; a memory note
-  points at that record, it does not replace it. Back the folder up to a private repository of your own (`keel memory
+  points at that record, it does not replace it. Back the folder up to a private repository of your own (`bowline memory
   setup <remote>`), because the notes are personal: they hold how you work, your machines and your links.

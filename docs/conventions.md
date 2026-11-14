@@ -1,12 +1,12 @@
-# The conventions keel recommends, and why each exists
+# The conventions bowline recommends, and why each exists
 
-keel enforces sizes. It does not enforce these. They are one team's way of working with Claude Code across months,
+bowline enforces sizes. It does not enforce these. They are one team's way of working with Claude Code across months,
 offered because each one grew out of a specific loss; take the ones whose loss you recognize. The `conventions` skill
 offers them one at a time with their templates (`templates/conventions/`).
 
 ## Three homes, by kind
 
-The one firm convention, because keel's checks assume it. A **rule** is an imperative with its one-sentence why, in a
+The one firm convention, because bowline's checks assume it. A **rule** is an imperative with its one-sentence why, in a
 file under `.claude/rules/` scoped by path, so it loads only when a file it concerns is touched and loads whole. A
 **procedure** is a skill under `.claude/skills/`, whose body loads only when used. A **decision or a story** is a
 document, read on demand: a decisions section for the why, the roadmap for the when, a conventions folder for the long
@@ -52,4 +52,4 @@ of a summary, each one a little further from what was said.
 Everything a person reads, in the code's messages, the documents and the rules, is written in full sentences, in plain
 words, one idea per sentence, a term explained before it is used, so that a first-time reader understands it without
 guessing. A rule written in shorthand is a rule the next contributor, and the next session, reads wrong. This is the
-convention the others are written in; keel's own files follow it.
+convention the others are written in; bowline's own files follow it.

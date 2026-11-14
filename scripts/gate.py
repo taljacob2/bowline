@@ -7,7 +7,7 @@
 
 It looks only at added lines, so an old line that already breaks a rule does not stop a commit that leaves it alone.
 It prints the file and the line number of every hit, never the matched text, and exits with 1 when a problem is found.
-The policies come from defaults.json, laid over by the repository's .claude/keel.json (see the gate section there):
+The policies come from defaults.json, laid over by the repository's .claude/bowline.json (see the gate section there):
 token-shaped strings, control bytes, a byte-order mark, a carriage return when the repository is LF only, characters
 outside ASCII (ignored, warned about or refused), and the words of a private never-commit list that lives outside every
 repository. Exit codes: 0 fine, 1 at least one problem, 2 the script could not run.
@@ -33,7 +33,7 @@ def compile_tokens(config):
         try:
             patterns.append((name, re.compile(pattern.encode("utf-8"))))
         except re.error as problem:
-            print(f"keel gate: the token pattern for '{name}' does not compile ({problem}).", file=sys.stderr)
+            print(f"bowline gate: the token pattern for '{name}' does not compile ({problem}).", file=sys.stderr)
             sys.exit(2)
     return patterns
 
@@ -51,7 +51,7 @@ def private_patterns(path):
             try:
                 patterns.append(re.compile(line.encode("utf-8"), re.IGNORECASE))
             except re.error as problem:
-                print(f"keel gate: the never-commit list has a pattern that does not compile ({problem}).", file=sys.stderr)
+                print(f"bowline gate: the never-commit list has a pattern that does not compile ({problem}).", file=sys.stderr)
                 sys.exit(2)
     return patterns
 
@@ -159,7 +159,7 @@ def main(argv=None):
 
     root = common.repo_root(options.repo)
     if not root:
-        print("keel gate: not inside a git repository.", file=sys.stderr)
+        print("bowline gate: not inside a git repository.", file=sys.stderr)
         return 2
     config = common.load_config(root)
     policy = Policy(config, options.never_commit)
@@ -178,7 +178,7 @@ def main(argv=None):
     private = "with the never-commit list" if policy.private else "without a never-commit list"
     if problems and options.hook:
         # A hook's stderr is what Claude Code shows as the reason for blocking; stdout would be ignored or duplicated.
-        print(f"keel gate: {len(problems)} problem(s) in {checked} {what}. The commit is blocked until they are fixed.", file=sys.stderr)
+        print(f"bowline gate: {len(problems)} problem(s) in {checked} {what}. The commit is blocked until they are fixed.", file=sys.stderr)
         for line in problems[:20]:
             print(line, file=sys.stderr)
         return 2
@@ -187,12 +187,12 @@ def main(argv=None):
     for line in problems:
         print(line)
     if problems:
-        print(f"keel gate: {len(problems)} problem(s) in {checked} {what}. Fix them before committing.")
+        print(f"bowline gate: {len(problems)} problem(s) in {checked} {what}. Fix them before committing.")
         return 1
     if checked == 0 and not options.all:
-        print("keel gate: nothing is staged.")
+        print("bowline gate: nothing is staged.")
         return 0
-    print(f"keel gate: {checked} {what} checked, nothing found ({private}; {len(warnings)} warning(s)).")
+    print(f"bowline gate: {checked} {what} checked, nothing found ({private}; {len(warnings)} warning(s)).")
     return 0
 
 

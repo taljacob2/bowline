@@ -1,6 +1,6 @@
 """Scaffolds the repository's side of the layout: the files a plugin cannot ship.
 
-    python -I scripts/keel.py init [--repo <path>] [--plan | --write] [--only item,item]
+    python -I scripts/bowline.py init [--repo <path>] [--plan | --write] [--only item,item]
 
 Items, each a file or a set of files under the repository:
   claude-md      the root CLAUDE.md gets three sections (appended when missing, the file created when absent):
@@ -11,7 +11,7 @@ Items, each a file or a set of files under the repository:
   scripts        .claude/scripts/: repository-local copies of the gate and the budget check with their defaults,
                  so CI and contributors without the plugin run the same checks
   githook        .githooks/pre-commit, running the gate; opt in with `git config core.hooksPath .githooks`
-  config         .claude/keel.json with the defaults a repository usually changes, each with its reason
+  config         .claude/bowline.json with the defaults a repository usually changes, each with its reason
   gitignore      .gitignore entries for a person's own Claude Code files
 
 --plan prints what each item would do and changes nothing. --write does it: it creates what is missing and appends
@@ -31,7 +31,7 @@ TEMPLATES = os.path.join(common.PLUGIN_ROOT, "templates")
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 ITEMS = ["claude-md", "claude-readme", "rules", "skills", "scripts", "githook", "config", "gitignore"]
 GITIGNORE_LINES = [
-    "# A person's own Claude Code settings and worktrees for this repository, never the team's (keel init).",
+    "# A person's own Claude Code settings and worktrees for this repository, never the team's (bowline init).",
     ".claude/settings.local.json",
     ".claude/worktrees/",
     "__pycache__/",
@@ -114,7 +114,7 @@ def build(root, config, only):
     if "githook" in wanted:
         plan.file("githook", ".githooks/pre-commit", template("githooks/pre-commit"))
     if "config" in wanted:
-        plan.file("config", common.CONFIG_FILE, template("keel.json"))
+        plan.file("config", common.CONFIG_FILE, template("bowline.json"))
     if "gitignore" in wanted:
         path = os.path.join(root, ".gitignore")
         existing = common.read_text(path) if os.path.isfile(path) else ""
@@ -130,7 +130,7 @@ def build(root, config, only):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Scaffolds the repository's side of keel's layout.")
+    parser = argparse.ArgumentParser(description="Scaffolds the repository's side of bowline's layout.")
     parser.add_argument("--repo")
     parser.add_argument("--plan", action="store_true", help="print what would be done (the default)")
     parser.add_argument("--write", action="store_true", help="do it: create what is missing, append missing sections, never overwrite")
@@ -138,14 +138,14 @@ def main(argv=None):
     options = parser.parse_args(argv)
     root = common.repo_root(options.repo)
     if not root:
-        print("keel init: not inside a git repository.", file=sys.stderr)
+        print("bowline init: not inside a git repository.", file=sys.stderr)
         return 2
     only = [i.strip() for i in options.only.split(",")] if options.only else None
     if only and any(i not in ITEMS for i in only):
-        print("keel init: unknown item; the items are " + ", ".join(ITEMS), file=sys.stderr)
+        print("bowline init: unknown item; the items are " + ", ".join(ITEMS), file=sys.stderr)
         return 2
     plan = build(root, common.load_config(root), only)
-    print(f"keel init: {root}")
+    print(f"bowline init: {root}")
     for item, path, verb, do in plan.actions:
         print(f"  {item:14} {path:40} {verb}")
     pending = [a for a in plan.actions if a[3] is not None]
@@ -155,7 +155,7 @@ def main(argv=None):
     for item, path, verb, do in pending:
         do()
     print(f"\n{len(pending)} change(s) made. Next: fill the placeholders in .claude/skills/*/SKILL.md, run `git config core.hooksPath .githooks` "
-          "to let git run the gate, and run `keel doctor`.")
+          "to let git run the gate, and run `bowline doctor`.")
     return 0
 
 

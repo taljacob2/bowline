@@ -1,6 +1,6 @@
 ---
 name: init
-description: Scaffold the repository's side of keel's layout - the root CLAUDE.md's three sections, .claude/README.md, two starter rules, two starter skills, repository-local copies of the gate and the budget check, the pre-commit hook, .claude/keel.json - file by file, with the person's yes, never overwriting. Use after the doctor on a repository that has none of it, or to add the parts it lacks.
+description: Scaffold the repository's side of bowline's layout - the root CLAUDE.md's three sections, .claude/README.md, two starter rules, two starter skills, repository-local copies of the gate and the budget check, the pre-commit hook, .claude/bowline.json - file by file, with the person's yes, never overwriting. Use after the doctor on a repository that has none of it, or to add the parts it lacks.
 ---
 
 # Scaffold the repository's side
@@ -10,12 +10,12 @@ and CI see them. `init` never overwrites: it creates what is missing and appends
 
 ## 1. Measure first
 
-Run `/keel:doctor` if it has not run in this session, so the person knows what is missing and why.
+Run `/bowline:doctor` if it has not run in this session, so the person knows what is missing and why.
 
 ## 2. Show the plan
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" init --plan
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" init --plan
 ```
 
 It lists every item with its target path and what would happen: create, append sections, or kept. For each item the
@@ -25,9 +25,9 @@ person has not seen before, show them the text that would be written, read from 
 - `claude-readme`: `claude-readme.md`.
 - `rules`: `rules/before-a-commit.md`, `rules/recording-decisions.md`.
 - `skills`: `skills/full-checks/SKILL.md`, `skills/push/SKILL.md` (starters with placeholders).
-- `scripts`: copies of keel's `gate.py`, `budget.py`, `common.py` and `defaults.json` into `.claude/scripts/`.
+- `scripts`: copies of bowline's `gate.py`, `budget.py`, `common.py` and `defaults.json` into `.claude/scripts/`.
 - `githook`: `githooks/pre-commit`.
-- `config`: `keel.json`.
+- `config`: `bowline.json`.
 - `gitignore`: the entries for a person's own Claude Code files.
 
 Say in one sentence per item what it is for. Ask which items they want; the default is all of them.
@@ -35,7 +35,7 @@ Say in one sentence per item what it is for. Ask which items they want; the defa
 ## 3. Write
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" init --write --only <the items they chose, comma-separated>
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" init --write --only <the items they chose, comma-separated>
 ```
 
 or without `--only` for all. Then show `git status` so they see exactly what appeared.
@@ -46,9 +46,9 @@ or without `--only` for all. Then show `git status` so they see exactly what app
   repository's own commands; ask for them rather than guessing.
 - Offer `git config core.hooksPath .githooks`, so git runs the gate on every commit, theirs included.
 - If the repository's convention is ASCII only, or it accepts a few characters, set `gate.nonAscii` and
-  `gate.acceptedCharacters` in `.claude/keel.json`.
-- Run `/keel:doctor` again and show that the findings it fixed are gone.
-- Suggest `/keel:conventions` when the repository has no decisions section, no roadmap with slots and no notes queue.
+  `gate.acceptedCharacters` in `.claude/bowline.json`.
+- Run `/bowline:doctor` again and show that the findings it fixed are gone.
+- Suggest `/bowline:conventions` when the repository has no decisions section, no roadmap with slots and no notes queue.
 
 Never edit an existing `CLAUDE.md` beyond appending the missing sections; what a repository already says is the
 person's.

@@ -1,0 +1,12 @@
+#!/bin/sh
+# bowline's launcher for POSIX shells (and Git Bash on Windows): finds Python 3 by whichever name this machine has and
+# runs scripts/bowline.py with the arguments. The Windows launcher is bowline.cmd beside this file.
+here="$(cd "$(dirname "$0")" && pwd)"
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 -I "$here/../scripts/bowline.py" "$@"
+elif command -v python >/dev/null 2>&1; then
+  exec python -I "$here/../scripts/bowline.py" "$@"
+else
+  echo "bowline: Python 3 was not found on this machine (neither python3 nor python)." >&2
+  exit 2
+fi

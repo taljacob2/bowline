@@ -4,6 +4,22 @@ Every version names the date its facts were last checked against the Claude Code
 keel measures against are Claude Code's, not keel's. When a limit moves, `defaults.json` and `docs/facts.md` change
 together and the entry here says which.
 
+## 0.2.0 (2026-11-14)
+
+The plugin is renamed from keel to bowline, hours after 0.1.1. Nothing else changes.
+
+- Why: "keel" turned out to be the name of an official Claude connector (a trading-strategy backtester on claude.com's
+  marketplace) and of at least five other Claude Code plugins, one of which already answers to `/keel:` commands.
+  Anthropic's directory needs a unique plugin name and makes it permanent, so the name changed before anyone depended
+  on it. A bowline is the sailor's knot that holds fast under load and still comes undone by hand.
+- What changes for a person who installed 0.1.x: remove the old plugin and its marketplace, then add the new one:
+  `claude plugin uninstall keel@keel`, `claude plugin marketplace remove keel`,
+  `claude plugin marketplace add taljacob2/bowline`, `claude plugin install bowline@bowline`. The skills are
+  `/bowline:doctor` and so on. A repository's configuration file is `.claude/bowline.json` (rename `.claude/keel.json`),
+  the launchers are `bin/bowline` and `bin/bowline.cmd`, and the entry point is `scripts/bowline.py`. The repository
+  `taljacob2/keel` redirects to `taljacob2/bowline`.
+- The entries below keep the old name, because those versions carried it.
+
 ## 0.1.1 (2026-11-14)
 
 What the first run of the tests on three systems found, hours after 0.1.0:

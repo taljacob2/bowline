@@ -46,7 +46,7 @@ class BudgetTests(ScratchRepo):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n" + "a line\n" * 150)
         code, out, _ = self.run_script("budget")
         self.assertEqual(code, 0, out)
-        write(os.path.join(self.repo, ".claude", "keel.json"), json.dumps({"limits": {"claudeMdLines": 100}}))
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"limits": {"claudeMdLines": 100}}))
         code, out, _ = self.run_script("budget")
         self.assertEqual(code, 1, out)
         self.assertIn("the target is under 100", out)

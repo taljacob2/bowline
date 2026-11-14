@@ -16,13 +16,13 @@ it came from.
 
 ## The move
 
-1. `keel doctor` says which file is cut, at which line, inside which section, and what is never read. That is the fact
+1. `bowline doctor` says which file is cut, at which line, inside which section, and what is never read. That is the fact
    to show whoever decides.
-2. `keel move plan --file <file>` lists the sections with their sizes and where the cutoffs fall.
+2. `bowline move plan --file <file>` lists the sections with their sizes and where the cutoffs fall.
 3. Decide per section: a long-form page (history, reasoning, dated entries), a scoped rule (an imperative list for one
    area), a skill (a procedure), or the index. Group sections into pages by subject.
 4. Write the spec and the new index (under 200 lines: what the folder is, what to read first, where the rules, skills
-   and pages are, the commands). `keel move run --check`, then `run`.
+   and pages are, the commands). `bowline move run --check`, then `run`.
 5. Commit: "the move".
 
 ## The condensing
@@ -35,9 +35,9 @@ every named file and test against the code, and the budget: the scoped rules of 
 together, each file under 200 lines. Where two entries of the old file disagree, the rule follows the code, and the
 page gets a note at its top naming the names that have changed since its history was written.
 
-Then the pointers: `keel move find-pointers --name <old path>` lists every line that names the old file; a code
+Then the pointers: `bowline move find-pointers --name <old path>` lists every line that names the old file; a code
 comment or a document that points at a moved section gets a replacement in a pointers spec, each matched exactly once
-(`keel move pointers --spec <file>`); a historical mention that merely says the file existed stays.
+(`bowline move pointers --spec <file>`); a historical mention that merely says the file existed stays.
 
 Commit: "the short form".
 

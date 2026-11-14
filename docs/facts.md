@@ -1,6 +1,6 @@
-# The facts keel rests on
+# The facts bowline rests on
 
-keel measures a repository against limits that are Claude Code's, not keel's. Every number below is also a setting in
+bowline measures a repository against limits that are Claude Code's, not bowline's. Every number below is also a setting in
 `defaults.json`, with its reason beside it, and the doctor prints which it used. When Claude Code changes one, the two
 files change together and the changelog says so.
 
@@ -29,7 +29,7 @@ whether it was observed on a machine.
 
 - **A `CLAUDE.md` that grows is read less, not more.** Past 200 lines adherence drops; past the cutoff the rest is not
   read at all unless Claude decides to look. A repository whose conventions live in one growing file is applying a
-  shrinking share of them, and nothing tells it so. keel's doctor tells it so, naming the line and the section where
+  shrinking share of them, and nothing tells it so. bowline's doctor tells it so, naming the line and the section where
   the cut falls.
 - **The home of a piece of knowledge follows how Claude Code loads it.** A rule that concerns one part of the code
   belongs in a scoped rules file, so it loads only then and loads whole. A procedure belongs in a skill, so its body

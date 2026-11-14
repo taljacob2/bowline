@@ -5,7 +5,7 @@ description: Offer a repository the working conventions that keep decisions, roa
 
 # The conventions
 
-These are recommended defaults, not rules keel enforces. Each one exists because of a specific loss; offer it with its
+These are recommended defaults, not rules bowline enforces. Each one exists because of a specific loss; offer it with its
 reason and let the person choose. The reasons and templates are in `${CLAUDE_PLUGIN_ROOT}/docs/conventions.md` and
 `${CLAUDE_PLUGIN_ROOT}/templates/conventions/`.
 
@@ -33,6 +33,6 @@ if it exists so the rule and the file agree.
 
 ## What not to do
 
-Do not write all five unasked, and do not present them as keel's rules: they are one team's way that worked, offered
+Do not write all five unasked, and do not present them as bowline's rules: they are one team's way that worked, offered
 with its reasons. A repository that already has an ADR folder, an issue tracker as its roadmap, or another queue keeps
 its own; point the rule at the existing thing instead.

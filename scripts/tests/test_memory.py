@@ -12,8 +12,8 @@ from support import SCRIPTS, ScratchRepo, git, load_json, write
 
 
 class MemoryTests(ScratchRepo):
-    def keel(self, *args, stdin=None, cwd=None):
-        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "memory", *args], input=stdin,
+    def bowline(self, *args, stdin=None, cwd=None):
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "bowline.py"), "memory", *args], input=stdin,
                                 cwd=cwd or self.repo, capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         return result.returncode, result.stdout, result.stderr
 
@@ -38,28 +38,28 @@ class MemoryTests(ScratchRepo):
         return bare
 
     def test_no_project_folder_is_refused_with_the_hint(self):
-        code, out, err = self.keel("setup", self.bare("m"))
+        code, out, err = self.bowline("setup", self.bare("m"))
         self.assertEqual(code, 1)
         self.assertIn("Start Claude Code once", err)
 
     def test_new_machine_clones_installs_hook_and_is_idempotent(self):
         folder = self.project_memory(self.repo)
         bare = self.bare("m", seeded=True)
-        code, out, err = self.keel("setup", bare, "--dry-run")
+        code, out, err = self.bowline("setup", bare, "--dry-run")
         self.assertEqual(code, 0, out + err)
         self.assertIn("dry run", out)
         self.assertFalse(os.path.exists(folder))
-        code, out, err = self.keel("setup", bare)
+        code, out, err = self.bowline("setup", bare)
         self.assertEqual(code, 0, out + err)
         self.assertTrue(os.path.isfile(os.path.join(folder, "MEMORY.md")))
         settings = load_json(os.path.join(self.config_dir, "settings.json"))
         self.assertEqual(len(settings["hooks"]["Stop"]), 1)
         self.assertEqual(len(settings["hooks"]["SessionEnd"]), 1)
         self.assertEqual(settings["hooks"]["Stop"][0]["hooks"][0]["args"][-2:], ["push", "--hook"])
-        code, out, _ = self.keel("setup", bare)
+        code, out, _ = self.bowline("setup", bare)
         self.assertIn("already", out)
         self.assertEqual(load_json(os.path.join(self.config_dir, "settings.json")), settings)
-        code, out, _ = self.keel("status")
+        code, out, _ = self.bowline("status")
         self.assertEqual(code, 0, out)
         self.assertIn("hook on this machine: installed", out)
         self.assertIn("not yet pushed: 0", out)
@@ -70,7 +70,7 @@ class MemoryTests(ScratchRepo):
         write(os.path.join(folder, "MEMORY.md"), "- my note\n")
         bare = self.bare("m")
         env = dict(os.environ, GIT_AUTHOR_NAME="Test", GIT_AUTHOR_EMAIL="t@example.invalid", GIT_COMMITTER_NAME="Test", GIT_COMMITTER_EMAIL="t@example.invalid")
-        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "keel.py"), "memory", "setup", bare, "--no-hook"],
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "bowline.py"), "memory", "setup", bare, "--no-hook"],
                                 cwd=self.repo, capture_output=True, text=True, encoding="utf-8", env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("first backup", subprocess.run(["git", "-C", bare, "log", "--format=%s", "main"], capture_output=True, text=True).stdout)
@@ -81,7 +81,7 @@ class MemoryTests(ScratchRepo):
         os.makedirs(folder)
         write(os.path.join(folder, "MEMORY.md"), "- local\n")
         bare = self.bare("m", seeded=True)
-        code, out, err = self.keel("setup", bare)
+        code, out, err = self.bowline("setup", bare)
         self.assertEqual(code, 1)
         self.assertIn("Merge them by hand", err)
         self.assertFalse(os.path.isdir(os.path.join(folder, ".git")))
@@ -89,28 +89,28 @@ class MemoryTests(ScratchRepo):
     def test_push_commits_and_pushes_and_sets_upstream_after_an_empty_clone(self):
         folder = self.project_memory(self.repo)
         bare = self.bare("m")                              # empty remote: setup clones an empty repository
-        self.keel("setup", bare, "--no-hook")
+        self.bowline("setup", bare, "--no-hook")
         git(folder, "config", "user.email", "t@example.invalid")
         git(folder, "config", "user.name", "Test")
         write(os.path.join(folder, "MEMORY.md"), "- first\n")
         payload = json.dumps({"transcript_path": os.path.join(os.path.dirname(folder), "x.jsonl")})
-        code, out, err = self.keel("push", "--hook", stdin=payload)
+        code, out, err = self.bowline("push", "--hook", stdin=payload)
         self.assertEqual(code, 0)
         self.assertEqual(out + err, "")
         log = subprocess.run(["git", "-C", bare, "log", "--format=%s", "--all"], capture_output=True, text=True).stdout
         self.assertIn("Memory as of", log)
         write(os.path.join(folder, "n.md"), "fact\n")
-        code, out, _ = self.keel("push")
+        code, out, _ = self.bowline("push")
         self.assertEqual(code, 0)
         self.assertIn("committed; pushed", out)
-        code, out, _ = self.keel("push")
+        code, out, _ = self.bowline("push")
         self.assertIn("nothing new; nothing to push", out)
 
     def test_push_leaves_a_plain_folder_alone(self):
         folder = self.project_memory(self.repo)
         os.makedirs(folder)
         write(os.path.join(folder, "MEMORY.md"), "- note\n")
-        code, out, err = self.keel("push", "--hook", stdin=json.dumps({"transcript_path": os.path.join(os.path.dirname(folder), "x.jsonl")}))
+        code, out, err = self.bowline("push", "--hook", stdin=json.dumps({"transcript_path": os.path.join(os.path.dirname(folder), "x.jsonl")}))
         self.assertEqual((code, out, err), (0, "", ""))
         self.assertFalse(os.path.isdir(os.path.join(folder, ".git")))
 

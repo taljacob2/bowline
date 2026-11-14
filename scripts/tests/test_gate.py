@@ -27,7 +27,7 @@ class GateTests(ScratchRepo):
             "a key AKIA" + "ABCDEFGHIJKLMNOP",  # 7 an AWS key id
             "middle dot " + chr(0xB7) + " is accepted",    # 8 accepted below through the configuration
         ])
-        write(os.path.join(self.repo, ".claude", "keel.json"), json.dumps({"gate": {"acceptedCharacters": ["U+00B7"]}}))
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"gate": {"acceptedCharacters": ["U+00B7"]}}))
         code, out, err = self.run_script("gate", "--never-commit", never)
         self.assertEqual(code, 1, out + err)
         hits = [l for l in out.splitlines() if l.startswith("new.txt:")]
@@ -41,14 +41,14 @@ class GateTests(ScratchRepo):
         self.assertNotIn("Secret-Partner", out + err)
 
     def test_refuse_policy_makes_non_ascii_a_problem(self):
-        write(os.path.join(self.repo, ".claude", "keel.json"), json.dumps({"gate": {"nonAscii": "refuse"}}))
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"gate": {"nonAscii": "refuse"}}))
         self.stage("a.txt", ["caf" + chr(0xE9)])
         code, out, _ = self.run_script("gate")
         self.assertEqual(code, 1)
         self.assertIn("a.txt:1: a character outside ASCII (U+00E9)", out)
 
     def test_ignore_policy_and_any_line_endings(self):
-        write(os.path.join(self.repo, ".claude", "keel.json"), json.dumps({"gate": {"nonAscii": "ignore", "lineEndings": "any"}}))
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"gate": {"nonAscii": "ignore", "lineEndings": "any"}}))
         self.stage("a.txt", ["caf" + chr(0xE9) + "\r"])
         code, out, _ = self.run_script("gate")
         self.assertEqual(code, 0, out)

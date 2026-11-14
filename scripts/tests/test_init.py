@@ -28,7 +28,7 @@ class InitTests(ScratchRepo):
         for path in (".claude/README.md", ".claude/rules/before-a-commit.md", ".claude/rules/recording-decisions.md",
                      ".claude/skills/full-checks/SKILL.md", ".claude/skills/push/SKILL.md", ".claude/scripts/gate.py",
                      ".claude/scripts/budget.py", ".claude/scripts/common.py", ".claude/scripts/defaults.json",
-                     ".githooks/pre-commit", ".claude/keel.json"):
+                     ".githooks/pre-commit", ".claude/bowline.json"):
             self.assertTrue(os.path.isfile(os.path.join(self.repo, path)), path)
         ignore = read(os.path.join(self.repo, ".gitignore"))
         self.assertTrue(ignore.startswith("bin/\n"))
@@ -46,7 +46,7 @@ class InitTests(ScratchRepo):
         text = read(os.path.join(self.repo, "CLAUDE.md"))
         self.assertTrue(text.startswith("# This repository, for every Claude Code session"))
         self.assertIn("## Compact Instructions", text)
-        self.assertTrue(os.path.isfile(os.path.join(self.repo, ".claude", "keel.json")))
+        self.assertTrue(os.path.isfile(os.path.join(self.repo, ".claude", "bowline.json")))
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".claude", "README.md")))
 
     def test_local_copies_run_on_their_own(self):

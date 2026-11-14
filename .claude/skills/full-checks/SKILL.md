@@ -1,6 +1,6 @@
 ---
 name: full-checks
-description: Run every check keel requires before a push - the tests on scratch repositories, keel's own gate over its files, the budget and the doctor. Use before pushing, or when asked whether everything passes.
+description: Run every check bowline requires before a push - the tests on scratch repositories, bowline's own gate over its files, the budget and the doctor. Use before pushing, or when asked whether everything passes.
 ---
 
 # The full checks
@@ -18,15 +18,15 @@ folder and removes them afterwards. A test that fails only on one system is a re
 are what differ between Windows, Linux and macOS. CI runs the same command on Linux and Windows on every push; macOS
 runs when started by hand while the repository is private.
 
-## 2. keel's own gate, budget and doctor
+## 2. bowline's own gate, budget and doctor
 
 ```
-python -I scripts/keel.py gate --all
-python -I scripts/keel.py budget
-python -I scripts/keel.py doctor --no-memory
+python -I scripts/bowline.py gate --all
+python -I scripts/bowline.py budget
+python -I scripts/bowline.py doctor --no-memory
 ```
 
-keel's files are ASCII only (`.claude/keel.json` makes a character outside ASCII a refusal), so a `\u` escape typed
+bowline's files are ASCII only (`.claude/bowline.json` makes a character outside ASCII a refusal), so a `\u` escape typed
 into a test must be built with `chr()`; the Write tool of Claude Code turns the escape into the character itself.
 
 ## 3. What tests cannot show

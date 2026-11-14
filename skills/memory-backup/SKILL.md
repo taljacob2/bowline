@@ -6,7 +6,7 @@ description: Back up Claude Code's memory folder for this repository to a privat
 # The memory backup
 
 Claude Code keeps its notes about this repository in a folder outside it, one per person per machine, and loses it with
-the machine. keel makes that folder a git repository tied to a private remote and pushes it after every reply.
+the machine. bowline makes that folder a git repository tied to a private remote and pushes it after every reply.
 
 ## Setting it up
 
@@ -20,11 +20,11 @@ the machine. keel makes that folder a git repository tied to a private remote an
    and use `git@github.com:<owner>/<name>.git`. Creating a repository on their account is outward-facing: do it only on
    their word.
 
-2. Run the setup. The keel plugin's own hook already pushes after every reply once the plugin is installed, so no
+2. Run the setup. The bowline plugin's own hook already pushes after every reply once the plugin is installed, so no
    per-machine hook is needed:
 
    ```
-   "${CLAUDE_PLUGIN_ROOT}/bin/keel" memory setup <remote> --no-hook
+   "${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory setup <remote> --no-hook
    ```
 
    It clones the remote when the folder is empty (a new machine), initializes and pushes a first backup when the folder
@@ -32,7 +32,7 @@ the machine. keel makes that folder a git repository tied to a private remote an
    Claude Code has made no project folder yet, a session has to run in the repository once first; this one counts, so
    run it again.
 
-3. Show the result of `"${CLAUDE_PLUGIN_ROOT}/bin/keel" memory status`: the index's size against its cap, the remote,
+3. Show the result of `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory status`: the index's size against its cap, the remote,
    the last commit, what is not yet pushed.
 
 If the plugin's hook cannot run on this machine (Windows without Git Bash), run the setup without `--no-hook`: it then
@@ -41,7 +41,7 @@ writes a per-machine hook into Claude Code's settings with the absolute path of 
 ## On a new machine
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" memory restore <remote> --no-hook
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory restore <remote> --no-hook
 ```
 
 after one session has run in the repository. Then `/memory` in a new session shows the notes read.
@@ -49,6 +49,6 @@ after one session has run in the repository. Then `/memory` in a new session sho
 ## When asked what Claude remembers
 
 `memory status` says where the folder is and how big the index is. The notes themselves are the person's to read; the
-index `MEMORY.md` lists them one line each. If the index is near its cap, offer `/keel:curate-memory`.
+index `MEMORY.md` lists them one line each. If the index is near its cap, offer `/bowline:curate-memory`.
 
 Never print the content of a note the person did not ask to see, and never push to a remote that is not private.

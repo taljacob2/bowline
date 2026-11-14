@@ -14,8 +14,8 @@ is reviewed against the page it came from.
 ## 1. Measure and propose
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" doctor
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" move plan --file <the CLAUDE.md>
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" doctor
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move plan --file <the CLAUDE.md>
 ```
 
 The plan lists each `## ` section with its lines, its size and where the two cutoffs fall. Propose, section by section:
@@ -26,13 +26,13 @@ area. Write the proposal as a table and ask the person; they know which sections
 
 ## 2. The move, as a spec
 
-Write the approved proposal as a spec file (the shape is in `"${CLAUDE_PLUGIN_ROOT}/bin/keel" move --help`), and the
+Write the approved proposal as a spec file (the shape is in `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move --help`), and the
 new index as a Markdown file under 200 lines: what the folder is, what to read first, where its rules, skills and pages
 are, its commands. Then:
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" move run --file <the CLAUDE.md> --spec <spec> --check
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" move run --file <the CLAUDE.md> --spec <spec>
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move run --file <the CLAUDE.md> --spec <spec> --check
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move run --file <the CLAUDE.md> --spec <spec>
 ```
 
 `--check` prints every target with its size, the characters it will normalize (em dashes and the like, when the
@@ -49,12 +49,12 @@ enforced by a named test or lint rule the subagent confirmed, or a one-off that 
 its page: every imperative traceable, every named file or test real, nothing personal, nothing dated without a reason.
 Trim to the area's budget; a dropped rule stays in the page.
 
-Then `"${CLAUDE_PLUGIN_ROOT}/bin/keel" budget` must pass, and the doctor must show the file as an index.
+Then `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" budget` must pass, and the doctor must show the file as an index.
 
 ## 4. Update the pointers
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" move find-pointers --name <the old file's path>
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move find-pointers --name <the old file's path>
 ```
 
 lists every line in the repository that names it. For each that points at a moved section (a code comment, a doc, a

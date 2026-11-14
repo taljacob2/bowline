@@ -3,11 +3,11 @@
 These rules apply to every commit in this repository, whichever part it touches. The `push` skill is the procedure
 that follows them.
 
-- **Run the gate before every commit.** `python -I scripts/keel.py gate` checks the staged lines for a token-shaped
+- **Run the gate before every commit.** `python -I scripts/bowline.py gate` checks the staged lines for a token-shaped
   string, a control byte, a carriage return, a byte-order mark, characters the repository does not accept, and the
   words of a private never-commit list. One hit stops the commit and the push. Never print a count and go on: a pushed
   secret cannot be taken back.
-- **Keep the line endings and the encoding the repository uses** (LF, no byte-order mark, unless `.claude/keel.json`
+- **Keep the line endings and the encoding the repository uses** (LF, no byte-order mark, unless `.claude/bowline.json`
   says otherwise). A script that edits files keeps them; on Windows, Python opens files with `newline=''`, and
   PowerShell's `Set-Content` and `Out-File` are not used for repository files because they add a byte-order mark.
 - **Fetch and rebase before every push**, with a clean tree, when more than one person or session pushes to the same

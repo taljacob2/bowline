@@ -10,7 +10,7 @@ The doctor changes nothing. It measures and says, for each finding, what it foun
 ## Run it
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/keel" doctor
+"${CLAUDE_PLUGIN_ROOT}/bin/bowline" doctor
 ```
 
 Add `--no-memory` when the memory folder is not this person's concern (CI, a shared machine). Add `--repo <path>` to
@@ -21,13 +21,13 @@ measure another repository.
 Go through the findings in order, worst first: PROBLEM, then WARNING, then NOTE. For each, say in one sentence what it
 means for this repository, in plain words, and name the skill that fixes it:
 
-- A `CLAUDE.md` over 200 lines, or a nested one cut at a line: `/keel:split-instructions`. Say which sections are
+- A `CLAUDE.md` over 200 lines, or a nested one cut at a line: `/bowline:split-instructions`. Say which sections are
   never read today; that is the fact that convinces.
-- A rules file or an area over its budget: `/keel:split-instructions` for the move, then shorten the rules.
+- A rules file or an area over its budget: `/bowline:split-instructions` for the move, then shorten the rules.
 - A path outside the repository in an instruction file: fix the pointer by hand; a contributor cannot follow it.
-- No `Compact Instructions` or `Memory between sessions` section, no `.claude/keel.json`, no gate: `/keel:init`.
-- The memory index near or over its cap: `/keel:curate-memory`.
-- The memory not backed up, or no hook pushing it: `/keel:memory-backup`.
+- No `Compact Instructions` or `Memory between sessions` section, no `.claude/bowline.json`, no gate: `/bowline:init`.
+- The memory index near or over its cap: `/bowline:curate-memory`.
+- The memory not backed up, or no hook pushing it: `/bowline:memory-backup`.
 
 Then stop. Do not fix anything from this skill; each fix is its own skill with the person's yes. If the report is clean,
 say so in one line and what the numbers were.

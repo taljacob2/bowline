@@ -1,4 +1,4 @@
-# keel's tests on the three systems it supports, on every push and pull request. The repository is public, so the
+# bowline's tests on the three systems it supports, on every push and pull request. The repository is public, so the
 # minutes are free; every job has a time limit so a hang cannot run on.
 name: tests
 
@@ -26,14 +26,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          # 3.8 is the oldest Python keel supports and runs on the Windows and macOS runners; the Linux runner's
+          # 3.8 is the oldest Python bowline supports and runs on the Windows and macOS runners; the Linux runner's
           # image no longer offers 3.8, so it runs a newer one.
           python-version: ${{ matrix.python }}
       - name: Run the tests on scratch repositories
         run: python -I -m unittest discover -s scripts/tests -p "test_*.py" -v
-      - name: keel's own gate over every tracked file
-        run: python -I scripts/keel.py gate --all
-      - name: keel's own budget and doctor
+      - name: bowline's own gate over every tracked file
+        run: python -I scripts/bowline.py gate --all
+      - name: bowline's own budget and doctor
         run: |
-          python -I scripts/keel.py budget
-          python -I scripts/keel.py doctor --no-memory || true
+          python -I scripts/bowline.py budget
+          python -I scripts/bowline.py doctor --no-memory || true

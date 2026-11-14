@@ -1,4 +1,4 @@
-"""What keel's scripts share: where the repository and Claude Code's folders are, the configuration, and how a finding
+"""What bowline's scripts share: where the repository and Claude Code's folders are, the configuration, and how a finding
 is printed. Standard library only; Python 3.8 or later; Windows, Linux and macOS alike."""
 
 import json
@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_FILE = ".claude/keel.json"
+CONFIG_FILE = ".claude/bowline.json"
 
 
 def run_git(args, cwd=None, check=True):
@@ -16,10 +16,10 @@ def run_git(args, cwd=None, check=True):
     try:
         result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=False)
     except FileNotFoundError:
-        print("keel: git was not found on this machine.", file=sys.stderr)
+        print("bowline: git was not found on this machine.", file=sys.stderr)
         sys.exit(2)
     if check and result.returncode != 0:
-        print("keel: git failed: " + result.stderr.decode("utf-8", "replace").strip(), file=sys.stderr)
+        print("bowline: git failed: " + result.stderr.decode("utf-8", "replace").strip(), file=sys.stderr)
         sys.exit(2)
     return result.stdout.decode("utf-8", "replace")
 
@@ -81,12 +81,12 @@ def defaults_path():
         path = os.path.join(folder, "defaults.json")
         if os.path.isfile(path):
             return path
-    print("keel: defaults.json was not found beside the scripts.", file=sys.stderr)
+    print("bowline: defaults.json was not found beside the scripts.", file=sys.stderr)
     sys.exit(2)
 
 
 def load_config(root):
-    """The plugin's defaults, with the repository's .claude/keel.json laid over them when it exists."""
+    """The plugin's defaults, with the repository's .claude/bowline.json laid over them when it exists."""
     with open(defaults_path(), encoding="utf-8") as handle:
         config = json.load(handle)
     if root:
@@ -96,7 +96,7 @@ def load_config(root):
                 try:
                     config = deep_merge(config, json.load(handle))
                 except json.JSONDecodeError as problem:
-                    print(f"keel: {CONFIG_FILE} is not valid JSON ({problem}); using the defaults.", file=sys.stderr)
+                    print(f"bowline: {CONFIG_FILE} is not valid JSON ({problem}); using the defaults.", file=sys.stderr)
     return config
 
 
@@ -147,7 +147,7 @@ class Finding:
         return out
 
 
-def print_findings(findings, prefix="keel"):
+def print_findings(findings, prefix="bowline"):
     for finding in findings:
         for line in finding.lines():
             print(line)

@@ -1,28 +1,29 @@
-# keel
+# bowline
 
 Claude Code reads less of your `CLAUDE.md` than you think. A nested one is cut at a fixed size and the rest is never
 applied; the documentation's target is 200 lines, and real files grow to thousands. The memory Claude keeps about your
 project lives on one machine, loads only its index at the start of a session, and is lost with the machine. A long
 conversation is summarized while you are away, and nothing tells the summary what to keep.
 
-keel is a small set of tools and one explanation. It measures a repository and a machine against what Claude Code
+bowline is a small set of tools and one explanation. It measures a repository and a machine against what Claude Code
 actually reads and says what to do; it scaffolds a layout where each kind of knowledge lives where the tool loads it;
 it backs up and curates the personal memory; it moves an oversized instruction file into that layout without losing a
 line; and it refuses a commit that carries what must never be committed. Every number it uses is a visible, dated
-setting with its source. The name is the beam a ship is built on, the one that keeps it steady on every voyage.
+setting with its source. The name is the sailor's knot that holds fast under load and still comes undone by hand:
+knowledge tied down so that it holds, with nothing locked.
 
 ## Install
 
 As a Claude Code plugin, so its skills and hooks are there in every session:
 
 ```
-claude plugin marketplace add taljacob2/keel
-claude plugin install keel@keel
+claude plugin marketplace add taljacob2/bowline
+claude plugin install bowline@bowline
 ```
 
-Then, in any repository, `/keel:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
+Then, in any repository, `/bowline:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
 one-line finding into Claude's context when something is over budget or unbacked, and nothing when all is well; after
-every reply the memory folder is pushed to its backup once `/keel:memory-backup` has tied it to a private remote; and
+every reply the memory folder is pushed to its backup once `/bowline:memory-backup` has tied it to a private remote; and
 before every `git commit` Claude issues, the gate checks the staged lines. Everything else is a skill you or Claude
 invoke, with you approving before anything moves.
 
@@ -30,8 +31,8 @@ To try it without installing, start a session with `claude --plugin-dir <a clone
 scripts directly:
 
 ```
-git clone https://github.com/taljacob2/keel
-python -I keel/scripts/keel.py doctor --repo <your repository>
+git clone https://github.com/taljacob2/bowline
+python -I bowline/scripts/bowline.py doctor --repo <your repository>
 ```
 
 The doctor prints three lines per finding: what it found, why it matters, and what to do. Nothing is changed.
@@ -44,12 +45,12 @@ The doctor prints three lines per finding: what it found, why it matters, and wh
 | `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
 | `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
 | `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. |
-| `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/keel.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. |
+| `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/bowline.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. |
 
 ```
-python -I keel/scripts/keel.py init --repo <your repository> --plan
-python -I keel/scripts/keel.py init --repo <your repository> --write
-python -I keel/scripts/keel.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
+python -I bowline/scripts/bowline.py init --repo <your repository> --plan
+python -I bowline/scripts/bowline.py init --repo <your repository> --write
+python -I bowline/scripts/bowline.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
 ```
 
 | `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention. |
@@ -63,7 +64,7 @@ packaging that installs them with one command is the next round; until then, sta
 `claude --plugin-dir <this folder>` once the manifest lands.
 
 The guide: [`docs/guide.md`](docs/guide.md) (the problem in a page, the three homes, the budgets, the four flows
-drawn), [`docs/facts.md`](docs/facts.md) (what keel measures against, with sources and the date checked),
+drawn), [`docs/facts.md`](docs/facts.md) (what bowline measures against, with sources and the date checked),
 [`docs/conventions.md`](docs/conventions.md) (the conventions and the loss each prevents),
 [`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory) and
 [`docs/compared.md`](docs/compared.md) (how it differs from doing it by hand, from `claude-md-management`, and from
@@ -76,7 +77,7 @@ Python 3.8 or later (standard library only) and git. Windows, Linux and macOS.
 ## Configuration
 
 `defaults.json` holds every limit and policy with its reason. A repository lays its own values over them in
-`.claude/keel.json`, for example to make characters outside ASCII a refusal rather than a warning, or to name the
+`.claude/bowline.json`, for example to make characters outside ASCII a refusal rather than a warning, or to name the
 characters it accepts.
 
 ## Tests

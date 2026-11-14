@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" doctor --brief",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" doctor --brief",
             "timeout": 20
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" memory push --hook",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" memory push --hook",
             "timeout": 60
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" memory push --hook",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" memory push --hook",
             "timeout": 60
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" gate --hook",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" gate --hook",
             "if": "Bash(git commit*)",
             "timeout": 60
           }

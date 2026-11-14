@@ -1,11 +1,11 @@
-"""keel's one entry point. The launchers in bin/ run it; so can you:
+"""bowline's one entry point. The launchers in bin/ run it; so can you:
 
-    python -I scripts/keel.py doctor [--repo <path>] [--no-memory]
-    python -I scripts/keel.py gate [--all | --hook] [--never-commit <file>]
-    python -I scripts/keel.py budget [--repo <path>]
-    python -I scripts/keel.py memory setup|restore <remote> [--no-hook] | status | push [--hook]
-    python -I scripts/keel.py init [--plan | --write] [--only item,item]
-    python -I scripts/keel.py move plan --file <CLAUDE.md> | run --file <CLAUDE.md> --spec <json> [--check] | find-pointers --name <words> | pointers --spec <json> [--check]
+    python -I scripts/bowline.py doctor [--repo <path>] [--no-memory]
+    python -I scripts/bowline.py gate [--all | --hook] [--never-commit <file>]
+    python -I scripts/bowline.py budget [--repo <path>]
+    python -I scripts/bowline.py memory setup|restore <remote> [--no-hook] | status | push [--hook]
+    python -I scripts/bowline.py init [--plan | --write] [--only item,item]
+    python -I scripts/bowline.py move plan --file <CLAUDE.md> | run --file <CLAUDE.md> --spec <json> [--check] | find-pointers --name <words> | pointers --spec <json> [--check]
 
 Each command is its own module beside this file and can be run directly with the same arguments.
 """
@@ -40,10 +40,10 @@ def main(argv=None):
         return usage()
     name, rest = argv[0], argv[1:]
     if name in LATER:
-        print(f"keel: '{name}' is not here yet: {LATER[name]}.", file=sys.stderr)
+        print(f"bowline: '{name}' is not here yet: {LATER[name]}.", file=sys.stderr)
         return 2
     if name not in COMMANDS:
-        print(f"keel: unknown command '{name}'.", file=sys.stderr)
+        print(f"bowline: unknown command '{name}'.", file=sys.stderr)
         return usage()
     module = __import__(COMMANDS[name][0])
     return module.main(rest)

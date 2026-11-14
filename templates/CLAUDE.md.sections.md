@@ -40,5 +40,5 @@ loaded, and only its first 200 lines or 25 KB, whichever comes first; the files 
   round, so that a compaction or a fresh session at any moment finds it.
 - **The repository is the record; the memory is the working notes.** The memory folder is not part of the repository
   and is not backed up with it. A decision is durable only once it is in the repository's documents; a memory note
-  points at that record, it does not replace it. Back the folder up to a private repository of your own (`keel memory
+  points at that record, it does not replace it. Back the folder up to a private repository of your own (`bowline memory
   setup <remote>`), because the notes are personal: they hold how you work, your machines and your links.

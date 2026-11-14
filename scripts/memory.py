@@ -1,9 +1,9 @@
 """The memory backup: Claude Code's memory folder for a repository becomes a git repository pushed to a private remote.
 
-    python -I scripts/keel.py memory setup <remote> [--repo <path>] [--no-hook] [--python <exe>] [--dry-run]
-    python -I scripts/keel.py memory restore <remote> [--repo <path>]     the same, in a new machine's words
-    python -I scripts/keel.py memory status [--repo <path>]
-    python -I scripts/keel.py memory push [--repo <path>] [--hook]        what the hook runs after every reply
+    python -I scripts/bowline.py memory setup <remote> [--repo <path>] [--no-hook] [--python <exe>] [--dry-run]
+    python -I scripts/bowline.py memory restore <remote> [--repo <path>]     the same, in a new machine's words
+    python -I scripts/bowline.py memory status [--repo <path>]
+    python -I scripts/bowline.py memory push [--repo <path>] [--hook]        what the hook runs after every reply
 
 Claude Code keeps notes between sessions in <config>/projects/<project>/memory/, one folder per person per machine,
 outside the repository; a lost machine loses them. setup ties that folder to a private remote: when the folder is
@@ -11,7 +11,7 @@ missing or empty it clones the remote (a new machine); when it holds notes and t
 and pushes a first backup; when both hold content it stops and says how to merge by hand. Then, unless --no-hook, it
 installs a hook for this machine in <config>/settings.json that runs `memory push --hook` after every reply (Stop) and
 when a session ends (SessionEnd), with the absolute path of the interpreter that ran setup, so the name of Python on
-this machine does not matter. The keel plugin's own hooks.json does the same for every project once the plugin is
+this machine does not matter. The bowline plugin's own hooks.json does the same for every project once the plugin is
 installed; pass --no-hook then.
 
 push commits what changed as "Memory as of <date>" and pushes when the branch is ahead; with --hook it prints nothing
@@ -30,7 +30,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common  # noqa: E402
 
-HOOK_MARKS = ("keel", "push-memory")
+HOOK_MARKS = ("bowline", "push-memory")
 
 
 def git(folder, *args, capture=False):
@@ -46,7 +46,7 @@ def folder_has_files(folder):
 def remote_has_commits(remote):
     code, out = git(".", "ls-remote", "--heads", remote, capture=True)
     if code != 0:
-        raise SystemExit(f"keel memory: the remote {remote} could not be reached.")
+        raise SystemExit(f"bowline memory: the remote {remote} could not be reached.")
     return bool(out.strip())
 
 
@@ -67,11 +67,11 @@ def tie(memory, remote, dry_run):
                 os.rmdir(memory)
             code, out = git(".", "clone", "-q", remote, memory, capture=True)
             if code != 0:
-                raise SystemExit("keel memory: the clone failed: " + out.strip())
+                raise SystemExit("bowline memory: the clone failed: " + out.strip())
         return
     if remote_has_commits(remote):
         raise SystemExit(
-            f"keel memory: {memory} already holds notes and {remote} already holds commits. Merge them by hand: move the\n"
+            f"bowline memory: {memory} already holds notes and {remote} already holds commits. Merge them by hand: move the\n"
             "notes aside, clone the remote into the folder, copy the notes back, then commit and push.")
     print(f"memory: {memory} holds notes and the remote is empty; initializing git and pushing the first backup")
     if dry_run:
@@ -80,11 +80,11 @@ def tie(memory, remote, dry_run):
                  ("remote", "add", "origin", remote), ("push", "-q", "-u", "origin", "main")):
         code, out = git(memory, *args, capture=True)
         if code != 0:
-            raise SystemExit(f"keel memory: git {' '.join(args)} failed: {out.strip()}")
+            raise SystemExit(f"bowline memory: git {' '.join(args)} failed: {out.strip()}")
 
 
-def hook_entry(python, keel_py):
-    return {"type": "command", "command": python, "args": ["-I", keel_py.replace("\\", "/"), "memory", "push", "--hook"], "timeout": 60}
+def hook_entry(python, bowline_py):
+    return {"type": "command", "command": python, "args": ["-I", bowline_py.replace("\\", "/"), "memory", "push", "--hook"], "timeout": 60}
 
 
 def hook_present(groups):
@@ -103,14 +103,14 @@ def install_hook(python, dry_run):
         with open(path, encoding="utf-8") as handle:
             settings = json.load(handle)
     hooks = settings.setdefault("hooks", {})
-    keel_py = os.path.join(common.PLUGIN_ROOT, "scripts", "keel.py")
+    bowline_py = os.path.join(common.PLUGIN_ROOT, "scripts", "bowline.py")
     changed = False
     for event in ("Stop", "SessionEnd"):
         groups = hooks.setdefault(event, [])
         if hook_present(groups):
             print(f"hook: the {event} hook is already there.")
             continue
-        groups.append({"hooks": [hook_entry(python, keel_py)]})
+        groups.append({"hooks": [hook_entry(python, bowline_py)]})
         changed = True
         print(f"hook: adding the {event} hook to {path}")
     if changed and not dry_run:
@@ -138,13 +138,13 @@ def do_setup(options, words):
     project = os.path.dirname(memory)
     if not os.path.isdir(project):
         raise SystemExit(
-            f"keel memory: Claude Code has not made a project folder for {checkout} yet (expected {project}).\n"
+            f"bowline memory: Claude Code has not made a project folder for {checkout} yet (expected {project}).\n"
             "Start Claude Code once inside the repository, then run this again.")
     print(f"repository: {checkout}")
     print(f"memory folder: {memory}")
     tie(memory, options.remote, options.dry_run)
     if options.no_hook:
-        print("hook: not installed (--no-hook); the keel plugin's own hook pushes when it is installed.")
+        print("hook: not installed (--no-hook); the bowline plugin's own hook pushes when it is installed.")
     else:
         install_hook(options.python or sys.executable, options.dry_run)
     print("dry run: nothing was changed." if options.dry_run else f"done. {words}")
@@ -166,7 +166,7 @@ def do_status(options):
     notes = [f for f in os.listdir(memory) if f.endswith(".md") and f != "MEMORY.md"]
     print(f"notes: {len(notes)}")
     if not os.path.isdir(os.path.join(memory, ".git")):
-        print("backup: none. Run: keel memory setup <private remote>")
+        print("backup: none. Run: bowline memory setup <private remote>")
         return 1
     _, remote = git(memory, "remote", "get-url", "origin", capture=True)
     _, last = git(memory, "log", "-1", "--format=%ci %s", capture=True)
@@ -196,7 +196,7 @@ def do_push(options):
             return 0 if options.hook else 2
     if not os.path.isdir(os.path.join(memory, ".git")):
         if not options.hook:
-            print(f"keel memory: {memory} is not a git repository; nothing to push.")
+            print(f"bowline memory: {memory} is not a git repository; nothing to push.")
         return 0
     git(memory, "add", "-A")
     committed = False
@@ -215,7 +215,7 @@ def do_push(options):
         if (ahead.strip() or "0") != "0":
             pushed = git(memory, "push", "-q")[0] == 0
     if not options.hook:
-        print(f"keel memory: {'committed' if committed else 'nothing new'}; {'pushed' if pushed else 'nothing to push'}.")
+        print(f"bowline memory: {'committed' if committed else 'nothing new'}; {'pushed' if pushed else 'nothing to push'}.")
     return 0
 
 

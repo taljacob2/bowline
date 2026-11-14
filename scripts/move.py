@@ -1,9 +1,9 @@
 """Moves an oversized instruction file into pages, rules and an index without losing a line, and updates the pointers.
 
-    python -I scripts/keel.py move plan --file <CLAUDE.md>
-    python -I scripts/keel.py move run --file <CLAUDE.md> --spec <spec.json> [--check]
-    python -I scripts/keel.py move find-pointers --name <file or section words> [--repo <path>]
-    python -I scripts/keel.py move pointers --spec <pointers.json> [--check]
+    python -I scripts/bowline.py move plan --file <CLAUDE.md>
+    python -I scripts/bowline.py move run --file <CLAUDE.md> --spec <spec.json> [--check]
+    python -I scripts/bowline.py move find-pointers --name <file or section words> [--repo <path>]
+    python -I scripts/bowline.py move pointers --spec <pointers.json> [--check]
 
 `plan` lists the file's "## " sections with their line ranges and sizes, and where Claude Code's two cutoffs fall, so a
 person and Claude can decide which sections become long-form pages, which become scoped rules, and which become
@@ -44,7 +44,7 @@ ASCII = {
 }
 
 PREAMBLE = (
-    "<!-- Moved verbatim from {source} on {date} by keel, with characters outside ASCII normalized to the repository's\n"
+    "<!-- Moved verbatim from {source} on {date} by bowline, with characters outside ASCII normalized to the repository's\n"
     "spelling. This is the long form: every entry's history and reasoning, as it was written. The short form that\n"
     "Claude Code loads is under {rules_dir}/; its rules point here by title. -->\n\n"
 )
@@ -74,7 +74,7 @@ def find_section(sections, wanted):
     """The one section whose title starts with the wanted words; an error when none or several match."""
     hits = [(t, b) for t, b in sections if t.lower().startswith(wanted.lower())]
     if len(hits) != 1:
-        raise SystemExit(f"keel move: the section '{wanted}' matches {len(hits)} heading(s); name it so it matches one.")
+        raise SystemExit(f"bowline move: the section '{wanted}' matches {len(hits)} heading(s); name it so it matches one.")
     return hits[0]
 
 
@@ -94,7 +94,7 @@ def normalize(text, accepted, allow_unknown):
         else:
             out.append(ch)
     if unknown and not allow_unknown:
-        raise SystemExit("keel move: characters with no ASCII spelling: " + ", ".join(f"U+{ord(c):04X}" for c in sorted(unknown))
+        raise SystemExit("bowline move: characters with no ASCII spelling: " + ", ".join(f"U+{ord(c):04X}" for c in sorted(unknown))
                          + ". Add them to the repository's acceptedCharacters, or pass --allow-unknown to write '?' for them.")
     return "".join(out), counts
 
@@ -106,7 +106,7 @@ def do_plan(options):
     preamble, sections = split_sections(text)
     small, large = config["limits"]["onDemandCutoffSmallWindow"], config["limits"]["onDemandCutoffLargeWindow"]
     total_lines = common.count_lines(text)
-    print(f"keel move plan: {options.file}: {total_lines} lines, {len(text):,} characters")
+    print(f"bowline move plan: {options.file}: {total_lines} lines, {len(text):,} characters")
     offset = len("\n".join(preamble)) + 1
     line = len(preamble) + 1
     print(f"  {'section':50} {'lines':>12} {'chars':>9}  {'starts at char':>14}")
@@ -126,7 +126,7 @@ def do_plan(options):
         offset += len(body_text) + 1
         line += len(body)
     print("\nDecide for each section: a long-form page (docs/conventions), a scoped rule (.claude/rules/<area>/), a skill, or the"
-          " index. Write the decision as a spec and run `keel move run --spec <file> --check`.")
+          " index. Write the decision as a spec and run `bowline move run --spec <file> --check`.")
     return 0
 
 
@@ -186,7 +186,7 @@ def do_run(options):
         index = common.read_text(spec["index"])
         bad = sorted({ord(c) for c in index if ord(c) > 127 and ord(c) not in accepted})
         if bad:
-            raise SystemExit("keel move: the index has characters outside ASCII: " + ", ".join(f"U+{c:04X}" for c in bad))
+            raise SystemExit("bowline move: the index has characters outside ASCII: " + ", ".join(f"U+{c:04X}" for c in bad))
         outputs.append((source_rel, index))
 
     unused = [t for t, _ in sections if t not in used]
@@ -224,7 +224,7 @@ def do_find_pointers(options):
             if needle in line:
                 hits += 1
                 print(f"{path}:{number}: {line.strip()[:160]}")
-    print(f"keel move: {hits} line(s) name '{needle}'.")
+    print(f"bowline move: {hits} line(s) name '{needle}'.")
     return 0
 
 
@@ -238,7 +238,7 @@ def do_pointers(options):
         text = common.read_text(full)
         count = text.count(entry["old"])
         if count != 1:
-            raise SystemExit(f"keel move: {entry['file']}: the old text occurs {count} time(s), not once: {entry['old'][:60]!r}")
+            raise SystemExit(f"bowline move: {entry['file']}: the old text occurs {count} time(s), not once: {entry['old'][:60]!r}")
         changes.append((full, entry["file"], text.replace(entry["old"], entry["new"], 1)))
         print(f"ok  {entry['file']}")
     if options.check:
@@ -261,7 +261,7 @@ def main(argv=None):
     p = sub.add_parser("pointers"); p.add_argument("--spec", required=True); p.add_argument("--check", action="store_true"); p.add_argument("--repo")
     options = parser.parse_args(argv)
     if not common.repo_root(options.repo):
-        print("keel move: not inside a git repository.", file=sys.stderr)
+        print("bowline move: not inside a git repository.", file=sys.stderr)
         return 2
     return {"plan": do_plan, "run": do_run, "find-pointers": do_find_pointers, "pointers": do_pointers}[options.command](options)
 

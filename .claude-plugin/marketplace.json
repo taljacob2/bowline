@@ -1,19 +1,19 @@
 {
-  "name": "keel",
-  "description": "keel: tools and a guide for keeping a project's knowledge within what Claude Code reads",
+  "name": "bowline",
+  "description": "bowline: tools and a guide for keeping a project's knowledge within what Claude Code reads",
   "owner": {
     "name": "Tal Jacob"
   },
   "plugins": [
     {
-      "name": "keel",
+      "name": "bowline",
       "description": "Measure, scaffold, back up, curate, move and gate: a project's knowledge kept within what Claude Code actually reads, across sessions, machines and contributors.",
       "source": {
         "source": "github",
-        "repo": "taljacob2/keel"
+        "repo": "taljacob2/bowline"
       },
       "category": "productivity",
-      "homepage": "https://github.com/taljacob2/keel"
+      "homepage": "https://github.com/taljacob2/bowline"
     }
   ]
 }

@@ -7,8 +7,8 @@ project's working rules depend on. Everything in it is for every contributor; no
 |---|---|---|
 | `rules/` | One rule per topic: an imperative with its one-sentence why. A file with a `paths:` list in its front matter is scoped and loads only when Claude touches a file that matches. A file without one loads at the start of every session, like the root `CLAUDE.md`. | By path, or at launch |
 | `skills/` | One procedure per folder, `SKILL.md` with reference files beside it: how to run the checks, how to push, how to do the project's own recurring tasks. | When you type `/name`, or when Claude judges it relevant |
-| (keel's own `scripts/`) | This is keel itself, so the checks the rules name are keel's own scripts in `scripts/`: `python -I scripts/keel.py gate` and `python -I scripts/keel.py budget`. A repository that uses keel gets copies under `.claude/scripts/` from `keel init`. | Run by the skills, the pre-commit hook and CI |
-| `keel.json` | The repository's own limits and gate policy, laid over keel's defaults, so every contributor measures against the same numbers. | By the checks |
+| (bowline's own `scripts/`) | This is bowline itself, so the checks the rules name are bowline's own scripts in `scripts/`: `python -I scripts/bowline.py gate` and `python -I scripts/bowline.py budget`. A repository that uses bowline gets copies under `.claude/scripts/` from `bowline init`. | Run by the skills, the pre-commit hook and CI |
+| `bowline.json` | The repository's own limits and gate policy, laid over bowline's defaults, so every contributor measures against the same numbers. | By the checks |
 
 Long explanations do not live here. A rule points to the page under `docs/conventions/` that holds its history and its
 reasoning, and a decision is recorded in the project's design document.
@@ -19,13 +19,13 @@ Claude Code loads a nested `CLAUDE.md`, and a scoped rule, when a matching file 
 40,000 characters of it on a 200K context window (150,000 on a 1M window). Past that, Claude gets a note that it may
 read the rest, and usually does not. So every `CLAUDE.md` stays under 200 lines, every rules file under 200 lines and
 40,000 characters, the scoped rules that load together for one area under 40,000 characters in all, and the unscoped
-rules, which every session loads, under 10,000 together. `scripts/budget.py` checks these; `keel doctor` explains
+rules, which every session loads, under 10,000 together. `scripts/budget.py` checks these; `bowline doctor` explains
 each finding.
 
 ## The commit gate
 
-`python -I scripts/keel.py gate` reads the staged diff and refuses a commit whose added lines hold a token, a control
-byte, a carriage return, a byte-order mark, a character outside ASCII (keel's own files are ASCII only, `keel.json`
+`python -I scripts/bowline.py gate` reads the staged diff and refuses a commit whose added lines hold a token, a control
+byte, a carriage return, a byte-order mark, a character outside ASCII (bowline's own files are ASCII only, `bowline.json`
 says so), or a word from a private list at `~/.claude/private/never-commit.txt` when that file exists. To have git run
 it on its own, once:
 
