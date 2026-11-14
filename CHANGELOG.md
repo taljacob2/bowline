@@ -33,8 +33,10 @@ background, on a branch of its own, and the person reviews and merges.
   with it, because an unattended session cannot write under `.claude/` itself: Claude Code treats that as a
   sensitive-file edit that only a person may approve, which the first live run found (`docs/facts.md` has the row, and
   `docs/decisions.md` says why the worker was not given `bypassPermissions` instead).
-- Left out, with the reason in `docs/decisions.md`: a setting that merges the result onto the person's branch on its
-  own.
+- `autosplit.deliver` chooses how the result arrives: `branch` (the default) leaves the two commits for the person to
+  review and cherry-pick; `merge` has the worker cherry-pick them onto the current branch as soon as they are ready,
+  only onto a clean tree and only when they apply without a conflict, and the doctor says what landed until `done`.
+  `docs/decisions.md` says why branch is the default.
 - The tests run the worker against a stand-in for the `claude` command (`scripts/tests/fake_claude.py`), so the suite
   starts no session. That a headless session starts from inside another session's hook environment and returns the JSON
   result was checked by hand on Windows, with a ten-cent cap.

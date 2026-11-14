@@ -35,7 +35,8 @@ you work, and the merge is yours.
 ## What bowline deliberately is not
 
 - Not a background optimizer of what you work from. It measures and nudges on its own, and with `autosplit` turned on it
-  prepares a split on a branch of its own; nothing on your branch changes without your yes.
+  prepares a split on a branch of its own; nothing on your branch changes without your yes, unless the repository
+  chooses `deliver: merge` in the open, in a file every contributor sees.
 - Not a framework. Six skills, three hooks, five scripts, standard library Python, no server, no dependency.
 - Not an opinion about your rules' content. It cares where a rule lives and how big the file is, not what it says.
 - Not a way to share memory. Memory is personal by design; bowline promotes what a project needs into the repository and

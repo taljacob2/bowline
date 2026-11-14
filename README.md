@@ -56,7 +56,7 @@ python -I bowline/scripts/bowline.py memory setup git@github.com:<you>/<private 
 ```
 
 | `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
-| `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
+| `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `deliver` chooses between that branch (the default) and merging onto your branch on its own when your tree is clean. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
 
 ## The skills, for Claude Code
 

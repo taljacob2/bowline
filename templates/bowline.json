@@ -9,6 +9,7 @@
   "conventionsDir": "docs/conventions",
   "_autosplit": "Set enabled to true to let bowline prepare the split of a CLAUDE.md that outgrew the limits in the background, on a branch for you to review and merge; the other keys and their reasons are in bowline's defaults.json.",
   "autosplit": {
-    "enabled": false
+    "enabled": false,
+    "deliver": "branch"
   }
 }

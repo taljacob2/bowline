@@ -36,12 +36,17 @@ person's tree, their uncommitted work and their open session are never touched.
 every contributor sees, and a contributor who installs the plugin for another repository gets nothing they did not ask
 for.
 
-**What was not chosen.** A `deliver: merge` setting that would cherry-pick the result onto the person's branch as soon
-as it is ready. It is a few lines, and it may come when a repository asks for it; it was left out because it would
-rewrite the person's instructions and collide with their uncommitted edits at a moment they did not choose. Also not
-chosen: running the worker at a session's start, which would make the person wait, where the hook after a reply starts
-it while they work; and keeping the worktree under the repository, which would show up as an untracked folder in their
-tree.
+**The two ways to deliver, and the default.** `deliver: branch`, the default, leaves the two commits on their branch
+for the person to review and cherry-pick. `deliver: merge` has the worker cherry-pick them onto the person's current
+branch itself as soon as they are ready, with three safeguards: only when the working tree is clean, only when the
+cherry-pick applies without a conflict (otherwise the split stays on its branch and the doctor says why), and never a
+push; the doctor then says what landed until the person acknowledges it with `done`. The default is branch because
+the condensing drops lines by judgment, and an unreviewed change to the instructions is the one thing bowline exists to
+prevent. merge exists because the first user asked that every option be there for the person to choose, with a
+default chosen for them, and a repository that wants the autocompact feel to the end can say so in the open, in a file
+every contributor sees. Not chosen: running the worker at a session's start, which would make the person wait, where
+the hook after a reply starts it while they work; and keeping the worktree under the repository, which would show up
+as an untracked folder in their tree.
 
 Also not chosen, after the first live run: giving the worker's session `bypassPermissions` so that it could write the
 rule files itself. The run showed that Claude Code treats an edit under `.claude/` as a sensitive-file edit that only a
