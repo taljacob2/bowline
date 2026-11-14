@@ -4,6 +4,18 @@ Every version names the date its facts were last checked against the Claude Code
 keel measures against are Claude Code's, not keel's. When a limit moves, `defaults.json` and `docs/facts.md` change
 together and the entry here says which.
 
+## 0.1.1 (2026-11-14)
+
+What the first run of the tests on three systems found, hours after 0.1.0:
+
+- `move` built the "moved from" path from the file's path as given; on macOS the temp folder sits behind a symlink and
+  on a Windows runner behind a short name, so the relative path was wrong. Both sides are real paths now.
+- The tests named the memory folder from the scratch folder's path as given, while the scripts name it from what git
+  reports; the scratch folder is a real path now, as git sees it.
+- `.gitattributes` checks every text file out with LF on every system, so the gate's carriage-return rule means the same
+  thing everywhere; `*.cmd` keeps CRLF, as cmd expects.
+- CI runs Python 3.8 on the Windows and macOS runners and 3.11 on Linux, whose image no longer offers 3.8.
+
 ## 0.1.0 (2026-11-14)
 
 The first version, extracted from the knowledge work done in one repository over two days and proven on a second.

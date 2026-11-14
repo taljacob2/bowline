@@ -1,0 +1,4 @@
+# Every text file is checked out with LF line endings on every system, so the gate's carriage-return rule and the tests'
+# byte counts mean the same thing on Windows, Linux and macOS.
+* text=auto eol=lf
+*.cmd text eol=crlf

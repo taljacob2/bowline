@@ -138,7 +138,9 @@ def do_run(options):
     with open(options.spec, encoding="utf-8") as handle:
         spec = json.load(handle)
     source_path = options.file
-    source_rel = os.path.relpath(os.path.abspath(source_path), root).replace("\\", "/")
+    # Real paths on both sides: git reports the repository root resolved, and the file may be given through a symlink
+    # or a short name (macOS's /var, Windows's RUNNER~1), which would make the relative path wrong.
+    source_rel = os.path.relpath(os.path.realpath(source_path), os.path.realpath(root)).replace("\\", "/")
     text = common.read_text(source_path)
     preamble, sections = split_sections(text)
     date = __import__("datetime").date.today().isoformat()

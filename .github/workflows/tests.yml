@@ -13,14 +13,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.8"
+          - os: macos-latest
+            python: "3.8"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.8"
+          # 3.8 is the oldest Python keel supports and runs on the Windows and macOS runners; the Linux runner's
+          # image no longer offers 3.8, so it runs a newer one.
+          python-version: ${{ matrix.python }}
       - name: Run the tests on scratch repositories
         run: python -I -m unittest discover -s scripts/tests -p "test_*.py" -v
       - name: keel's own gate over every tracked file
