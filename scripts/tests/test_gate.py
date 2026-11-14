@@ -54,6 +54,14 @@ class GateTests(ScratchRepo):
         self.assertEqual(code, 0, out)
         self.assertIn("nothing found", out)
 
+    def test_a_batch_file_may_carry_carriage_returns(self):
+        self.stage("tool.cmd", ["@echo off\r", "echo hi\r"])
+        self.stage("notes.txt", ["a line\r"])
+        code, out, _ = self.run_script("gate")
+        self.assertEqual(code, 1, out)
+        self.assertIn("notes.txt:1: a carriage return", out)
+        self.assertNotIn("tool.cmd", out)
+
     def test_nothing_staged(self):
         code, out, _ = self.run_script("gate")
         self.assertEqual(code, 0)

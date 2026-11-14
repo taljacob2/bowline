@@ -14,6 +14,7 @@ repository. Exit codes: 0 fine, 1 at least one problem, 2 the script could not r
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -62,14 +63,20 @@ class Policy:
         self.control = bool(gate.get("controlBytes", True))
         self.bom = bool(gate.get("byteOrderMark", True))
         self.cr = (gate.get("lineEndings") or "lf").lower() == "lf"
+        self.crlf_files = list(gate.get("crlfFiles") or [])
         self.non_ascii = (gate.get("nonAscii") or "warn").lower()
         self.accepted = common.accepted_characters(gate.get("acceptedCharacters"))
         list_path = never_commit_override or gate.get("neverCommitList")
         self.private_path = common.expand_path(list_path) if list_path else None
         self.private = private_patterns(self.private_path)
 
+    def allows_cr(self, path):
+        """Whether a carriage return is fine in this file: a Windows batch file, by default."""
+        name = os.path.basename(path)
+        return any(fnmatch.fnmatch(name, pattern) for pattern in self.crlf_files)
 
-def problems_in(line, policy):
+
+def problems_in(line, policy, path=""):
     """The rules one added line breaks, as (level, rule) pairs. The line is bytes without its line ending."""
     found = []
     for name, pattern in policy.tokens:
@@ -77,7 +84,7 @@ def problems_in(line, policy):
             found.append(("problem", name))
     if policy.control and CONTROL.search(line):
         found.append(("problem", "a control character"))
-    if policy.cr and b"\r" in line:
+    if policy.cr and b"\r" in line and not policy.allows_cr(path):
         found.append(("problem", "a carriage return (the repository is LF only)"))
     if policy.bom and BOM in line:
         found.append(("problem", "a byte-order mark"))
@@ -137,7 +144,7 @@ def run(root, policy, everything=False):
     checked = 0
     for path, number, line in lines:
         checked += 1
-        for level, rule in problems_in(line, policy):
+        for level, rule in problems_in(line, policy, path):
             (problems if level == "problem" else warnings).append(f"{path}:{number}: {rule}")
     return problems, warnings, checked
 

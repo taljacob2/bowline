@@ -40,6 +40,7 @@
     "controlBytes": true,
     "byteOrderMark": true,
     "lineEndings": "lf",
+    "crlfFiles": ["*.cmd", "*.bat"],
     "nonAscii": "warn",
     "acceptedCharacters": [],
     "neverCommitList": "~/.claude/private/never-commit.txt"
@@ -49,6 +50,7 @@
     "controlBytes": "A bell or another control character survives a type check and breaks a terminal or a string.",
     "byteOrderMark": "A byte-order mark is invisible, passes the compilers, and breaks the first line of a file or a commit message.",
     "lineEndings": "A repository that is LF only keeps diffs honest; a carriage return in one line makes the whole file look changed. Set to any to allow both.",
+    "crlfFiles": "Windows batch files are the one kind that needs CRLF (cmd's goto misses labels in a long LF-only file), so the carriage-return rule skips files matching these patterns; a .gitattributes line checks them out that way.",
     "nonAscii": "warn names characters outside ASCII without stopping the commit; refuse stops it, for a repository whose convention is ASCII only; ignore says nothing. acceptedCharacters lists the exceptions, as characters or as U+XXXX.",
     "neverCommitList": "Words that must never be committed, one regular expression per line, kept outside every repository so the repository itself never holds them; the gate reads the file when it exists and says nothing when it does not."
   },

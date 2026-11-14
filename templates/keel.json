@@ -3,7 +3,8 @@
   "gate": {
     "nonAscii": "warn",
     "acceptedCharacters": [],
-    "lineEndings": "lf"
+    "lineEndings": "lf",
+    "crlfFiles": ["*.cmd", "*.bat"]
   },
   "conventionsDir": "docs/conventions"
 }

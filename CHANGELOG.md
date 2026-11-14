@@ -14,6 +14,9 @@ What the first run of the tests on three systems found, hours after 0.1.0:
   reports; the scratch folder is a real path now, as git sees it.
 - `.gitattributes` checks every text file out with LF on every system, so the gate's carriage-return rule means the same
   thing everywhere; `*.cmd` keeps CRLF, as cmd expects.
+- That CRLF checkout made the gate's own sweep refuse every line of the Windows launcher on the three runners, while
+  the LF copy on the development machine passed. The carriage-return rule now skips the files `gate.crlfFiles` names,
+  by default `*.cmd` and `*.bat`, and a test stages one file of each kind.
 - CI runs Python 3.8 on the Windows and macOS runners and 3.11 on Linux, whose image no longer offers 3.8.
 
 ## 0.1.0 (2026-11-14)
