@@ -182,12 +182,32 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Measures a repository and this machine against what Claude Code reads.")
     parser.add_argument("--repo", help="a path inside the repository (default: the current folder)")
     parser.add_argument("--no-memory", action="store_true", help="skip the memory folder checks (for CI)")
+    parser.add_argument("--brief", action="store_true",
+                        help="one line per problem or warning and nothing when clean; always exit 0 (for a SessionStart hook)")
     options = parser.parse_args(argv)
     root = common.repo_root(options.repo)
     if not root:
+        if options.brief:
+            return 0
         print("keel doctor: not inside a git repository.", file=sys.stderr)
         return 2
     config = common.load_config(root)
+    if options.brief:
+        try:
+            budget_findings, facts = budget.measure(root, config)
+            findings = claude_md_findings(root, config, facts)
+            findings += [f for f in budget_findings if f.level == "problem"]
+            findings += [f for f in root_claude_md_findings(root, facts) if f.level != "note"]
+            if not options.no_memory:
+                findings += [f for f in memory_findings(root, config) if f.level != "note"]
+        except Exception:
+            return 0
+        urgent = [f for f in findings if f.level in ("problem", "warning")]
+        if urgent:
+            print(f"keel found {len(urgent)} thing(s) about this repository's instructions or memory worth a look; run /keel:doctor for the report. The first:")
+            for finding in urgent[:3]:
+                print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
+        return 0
     print(f"keel doctor: {root}")
     print(f"limits from defaults.json (facts checked against the Claude Code docs on {config.get('checkedAgainstDocs')})"
           + (f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(root, common.CONFIG_FILE)) else ""))

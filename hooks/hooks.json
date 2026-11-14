@@ -1,6 +1,17 @@
 {
-  "description": "Pushes the memory folder's backup after every reply and when a session ends (only when the folder is a git repository), and runs the commit gate before a git commit that Claude issues, blocking it on a hit.",
+  "description": "At a session's start, measures the repository and the memory and puts a one-line finding into Claude's context when something is over budget or unbacked (nothing when clean); pushes the memory folder's backup after every reply and when a session ends (only when the folder is a git repository); and runs the commit gate before a git commit that Claude issues, blocking it on a hit.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/keel\" doctor --brief",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

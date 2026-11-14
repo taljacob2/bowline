@@ -11,7 +11,23 @@ it backs up and curates the personal memory; it moves an oversized instruction f
 line; and it refuses a commit that carries what must never be committed. Every number it uses is a visible, dated
 setting with its source. The name is the beam a ship is built on, the one that keeps it steady on every voyage.
 
-## Try it in one minute
+## Install
+
+As a Claude Code plugin, so its skills and hooks are there in every session:
+
+```
+claude plugin marketplace add taljacob2/keel
+claude plugin install keel@keel
+```
+
+Then, in any repository, `/keel:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
+one-line finding into Claude's context when something is over budget or unbacked, and nothing when all is well; after
+every reply the memory folder is pushed to its backup once `/keel:memory-backup` has tied it to a private remote; and
+before every `git commit` Claude issues, the gate checks the staged lines. Everything else is a skill you or Claude
+invoke, with you approving before anything moves.
+
+To try it without installing, start a session with `claude --plugin-dir <a clone of this repository>`, or run the
+scripts directly:
 
 ```
 git clone https://github.com/taljacob2/keel

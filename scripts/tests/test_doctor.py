@@ -32,6 +32,17 @@ class DoctorTests(ScratchRepo):
         self.assertIn("never read: Second, Third", out)
         self.assertIn("/keel:split-instructions", out)
 
+    def test_brief_says_nothing_when_clean_and_one_line_per_problem(self):
+        write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n")
+        code, out, err = self.run_script("doctor", "--brief", "--no-memory")
+        self.assertEqual((code, out, err), (0, "", ""))
+        write(os.path.join(self.repo, "sub", "CLAUDE.md"), "# Sub\n\n## First\n\n" + ("words " * 20 + "\n") * 400 + "## Second\n\nx\n")
+        code, out, err = self.run_script("doctor", "--brief", "--no-memory")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("run /keel:doctor", out)
+        self.assertIn("sub/CLAUDE.md is cut at line", out)
+        self.assertLessEqual(len(out.strip().splitlines()), 4)
+
     def test_a_small_repository_gets_notes_not_problems(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\nShort.\n")
         code, out, _ = self.run_script("doctor", "--no-memory")
