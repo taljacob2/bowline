@@ -1,6 +1,5 @@
-# keel's tests on the three systems it supports. While the repository is private, every minute is billed and a macOS
-# minute costs ten Linux minutes, so a push runs Linux and Windows and macOS runs by hand (Actions, Run workflow).
-# When the repository is public the minutes are free and macOS joins the push matrix.
+# keel's tests on the three systems it supports, on every push and pull request. The repository is public, so the
+# minutes are free; every job has a time limit so a hang cannot run on.
 name: tests
 
 on:
@@ -14,12 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        include:
-          - os: macos-latest
-            manual: true
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    if: ${{ !matrix.manual || github.event_name == 'workflow_dispatch' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

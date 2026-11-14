@@ -4,8 +4,9 @@ Every version names the date its facts were last checked against the Claude Code
 keel measures against are Claude Code's, not keel's. When a limit moves, `defaults.json` and `docs/facts.md` change
 together and the entry here says which.
 
-## Unreleased
+## 0.1.0 (2026-11-14)
 
+The first version, extracted from the knowledge work done in one repository over two days and proven on a second.
 Facts checked against the Claude Code documentation on 2026-11-14 (`docs/facts.md`).
 
 - `doctor`: measures a repository's instruction files against what Claude Code reads, the memory folder against its
