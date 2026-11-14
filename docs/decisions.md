@@ -93,3 +93,24 @@ init was left out at first and asked for the same day: `init` from the folder no
 an index of the repositories with a table (a line for each, taken from its own CLAUDE.md), what applies to every
 repository, the Compact Instructions and a memory section that says the memory is one for the whole folder, plus the
 shared .claude/bowline.json; `init --each` scaffolds every repository. The depth stays at one level.
+
+## 2026-11-14: Anthropic's plugin directory follows a release branch, not main
+
+**The question.** The first user is submitting bowline to Anthropic's plugin directory. After the first submission, the
+directory follows one branch or tag of the repository, by default the default branch, and takes every new commit there
+as a candidate version: it checks and scans each one and, by default, has an Anthropic reviewer publish it. Which ref
+should it follow?
+
+**The decision.** A branch named `release`, which moves only at the end of a release, to the commit the version's tag
+names (step 5 of the `release` skill). The directory then sees exactly the released versions. bowline's own marketplace
+keeps following main, as before, because Claude Code installs only when the `version` field changes, so a commit
+between releases reaches nobody there. The first user agreed to the release branch when it was proposed.
+
+**Why not main.** Several sessions push work to main between releases, a commit per finished round, and the release is
+a separate commit that changes the version. Followed on main, every one of those commits would queue the directory's
+checks and, under the default setting, a reviewer, and a version could go live in the directory before its release.
+
+**Why not a tag.** The tags are one per version and never move. A directory that followed a tag would need its setting
+changed in the portal at every release, or a moving tag such as `stable`, which reads like a version and confuses the
+plain version tags. A branch that only moves forward says what it is, and git itself refuses a push that would move it
+backward.
