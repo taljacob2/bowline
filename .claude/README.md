@@ -11,7 +11,7 @@ project's working rules depend on. Everything in it is for every contributor; no
 | `bowline.json` | The repository's own limits and gate policy, laid over bowline's defaults, so every contributor measures against the same numbers. | By the checks |
 
 Long explanations do not live here. A rule points to the page under `docs/conventions/` that holds its history and its
-reasoning, and a decision is recorded in the project's design document.
+reasoning, and a decision is recorded in `docs/decisions.md`.
 
 ## Sizes, and why they matter
 

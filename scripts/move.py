@@ -4,6 +4,7 @@
     python -I scripts/bowline.py move run --file <CLAUDE.md> --spec <spec.json> [--check]
     python -I scripts/bowline.py move find-pointers --name <file or section words> [--repo <path>]
     python -I scripts/bowline.py move pointers --spec <pointers.json> [--check]
+    python -I scripts/bowline.py move place --spec <place.json> [--check]
 
 `plan` lists the file's "## " sections with their line ranges and sizes, and where Claude Code's two cutoffs fall, so a
 person and Claude can decide which sections become long-form pages, which become scoped rules, and which become
@@ -12,7 +13,10 @@ rule; the only change on the way is that characters outside ASCII which a commit
 their spellings (counted and printed; an unknown one stops the run unless --allow-unknown), and the index text given in
 the spec replaces the file. Nothing is deleted: the long form is the pages. `find-pointers` lists every line in the
 repository that names the file or a section, so the pointers can be updated; `pointers` applies replacements that must
-each match exactly once, or nothing is written. --check on `run` and `pointers` prints and changes nothing.
+each match exactly once, or nothing is written. `place` copies finished drafts, written in a scratch folder, into
+instruction files only (a rule, a skill, a page under the conventions folder, or a CLAUDE.md), normalized the same way:
+the condensed rules of a split are drafted in scratch and placed with it, because a session that runs unattended
+cannot write under .claude/ itself. --check on `run`, `pointers` and `place` prints and changes nothing.
 
 A spec:
 {
@@ -23,6 +27,7 @@ A spec:
   "index": "docs/new-index.md"
 }
 A pointers spec: [ {"file": "README.md", "old": "see CLAUDE.md's Architecture", "new": "see docs/conventions/architecture.md"} ]
+A place spec: [ {"source": ".bowline-scratch/words/rule.md", "target": ".claude/rules/platform/words.md"} ]
 """
 
 import argparse
@@ -251,6 +256,51 @@ def do_pointers(options):
     return 0
 
 
+def do_place(options):
+    """Copies finished drafts from a scratch folder into instruction files: rules, skills, pages, or a CLAUDE.md."""
+    root = common.repo_root(options.repo)
+    config = common.load_config(root)
+    accepted = common.accepted_characters(config.get("gate", {}).get("acceptedCharacters"))
+    skills = config.get("skillsDir", ".claude/skills")
+    homes = [config.get("rulesDir", ".claude/rules"), config.get("conventionsDir", "docs/conventions")]
+    homes += skills if isinstance(skills, list) else [skills]
+    homes = [h.replace("\\", "/").strip("/") + "/" for h in homes]
+    with open(options.spec, encoding="utf-8") as handle:
+        spec = json.load(handle)
+    outputs = []
+    total = collections.Counter()
+    for entry in spec:
+        target = entry["target"].replace("\\", "/")
+        while target.startswith("./"):
+            target = target[2:]
+        target = target.lstrip("/")
+        if not (any(target.startswith(home) for home in homes) or os.path.basename(target) == "CLAUDE.md"):
+            raise SystemExit(f"bowline move: {target} is not an instruction file; place writes only under "
+                             f"{', '.join(home.rstrip('/') for home in homes)}, or a CLAUDE.md.")
+        source = os.path.join(root, entry["source"])
+        if not os.path.isfile(source):
+            raise SystemExit(f"bowline move: the draft {entry['source']} does not exist.")
+        content, counts = normalize(common.read_text(source), accepted, options.allow_unknown)
+        total.update(counts)
+        note = ""
+        if target.startswith(homes[0]) and not content.startswith("---"):
+            note = "  (no paths: front matter, so this rule would load in every session)"
+        outputs.append((target, content, note))
+    for target, content, note in outputs:
+        print(f"  {target}: {common.count_lines(content)} lines, {len(content):,} characters{note}")
+    print(f"normalized: {dict((f'U+{ord(k):04X}', v) for k, v in total.most_common())}")
+    if options.check:
+        print("check only; nothing written.")
+        return 0
+    for target, content, _ in outputs:
+        full = os.path.join(root, target)
+        os.makedirs(os.path.dirname(full) or ".", exist_ok=True)
+        with open(full, "w", encoding="utf-8", newline="") as handle:
+            handle.write(content)
+        print("wrote", target)
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Moves an oversized instruction file into pages, rules and an index.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -259,11 +309,14 @@ def main(argv=None):
     p.add_argument("--check", action="store_true"); p.add_argument("--allow-unknown", action="store_true"); p.add_argument("--repo")
     p = sub.add_parser("find-pointers"); p.add_argument("--name", required=True); p.add_argument("--repo")
     p = sub.add_parser("pointers"); p.add_argument("--spec", required=True); p.add_argument("--check", action="store_true"); p.add_argument("--repo")
+    p = sub.add_parser("place"); p.add_argument("--spec", required=True); p.add_argument("--check", action="store_true")
+    p.add_argument("--allow-unknown", action="store_true"); p.add_argument("--repo")
     options = parser.parse_args(argv)
     if not common.repo_root(options.repo):
         print("bowline move: not inside a git repository.", file=sys.stderr)
         return 2
-    return {"plan": do_plan, "run": do_run, "find-pointers": do_find_pointers, "pointers": do_pointers}[options.command](options)
+    commands = {"plan": do_plan, "run": do_run, "find-pointers": do_find_pointers, "pointers": do_pointers, "place": do_place}
+    return commands[options.command](options)
 
 
 if __name__ == "__main__":

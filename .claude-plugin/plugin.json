@@ -1,7 +1,7 @@
 {
   "name": "bowline",
   "version": "0.2.0",
-  "description": "Keeps a project's knowledge within what Claude Code actually reads, across sessions, machines and contributors: a doctor that measures CLAUDE.md files, rules, skills and the memory against the loading limits and says what to do; a scaffold for the layout where each kind of knowledge lives where the tool loads it; a backup and a curation of the personal memory; a move of an oversized instruction file into pages, rules and an index without losing a line; and a commit gate. Every limit is a dated setting with its source.",
+  "description": "Keeps a project's knowledge within what Claude Code actually reads, across sessions, machines and contributors: a doctor that measures CLAUDE.md files, rules, skills and the memory against the loading limits and says what to do; a scaffold for the layout where each kind of knowledge lives where the tool loads it; a backup and a curation of the personal memory; a move of an oversized instruction file into pages, rules and an index without losing a line, prepared in the background on a branch when a repository asks for it; and a commit gate. Every limit is a dated setting with its source.",
   "author": {
     "name": "Tal Jacob"
   },

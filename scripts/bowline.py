@@ -5,7 +5,8 @@
     python -I scripts/bowline.py budget [--repo <path>]
     python -I scripts/bowline.py memory setup|restore <remote> [--no-hook] | status | push [--hook]
     python -I scripts/bowline.py init [--plan | --write] [--only item,item]
-    python -I scripts/bowline.py move plan --file <CLAUDE.md> | run --file <CLAUDE.md> --spec <json> [--check] | find-pointers --name <words> | pointers --spec <json> [--check]
+    python -I scripts/bowline.py move plan --file <CLAUDE.md> | run --file <CLAUDE.md> --spec <json> [--check] | find-pointers --name <words> | pointers --spec <json> [--check] | place --spec <json> [--check]
+    python -I scripts/bowline.py autosplit --hook | run --file <CLAUDE.md> | status | show --file <CLAUDE.md> | done --file <CLAUDE.md> | discard --file <CLAUDE.md>
 
 Each command is its own module beside this file and can be run directly with the same arguments.
 """
@@ -22,6 +23,7 @@ COMMANDS = {
     "memory": ("memory", "back up the memory folder: setup <remote>, restore <remote>, status, push"),
     "init": ("init", "scaffold the repository side: --plan to see, --write to do"),
     "move": ("move", "move an oversized CLAUDE.md into pages, rules and an index: plan, run --spec, find-pointers, pointers"),
+    "autosplit": ("autosplit", "prepare the split of an oversized CLAUDE.md in the background, on a branch: --hook, run, status, show, done, discard"),
 }
 LATER = {}
 

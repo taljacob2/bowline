@@ -8,12 +8,13 @@ so that a first-time reader understands it without guessing.
 
 bowline is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads:
 `docs/facts.md` holds the limits with their sources, `defaults.json` the same as settings, `scripts/` the tools
-(`doctor`, `gate`, `budget`, `memory`, `init`; `move` in round 3), `skills/` the procedures Claude runs them through,
+(`doctor`, `gate`, `budget`, `memory`, `init`, `move`, `autosplit`), `skills/` the procedures Claude runs them through,
 `hooks/hooks.json` the plugin's hooks, `templates/` what `init` writes into a repository, and `scripts/tests/` the tests
 on scratch repositories. bowline is its own first user: this file and `.claude/` were written by `bowline init`. Every file
 here is ASCII only, written for a stranger, Python 3.8 standard library only, with no dependency and no server.
 Before a push: `python -I -m unittest discover -s scripts/tests -p "test_*.py"`, then `python -I scripts/bowline.py gate`
-and `budget`. The plan and its rounds are in the commit messages and `CHANGELOG.md`.
+and `budget`. The plan and its rounds are in the commit messages and `CHANGELOG.md`; the design questions that
+settled, with their reasoning, in `docs/decisions.md`.
 
 ## Where the rest of the rules are
 

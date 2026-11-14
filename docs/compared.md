@@ -27,9 +27,15 @@ losing a line, the backup and curation of the memory that Claude Code leaves to 
 necessary around them, offered with their reasons. When Claude Code changes a limit, one file in bowline changes and the
 changelog says so.
 
+Autocompact is the one Claude Code feature that rewrites something unasked, and it can, because a conversation's
+context is nobody else's input. bowline's `autosplit` borrows its trigger, a limit crossed and noticed by a hook, but
+not its silence: a `CLAUDE.md` is every future session's input, so the split is prepared on a branch of its own while
+you work, and the merge is yours.
+
 ## What bowline deliberately is not
 
-- Not a background optimizer. It measures and nudges on its own; it changes nothing without a plan you approve.
+- Not a background optimizer of what you work from. It measures and nudges on its own, and with `autosplit` turned on it
+  prepares a split on a branch of its own; nothing on your branch changes without your yes.
 - Not a framework. Six skills, three hooks, five scripts, standard library Python, no server, no dependency.
 - Not an opinion about your rules' content. It cares where a rule lives and how big the file is, not what it says.
 - Not a way to share memory. Memory is personal by design; bowline promotes what a project needs into the repository and

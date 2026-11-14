@@ -110,6 +110,39 @@ class MoveTests(ScratchRepo):
         self.assertIn("occurs 0 time(s)", err)
         self.assertEqual(read(os.path.join(self.repo, "README.md")), "See docs/conventions/sub-architecture.md for why.\n")
 
+    def test_place_copies_drafts_into_instruction_files_only(self):
+        write(os.path.join(self.repo, ".bowline-scratch", "words", "rule.md"),
+              '---\npaths:\n  - "sub/**"\n---\n\n# Words\n\n- **Agent, never machine.** Because ' + ARROW + ' the product says so.\n')
+        write(os.path.join(self.repo, ".bowline-scratch", "index.md"), "# Sub, the index\n\nWhere things are.\n")
+        write(os.path.join(self.repo, ".bowline-scratch", "loose.md"), "# No front matter\n")
+        spec_path = os.path.join(self.root, "place.json")
+        write(spec_path, json.dumps([{"source": ".bowline-scratch/words/rule.md", "target": "src/words.md"}]))
+        code, out, err = self.run_script("move", "place", "--spec", spec_path)
+        self.assertEqual(code, 1)
+        self.assertIn("is not an instruction file", err)
+        write(spec_path, json.dumps([
+            {"source": ".bowline-scratch/words/rule.md", "target": "./.claude/rules/sub/words.md"},
+            {"source": ".bowline-scratch/index.md", "target": "sub/CLAUDE.md"},
+            {"source": ".bowline-scratch/loose.md", "target": ".claude/rules/loose.md"},
+        ]))
+        code, out, err = self.run_script("move", "place", "--spec", spec_path, "--check")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("check only", out)
+        self.assertIn("would load in every session", out)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, ".claude", "rules", "sub", "words.md")))
+        self.assertNotEqual(read(self.claude), "# Sub, the index\n\nWhere things are.\n")
+        code, out, err = self.run_script("move", "place", "--spec", spec_path)
+        self.assertEqual(code, 0, out + err)
+        rule = read(os.path.join(self.repo, ".claude", "rules", "sub", "words.md"))
+        self.assertTrue(rule.startswith('---\npaths:\n  - "sub/**"\n---\n'))
+        self.assertIn("Because -> the product says so.", rule)
+        self.assertEqual(read(self.claude), "# Sub, the index\n\nWhere things are.\n")
+        self.assertIn("U+2192", out)
+        write(spec_path, json.dumps([{"source": ".bowline-scratch/missing.md", "target": ".claude/rules/x.md"}]))
+        code, out, err = self.run_script("move", "place", "--spec", spec_path)
+        self.assertEqual(code, 1)
+        self.assertIn("does not exist", err)
+
 
 if __name__ == "__main__":
     unittest.main()

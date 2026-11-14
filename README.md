@@ -24,8 +24,10 @@ claude plugin install bowline@bowline
 Then, in any repository, `/bowline:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
 one-line finding into Claude's context when something is over budget or unbacked, and nothing when all is well; after
 every reply the memory folder is pushed to its backup once `/bowline:memory-backup` has tied it to a private remote; and
-before every `git commit` Claude issues, the gate checks the staged lines. Everything else is a skill you or Claude
-invoke, with you approving before anything moves.
+before every `git commit` Claude issues, the gate checks the staged lines. A repository that turns `autosplit` on in
+`.claude/bowline.json` gets one more: when a `CLAUDE.md` outgrows the limits, the hook after a reply starts a worker
+that prepares its split in the background, on a branch of its own, for you to review and merge. Everything else is a
+skill you or Claude invoke, with you approving before anything moves on your branch.
 
 To try it without installing, start a session with `claude --plugin-dir <a clone of this repository>`, or run the
 scripts directly:
@@ -53,7 +55,8 @@ python -I bowline/scripts/bowline.py init --repo <your repository> --write
 python -I bowline/scripts/bowline.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
 ```
 
-| `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention. |
+| `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
+| `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
 
 ## The skills, for Claude Code
 
@@ -63,12 +66,12 @@ second) and `conventions` (a decisions section, a roadmap with slots, a notes qu
 packaging that installs them with one command is the next round; until then, start a session with
 `claude --plugin-dir <this folder>` once the manifest lands.
 
-The guide: [`docs/guide.md`](docs/guide.md) (the problem in a page, the three homes, the budgets, the four flows
+The guide: [`docs/guide.md`](docs/guide.md) (the problem in a page, the three homes, the budgets, the five flows
 drawn), [`docs/facts.md`](docs/facts.md) (what bowline measures against, with sources and the date checked),
 [`docs/conventions.md`](docs/conventions.md) (the conventions and the loss each prevents),
-[`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory) and
+[`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory),
 [`docs/compared.md`](docs/compared.md) (how it differs from doing it by hand, from `claude-md-management`, and from
-Claude Code's own features).
+Claude Code's own features) and [`docs/decisions.md`](docs/decisions.md) (the design questions that settled, and why).
 
 ## Requirements
 
@@ -77,8 +80,8 @@ Python 3.8 or later (standard library only) and git. Windows, Linux and macOS.
 ## Configuration
 
 `defaults.json` holds every limit and policy with its reason. A repository lays its own values over them in
-`.claude/bowline.json`, for example to make characters outside ASCII a refusal rather than a warning, or to name the
-characters it accepts.
+`.claude/bowline.json`, for example to make characters outside ASCII a refusal rather than a warning, to name the
+characters it accepts, or to turn `autosplit` on.
 
 ## Tests
 

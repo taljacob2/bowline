@@ -1,5 +1,5 @@
 {
-  "description": "At a session's start, measures the repository and the memory and puts a one-line finding into Claude's context when something is over budget or unbacked (nothing when clean); pushes the memory folder's backup after every reply and when a session ends (only when the folder is a git repository); and runs the commit gate before a git commit that Claude issues, blocking it on a hit.",
+  "description": "At a session's start, measures the repository and the memory and puts a one-line finding into Claude's context when something is over budget or unbacked (nothing when clean); pushes the memory folder's backup after every reply and when a session ends (only when the folder is a git repository); at the same moments, when the repository turned autosplit on, starts the background worker that prepares the split of a CLAUDE.md over the limits on a branch of its own; and runs the commit gate before a git commit that Claude issues, blocking it on a hit.",
   "hooks": {
     "SessionStart": [
       {
@@ -19,6 +19,11 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" memory push --hook",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" autosplit --hook",
+            "timeout": 20
           }
         ]
       }
@@ -30,6 +35,11 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" memory push --hook",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/bowline\" autosplit --hook",
+            "timeout": 20
           }
         ]
       }
