@@ -11,6 +11,14 @@ change together and the entry here says which.
   repository, the Compact Instructions and a memory section that says the memory is one for the whole folder; and the
   shared `.claude/bowline.json`. `init --each` plans or writes the repository scaffold in every repository of the folder.
   Nothing that exists is overwritten, as before. The doctor's note for a folder without a `CLAUDE.md` points at it.
+- The sweep after it, so that every capability works from the folder without a thought: `autosplit run`, `show`, `done`
+  and `discard` take the repository from the file's path, as `move` does (`--file repo1/sub/CLAUDE.md`), and say so when
+  a bare name is given from the folder; a move spec's index path is read from the repository when it is not found from
+  the current folder; the doctor's header names the folder's shared config a repository lies over; the folder's
+  CLAUDE.md template says how a rule for a few of the repositories is scoped; and the split-instructions, memory-backup,
+  curate-memory (and its rubric) and conventions skills say what changes in a folder: paths from the folder and
+  `--repo` where no file is given, one memory for the whole folder, promotions to the repository a note concerns or to
+  the folder's own files for what spans them, conventions per repository or for the folder.
 
 ## 0.4.0 (2026-11-14)
 

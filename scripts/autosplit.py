@@ -590,6 +590,20 @@ def adjust(findings_list, root):
 # The commands a person runs
 
 
+def locate(file, repo):
+    """(repository root, the file's path from that root) for a --file: the repository is --repo's, or the current one, or
+    the one the file's own folder is in, so that from a folder of repositories `--file repo1/sub/CLAUDE.md` works."""
+    root = common.repo_root(repo or os.getcwd())
+    given = file.replace("\\", "/")
+    under_root = root is not None and os.path.exists(os.path.join(root, given))
+    if os.path.isabs(given) or (os.path.exists(given) and not under_root) or root is None:
+        candidate = common.repo_root(os.path.dirname(os.path.abspath(given)))
+        if candidate:
+            root = candidate
+            given = os.path.relpath(os.path.realpath(os.path.abspath(given)), os.path.realpath(candidate)).replace("\\", "/")
+    return root, given.strip("/")
+
+
 def do_run(root, config, path, foreground):
     state = load_state(root, path)
     if foreground and state and state.get("state") in ("starting", "running"):
@@ -727,20 +741,24 @@ def main(argv=None):
         parser.print_help()
         return 2
     root = common.repo_root(options.repo or os.getcwd())
+    if options.command == "status":
+        if root:
+            return do_status(root, common.load_config(root))
+        _, roots = common.roots_for(options.repo or os.getcwd())
+        if not roots:
+            print("bowline autosplit: not inside a git repository, and this folder holds none.", file=sys.stderr)
+            return 2
+        for root in roots:
+            do_status(root, common.load_config(root))
+            print()
+        return 0
+    root, path = locate(options.file, options.repo)
     if not root:
-        workspace, roots = common.roots_for(options.repo or os.getcwd())
-        if roots and options.command == "status":
-            for root in roots:
-                do_status(root, common.load_config(root))
-                print()
-            return 0
-        hint = " From a folder of repositories, pass --repo <one of them>." if roots else ", and this folder holds none."
-        print("bowline autosplit: not inside a git repository" + (hint if roots else hint), file=sys.stderr)
+        _, roots = common.roots_for(options.repo or os.getcwd())
+        hint = " From a folder of repositories, give the file as a path from here (repo1/sub/CLAUDE.md) or pass --repo." if roots else ", and this folder holds none."
+        print("bowline autosplit: not inside a git repository" + hint, file=sys.stderr)
         return 2
     config = common.load_config(root)
-    if options.command == "status":
-        return do_status(root, config)
-    path = options.file.replace("\\", "/").strip("/")
     if options.command in ("run", "worker"):
         return do_run(root, config, path, foreground=options.command == "run")
     if options.command == "show":

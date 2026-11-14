@@ -16,6 +16,8 @@ they look for it?
 - **Would a new contributor on another machine need it to do the work right?** Then it is project knowledge, however
   personal its origin. A rule the person stated in anger is still a rule.
 - **Is it already in the repository?** Grep two or three distinctive phrases over the instruction files and the docs.
+  In a folder of repositories, grep the repository the note concerns, and the folder's own files for a note that
+  concerns them all.
   If a file says it, the note is DELETE or TRIM, however well written.
 - **Does a test or a lint rule already enforce it?** Then the repository does not need the sentence either; name the
   test in the map and drop the note.

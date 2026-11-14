@@ -157,8 +157,9 @@ session's start and the reminders measure the folder's own `CLAUDE.md` and every
 the repository in each finding. The gate finds the repository a commit names. Autosplit works per repository, each
 split on a branch of its own repository, and a `.claude/bowline.json` in the folder is the layer every repository
 shares, under its own. From the folder, `init` writes the folder's own `CLAUDE.md`, an index of the repositories with
-the sections every root file needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repository;
-`move` takes the repository from the file it is given.
+the sections every root file needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repository.
+`move` and `autosplit` take the repository from the file they are given, as a path from the folder; the few commands
+that take no file want `--repo`. The skills say the same, so Claude needs no reminding.
 
 ## What bowline does, and what it leaves to you
 

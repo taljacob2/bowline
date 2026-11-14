@@ -107,6 +107,14 @@ class WorkspaceTests(ScratchRepo):
         code, out, err = self.bowline("move", "find-pointers", "--name", "sub/CLAUDE.md")
         self.assertEqual(code, 2)
         self.assertIn("pass --repo", err)
+        code, out, err = self.bowline("move", "find-pointers", "--name", "sub/CLAUDE.md", "--repo", "repo1")
+        self.assertEqual(code, 0, out + err)
+        write(os.path.join(self.repo1, "new-index.md"), "# Sub, the index\n\nShort.\n")                       # the spec's index, from the repository
+        write(os.path.join(self.root, "spec.json"), json.dumps({"pages": [{"target": "docs/conventions/sub.md", "sections": ["First", "Second"]}], "index": "new-index.md"}))
+        code, out, err = self.bowline("move", "run", "--file", "repo1/sub/CLAUDE.md", "--spec", os.path.join(self.root, "spec.json"))
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(read(os.path.join(self.repo1, "sub", "CLAUDE.md")), "# Sub, the index\n\nShort.\n")
+        self.assertTrue(os.path.isfile(os.path.join(self.repo1, "docs", "conventions", "sub.md")))
 
     def test_the_hook_starts_autosplit_in_the_repository_that_turned_it_on(self):
         write(os.path.join(self.repo1, ".claude", "bowline.json"),
@@ -137,9 +145,15 @@ class WorkspaceTests(ScratchRepo):
         code, out, _ = self.bowline("autosplit", "show", "--file", "sub/CLAUDE.md", "--repo", "repo1")
         self.assertEqual(code, 0, out)
         self.assertIn("git cherry-pick", out)
-        code, out, err = self.bowline("autosplit", "show", "--file", "sub/CLAUDE.md")
+        code, out, err = self.bowline("autosplit", "show", "--file", "repo1/sub/CLAUDE.md")       # the file's path names the repository
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("git cherry-pick", out)
+        code, out, err = self.bowline("autosplit", "show", "--file", "sub/CLAUDE.md")             # a bare name from the folder
         self.assertEqual(code, 2)
-        self.assertIn("pass --repo", err)
+        self.assertIn("give the file as a path from here", err)
+        code, out, err = self.bowline("autosplit", "discard", "--file", "repo1/sub/CLAUDE.md")
+        self.assertEqual(code, 0, out + err)
+        self.assertFalse(os.path.exists(state_file))
 
     def test_a_shared_config_in_the_folder_applies_to_its_repositories(self):
         write(os.path.join(self.workspace, ".claude", "bowline.json"), json.dumps({"limits": {"claudeMdLines": 5}}))

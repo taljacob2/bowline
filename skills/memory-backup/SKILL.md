@@ -6,7 +6,9 @@ description: Back up Claude Code's memory folder for this repository to a privat
 # The memory backup
 
 Claude Code keeps its notes about this repository in a folder outside it, one per person per machine, and loses it with
-the machine. bowline makes that folder a git repository tied to a private remote and pushes it after every reply.
+the machine. bowline makes that folder a git repository tied to a private remote and pushes it after every reply. A
+session started in a folder that holds several repositories keeps one memory for the whole folder, and the same steps
+back that one up; run them from the folder.
 
 ## Setting it up
 
@@ -29,8 +31,8 @@ the machine. bowline makes that folder a git repository tied to a private remote
 
    It clones the remote when the folder is empty (a new machine), initializes and pushes a first backup when the folder
    holds notes and the remote is empty, and refuses when both hold content, saying how to merge by hand. If it says
-   Claude Code has made no project folder yet, a session has to run in the repository once first; this one counts, so
-   run it again.
+   Claude Code has made no project folder yet, a session has to run in the repository, or in the folder, once first;
+   this one counts, so run it again.
 
 3. Show the result of `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory status`: the index's size against its cap, the remote,
    the last commit, what is not yet pushed.

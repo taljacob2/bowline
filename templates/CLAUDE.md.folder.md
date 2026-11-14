@@ -18,7 +18,8 @@ know where to start. Each repository's own `CLAUDE.md` says the rest.
 ## What applies to every repository
 
 A rule that holds in every repository goes in `.claude/rules/` here, without a `paths:` list, so that it loads at the
-start of a session started in this folder; a rule for one repository goes in that repository's own `.claude/rules/`.
+start of a session started in this folder; one for a few of them names them in a `paths:` list (`repo1/**`); a rule
+for one repository goes in that repository's own `.claude/rules/`.
 The `.claude/bowline.json` here is the layer every repository's own lies over: the limits and the gate policy they
 share.
 

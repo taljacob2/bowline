@@ -23,7 +23,9 @@ The rubric is `${CLAUDE_PLUGIN_ROOT}/skills/curate-memory/rubric.md`. Read each 
   repository does not already say it. Check by grep (two or three distinctive phrases over the instruction files and
   the docs). Draft the promoted sentence for a contributor who never met the person or Claude, at most sixty words,
   with the why, and name its home: a scoped rule under `.claude/rules/<area>/`, the root `CLAUDE.md` (rare, whole-repo
-  and short), a skill (a procedure), the design document's decisions section, or the roadmap.
+  and short), a skill (a procedure), the design document's decisions section, or the roadmap. In a folder of
+  repositories, a note about one repository goes into that repository; one that holds for all of them goes into the
+  folder's own `CLAUDE.md` or an unscoped rule under the folder's `.claude/rules/`.
 - **KEEP**: personal to the person and their Claude: how replies should sound, standing requests, how they coordinate
   sessions, their machines, lab, links and other projects, the state of ongoing conversations.
 - **TRIM**: a finished piece of work the repository already records; keep five lines (the final state, the hashes, an

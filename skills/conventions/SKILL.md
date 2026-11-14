@@ -27,7 +27,9 @@ reason and let the person choose. The reasons and templates are in `${CLAUDE_PLU
 5. **A fresh session at a finished item.** A summary of a summary loses more than a fresh start that reads the index
    and the instruction files. Offer the habit; nothing to install.
 
-For each one the person wants, write the template into the repository where they say, adapted to its words (ask for
+In a folder of repositories, each repository keeps its own decisions and roadmap, and the folder's own documents hold
+what spans them; ask which the person means before writing. For each one the person wants, write the template into
+the repository where they say, adapted to its words (ask for
 the design document's name, the roadmap's name, the queue's place), and add a line to `.claude/rules/recording-decisions.md`
 if it exists so the rule and the file agree.
 

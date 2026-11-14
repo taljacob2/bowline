@@ -69,8 +69,9 @@ The gate finds the repository a commit names (`git -C repo1 commit`, `cd repo1 &
 folder's one memory, as Claude Code keeps it. Autosplit works per repository, each split on a branch of its own
 repository, and a `.claude/bowline.json` in the folder is the layer every repository shares, under its own. From the
 folder, `init` writes the folder's own `CLAUDE.md`, an index of the repositories with the sections every root file
-needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repository; `move` takes the repository
-from the file it is given.
+needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repository. `move` and `autosplit` take the
+repository from the file they are given, as a path from the folder (`repo1/sub/CLAUDE.md`); the few commands that take
+no file want `--repo`.
 
 ## The skills, for Claude Code
 

@@ -70,6 +70,14 @@ have changed since the history was written, from what the subagents verified. Re
 numbers, and what the person should see in a fresh session: a `Loaded` line for the scoped rules when a file in the
 area is touched, and no size warning in `/status`.
 
+## From a folder of repositories
+
+When the session runs in a folder that holds several repositories, give every file as a path from the folder, such as
+`repo1/sub/CLAUDE.md`: `move plan`, `move run`, and `autosplit run`, `show`, `done` and `discard` take the repository
+from it. The commands that take no file, `move place`, `move pointers` and `move find-pointers`, need
+`--repo <repository>`; a spec's paths, the sources and the targets, are written from that repository's root. The
+doctor names the repository at the start of each finding, and its fixes carry the `--repo` already.
+
 ## Unattended: the background worker
 
 When a repository sets `autosplit.enabled` in `.claude/bowline.json`, bowline's hook notices after a reply that a

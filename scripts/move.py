@@ -188,7 +188,10 @@ def do_run(options):
         outputs.append((rule["target"], front + content + ("\n" if not note else note)))
 
     if "index" in spec:
-        index = common.read_text(spec["index"])
+        index_path = spec["index"]
+        if not os.path.isabs(index_path) and not os.path.exists(index_path):
+            index_path = os.path.join(root, index_path)        # written relative to the repository, as the targets are
+        index = common.read_text(index_path)
         bad = sorted({ord(c) for c in index if ord(c) > 127 and ord(c) not in accepted})
         if bad:
             raise SystemExit("bowline move: the index has characters outside ASCII: " + ", ".join(f"U+{c:04X}" for c in bad))

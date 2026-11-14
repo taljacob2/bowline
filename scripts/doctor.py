@@ -379,6 +379,9 @@ def main(argv=None):
     else:
         print(f"bowline doctor: {survey.roots[0]}")
         suffix = f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(survey.roots[0], common.CONFIG_FILE)) else ""
+        parent = os.path.dirname(survey.roots[0])
+        if os.path.isfile(os.path.join(parent, common.CONFIG_FILE)) and common.repo_root(parent) is None:
+            suffix += f", over the folder's shared {os.path.join(parent, common.CONFIG_FILE)}"
     print(f"limits from defaults.json (facts checked against the Claude Code docs on {config.get('checkedAgainstDocs')})" + suffix)
     print()
     for name, root, facts, _ in survey.parts:
