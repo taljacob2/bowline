@@ -4,6 +4,13 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
+## Unreleased
+
+- A `release` skill under `.claude/skills/`: the checks, the version in the plugin manifest (the only thing Claude Code
+  reads to decide that an update exists), the changelog heading, `claude plugin validate`, one commit, the push to main,
+  a plain `X.Y.Z` tag and the proof on this machine. `docs/decisions.md` says why the tag is plain and not the
+  `bowline--vX.Y.Z` that `claude plugin tag` makes.
+
 ## 0.3.0 (2026-11-14)
 
 `autosplit`: when a repository turns it on, bowline prepares the split of a `CLAUDE.md` that outgrew the limits in the

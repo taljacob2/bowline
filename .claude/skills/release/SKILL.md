@@ -1,0 +1,57 @@
+---
+name: release
+description: Release a version of bowline so that `claude plugin update` picks it up - the checks, the version in the plugin manifest, the changelog heading, the validation, one commit, the push to main, a plain git tag named after the version, and the proof on this machine. Use when a round is merged on main and ready for people to install.
+---
+
+# Release a version
+
+Claude Code reads no release page and no tag. A person's `claude plugin update bowline@bowline` fetches the default
+branch of this repository and installs it when the `version` in `.claude-plugin/plugin.json` differs from the one they
+have. So changing that field is the release, and a commit pushed without it reaches nobody. The git tag is for people
+and for history.
+
+## 1. Check
+
+- Release from main: `git checkout main`, `git pull --ff-only`, a clean tree.
+- The `full-checks` skill: the tests, the gate over every tracked file, the budget, the doctor.
+- `claude plugin validate .` passes. A warning about the icon is fine; anything else is fixed before the release.
+
+## 2. Name the version
+
+- The form is X.Y.Z, plain. A new command, hook or setting raises Y. A fix or a wording change raises Z. X rises when a
+  setting or a command changes its meaning for someone who installed the previous version; it stays 0 while the first
+  users are still shaping the plugin.
+- `.claude-plugin/plugin.json` gets `"version": "X.Y.Z"`. Nowhere else: the marketplace entry carries no version on
+  purpose, because the manifest's value wins and `validate` reports a mismatch.
+- In `CHANGELOG.md`, the `## Unreleased` heading becomes `## X.Y.Z (YYYY-MM-DD)`. When a limit moved, the entry says
+  which, and `docs/facts.md` changed in the same round.
+
+## 3. Commit and push
+
+One commit, named `bowline X.Y.Z: <what the version is about>`. Its body says why now (what is merged and proven), what
+changed in the two files, and what was checked. Then the `push` skill: the gate on the staged lines, the fast-forward
+push to main.
+
+## 4. Tag
+
+```
+git tag -a X.Y.Z -m "bowline X.Y.Z: <the same words as the commit>"
+git push origin X.Y.Z
+```
+
+Plain `X.Y.Z`, as every tag so far. Not `bowline--vX.Y.Z`, the form `claude plugin tag` would make: one plugin lives
+here, the repository's name already says which, and the tag is read by people, not by Claude Code. The reasoning is in
+`docs/decisions.md`.
+
+## 5. Prove that it arrived
+
+On your own machine, `claude plugin update bowline@bowline` prints "updated from <the old version> to X.Y.Z". Restart
+Claude Code; the first session shows the new hooks at work, starting with the one line at its start. Say in the reply
+which version is installed now.
+
+## What the marketplace does not need
+
+No upload, no form, no release on GitHub. `.claude-plugin/marketplace.json` names this repository as the plugin's
+source with no `ref`, so the default branch is what people get; pin a `ref` to a tag only if a stable channel is ever
+wanted. Third-party directories, such as claudemarketplaces.com, crawl GitHub on their own schedule and are not part of
+a release.

@@ -56,3 +56,19 @@ with every permission check bypassed, and the refusal was right: an unattended s
 grant than the work needs. Instead the move tool, which already writes the moved rule files from a spec, places the
 condensed drafts too (`move place`), and the model never edits under `.claude/` in its own session. What a person
 reviews on the branch is the same either way.
+
+## 2026-11-14: a release is the version field; the tag is a plain version number
+
+**The question.** How does a version of bowline reach the people who installed it, and what should its git tag be
+called? `claude plugin tag` makes tags of the form `bowline--v0.4.0`; the four tags so far are `0.1.0` to `0.3.0`.
+
+**The decision.** The release is the `version` field in `.claude-plugin/plugin.json`: Claude Code computes a plugin's
+version from it and replaces an installed copy only when it differs, so a commit pushed without changing it reaches
+nobody, and no tag or GitHub release is read at all. The tag stays a plain `X.Y.Z`. The first user's words: the
+prefixed form "feels dirty"; "why not 0.4.0". The reasoning behind the feeling: one plugin lives in this repository, and
+the repository's name already says which, so the prefix would repeat it; the tag is read by people, not by Claude Code;
+and the four tags that exist are plain. The procedure is the `release` skill under `.claude/skills/`.
+
+**Not chosen.** `claude plugin tag`, which also validates the manifests, because its tag name cannot be changed;
+`claude plugin validate .` gives the same check inside the skill. Pinning the marketplace entry to a tag with `ref`,
+which would make a stable channel: not wanted while every version is meant to be the one people run.
