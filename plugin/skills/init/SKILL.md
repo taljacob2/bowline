@@ -62,3 +62,14 @@ one for the whole folder; and the shared `.claude/bowline.json`, the layer every
 template, write with `--write`, then fill the table with the person: a line for each repository and how they call one
 another. `init --each --plan` plans the repository scaffold above in every repository of the folder, and
 `init --each --write --only <items>` writes it; show the plan before writing into several repositories at once.
+
+Before the first plan, unless the folder's `.claude/bowline.json` already sets `writeToRepositories`, ask the person
+once: may bowline write into the repositories, or should its files stay in this folder? They may have no write access,
+or not want the repositories touched. If the files should stay here, plan and write with `init --leave-repositories`:
+the folder's `.claude/bowline.json` gets `"writeToRepositories": false`, the folder gets the README, the starter rules
+and the skills too, and a rule for one repository goes in `.claude/rules/<repository>/` with
+`paths: ["<repository>/**"]`. A list of names in `writeToRepositories` lets bowline write into those repositories only;
+`--each` skips the others and says so. Tell the person the one limit: a session started inside a repository reads the
+folder's `CLAUDE.md`, but not its skills. When the folder is not a git repository, offer to make it one, so that its
+files are versioned like any repository's: `git init` in the folder, then `init` again writes the `.gitignore` lines
+that keep the repositories out of it.

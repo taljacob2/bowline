@@ -57,16 +57,79 @@ def child_repositories(folder):
             and os.path.exists(os.path.join(folder, name, ".git"))]
 
 
+def untracked_child_repositories(root):
+    """The git repositories directly under a repository's top folder that the repository does not track: repositories
+    kept side by side inside one that holds only what they share. A submodule is tracked, so it is not one of them."""
+    return [child for child in child_repositories(root)
+            if not run_git(["-C", root, "ls-files", "-z", "--", os.path.basename(child)], check=False)]
+
+
+def count(number, one, many):
+    """A number with its noun: 1 repository, 2 repositories."""
+    return f"{number} {one if number == 1 else many}"
+
+
+def is_repository(folder):
+    """Whether a folder is the top folder of a git repository."""
+    return folder is not None and repo_root(folder) == os.path.normpath(os.path.abspath(folder))
+
+
 def roots_for(start=None):
-    """Where bowline works from a path, as (folder of repositories or None, repository roots). Inside a repository:
-    (None, [its root]). In a folder that is not a repository but holds repositories, as with services cloned side by
-    side: (the folder, their roots). Anywhere else: (None, [])."""
+    """Where bowline works from a path, as (folder of repositories or None, repository roots). A folder of repositories
+    holds repositories side by side, as with services cloned next to one another: either a plain folder, or a git
+    repository of its own that holds what they share and does not track them. From one: (the folder, their roots).
+    Inside any other repository: (None, [its root]). Anywhere else: (None, [])."""
     root = repo_root(start)
     if root:
-        return None, [root]
+        children = untracked_child_repositories(root)
+        return (root, children) if children else (None, [root])
     folder = os.path.normpath(os.path.abspath(start or os.getcwd()))
     repos = child_repositories(folder)
     return (folder if repos else None), repos
+
+
+def folder_of(root):
+    """The folder of repositories a repository sits in directly, or None when it sits in none."""
+    root = os.path.normpath(root)
+    parent = os.path.dirname(root)
+    if not parent or parent == root:
+        return None
+    workspace, roots = roots_for(parent)
+    return workspace if workspace and root in roots else None
+
+
+def writes_allowed(root):
+    """Whether bowline may write into this repository. Always, unless it sits in a folder of repositories whose own
+    .claude/bowline.json sets writeToRepositories to false, or to a list of names that leaves it out. A repository's own
+    file cannot change this: the choice is the folder's, made by the person who works from it."""
+    folder = folder_of(root)
+    if folder is None:
+        return True
+    return allowed_by(load_config(folder).get("writeToRepositories", True), root)
+
+
+def allowed_by(setting, root):
+    """What a writeToRepositories value says about one repository: true, false, or a list of the names allowed."""
+    if isinstance(setting, list):
+        return os.path.basename(os.path.normpath(root)) in setting
+    return bool(setting)
+
+
+def left_alone(root):
+    """Why bowline writes nothing into this repository, in one sentence, for every message that says so."""
+    name = os.path.basename(os.path.normpath(root))
+    setting = load_config(folder_of(root) or root).get("writeToRepositories", True)
+    if isinstance(setting, list):
+        return (f"bowline leaves {name} untouched: the folder's {CONFIG_FILE} lists in writeToRepositories the "
+                f"repositories bowline may write to, and {name} is not one of them")
+    return f"bowline leaves {name} untouched: the folder's {CONFIG_FILE} sets writeToRepositories to false"
+
+
+def left_alone_fix(root):
+    """What a person can do about a finding in a repository bowline leaves untouched."""
+    name = os.path.basename(os.path.normpath(root))
+    return (f"{left_alone(root)}. Ask the repository's owners to change it, or put what this folder needs about {name} "
+            f"in the folder's .claude/rules/{name}/, with paths: [\"{name}/**\"] in each rule's front matter.")
 
 
 def main_checkout(start=None):
@@ -134,7 +197,7 @@ def load_config(root):
         return config
     layers = []
     parent = os.path.dirname(os.path.normpath(root))
-    if parent and parent != os.path.normpath(root) and os.path.isfile(os.path.join(parent, CONFIG_FILE)) and repo_root(parent) is None:
+    if parent and parent != os.path.normpath(root) and os.path.isfile(os.path.join(parent, CONFIG_FILE)) and folder_of(root):
         layers.append(os.path.join(parent, CONFIG_FILE))
     layers.append(os.path.join(root, CONFIG_FILE))
     for path in layers:

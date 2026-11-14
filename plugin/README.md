@@ -58,6 +58,22 @@ needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repo
 repository from the file they are given, as a path from the folder (`repo1/sub/CLAUDE.md`); the few commands that take
 no file want `--repo`.
 
+**Keeping bowline's files in the folder.** When you cannot write into the repositories, or would rather not touch them,
+set `"writeToRepositories": false` in the folder's `.claude/bowline.json`, or run `init --leave-repositories` from the
+folder, which writes it. `init` then puts the README, the rules and the skills in the folder itself, and a rule for one
+repository goes in `.claude/rules/<repository>/` with `paths: ["<repository>/**"]`, which Claude Code applies to that
+repository's files in a session started in the folder. `init --each`, `move` and autosplit write nothing into the
+repositories; the doctor still measures them, in notes that say why it changes nothing and what you can do instead. A
+list of names, `["repo2"]`, lets bowline write into those repositories only. One limit is Claude Code's: a session
+started inside one of the repositories reads the folder's `CLAUDE.md`, but not the folder's skills, and the
+documentation does not say that it reads the folder's rules, so the folder's files serve sessions started in the folder.
+
+**The folder as a git repository of its own.** The folder can itself be a git repository that holds only what its
+repositories share, so that its files are versioned and backed up like any repository's. bowline still sees a folder
+of repositories, as long as the folder does not track them: `init` writes the `.gitignore` lines that keep them out,
+and a submodule, which the folder does track, counts as part of it. The folder's own files are then committed, gated and
+split like a repository's.
+
 ## The skills, for Claude Code
 
 `skills/` holds the six procedures Claude runs these tools through, with the person in the loop: `doctor`, `init`,

@@ -78,6 +78,12 @@ from it. The commands that take no file, `move place`, `move pointers` and `move
 `--repo <repository>`; a spec's paths, the sources and the targets, are written from that repository's root. The
 doctor names the repository at the start of each finding, and its fixes carry the `--repo` already.
 
+A folder can leave some or all of its repositories untouched (`writeToRepositories` in the folder's
+`.claude/bowline.json`). In such a repository `move run`, `move pointers` and `move place` refuse and change nothing,
+while `move plan` and `--check` still work, and autosplit never starts. Do not split a file there: tell the person that
+the repository's owners can, or keep what the folder needs about that repository in the folder's own
+`.claude/rules/<repository>/`. The folder's own `CLAUDE.md` can be split when the folder is a git repository of its own.
+
 ## Unattended: the background worker
 
 When a repository sets `autosplit.enabled` in `.claude/bowline.json`, bowline's hook notices after a reply that a

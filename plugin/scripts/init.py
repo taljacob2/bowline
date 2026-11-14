@@ -38,7 +38,7 @@ import common  # noqa: E402
 TEMPLATES = os.path.join(common.PLUGIN_ROOT, "templates")
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 ITEMS = ["claude-md", "claude-readme", "rules", "skills", "scripts", "githook", "config", "gitignore"]
-FOLDER_ITEMS = ["claude-md", "config"]
+FOLDER_ITEMS = ["claude-md", "claude-readme", "rules", "skills", "config", "gitignore"]
 GITIGNORE_LINES = [
     "# A person's own Claude Code settings and worktrees for this repository, never the team's (bowline init).",
     ".claude/settings.local.json",
@@ -155,14 +155,70 @@ def repository_row(root):
     return f"| `{os.path.basename(root)}/` | {words} |"
 
 
-def build_folder(folder, roots, only):
+def folder_setting(folder, leave):
+    """The writeToRepositories value init works with: the folder's own file's when it says, else false when the person
+    asked to leave the repositories untouched (--leave-repositories), else true, today's default."""
+    path = os.path.join(folder, common.CONFIG_FILE)
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                own = json.load(handle)
+            if "writeToRepositories" in own:
+                return own["writeToRepositories"]
+        except (OSError, ValueError):
+            pass
+    return False if leave else True
+
+
+def about_folder(folder, count):
+    """The opening sentences of a folder's CLAUDE.md: what kind of folder it is."""
+    if common.is_repository(folder):
+        return (f"This folder is a git repository of its own, which holds only what its {count} repositories share; it does "
+                "not track them, and its `.gitignore` names them. Claude Code loads each repository's own `CLAUDE.md` when "
+                "a file under that repository is read or edited.")
+    return (f"This folder is not a repository. It holds {count} repositories side by side, and Claude Code loads each "
+            "repository's own `CLAUDE.md` when a file under that repository is read or edited.")
+
+
+def rules_for_one(roots, setting):
+    """Where a rule for one repository goes, given which repositories bowline may write into."""
+    kept = [os.path.basename(r) for r in roots if not common.allowed_by(setting, r)]
+    own = [os.path.basename(r) for r in roots if common.allowed_by(setting, r)]
+    here = ("in `.claude/rules/<repository>/`, with `paths: [\"<repository>/**\"]` in its front matter, because bowline "
+            "leaves {which} untouched (`writeToRepositories` in `.claude/bowline.json`)")
+    if not kept:
+        return "a rule for one repository goes in that repository's own `.claude/rules/`."
+    if not own:
+        return "a rule for one repository goes here too, " + here.format(which="the repositories") + "."
+    return (f"a rule for {', '.join(own)} goes in that repository's own `.claude/rules/`; a rule for "
+            f"{', '.join(kept)} goes here, " + here.format(which="them") + ".")
+
+
+def folder_config(setting):
+    """The folder's .claude/bowline.json: the template, with the writeToRepositories choice and its reason."""
+    data = json.loads(template("bowline.json"))
+    data["_writeToRepositories"] = ("Whether bowline writes into the repositories of this folder: true, false, or a list "
+                                    "of the names it may write into. With false, init, move and autosplit write nothing into "
+                                    "them, and what this folder needs about each one lives here.")
+    data["writeToRepositories"] = setting
+    return json.dumps(data, indent=2) + "\n"
+
+
+def build_folder(folder, roots, only, leave=False):
     """The scaffold for a folder of repositories: its own CLAUDE.md, an index of the repositories with the sections every
-    root file needs, and the shared .claude/bowline.json. The repositories get their own scaffold with --each."""
+    root file needs, and the shared .claude/bowline.json; the .claude/README.md, starter rules and skills too when the
+    folder keeps the files of repositories bowline leaves untouched; and, when the folder is a git repository of its
+    own, the .gitignore lines that keep its repositories out of it. The repositories get their own scaffold with --each."""
     plan = Plan(folder, None)
-    wanted = set(only) if only else set(FOLDER_ITEMS)
+    setting = folder_setting(folder, leave)
+    keeps = any(not common.allowed_by(setting, r) for r in roots)
+    default = ["claude-md", "config"] + (["claude-readme", "rules", "skills"] if keeps else [])
+    default += ["gitignore"] if common.is_repository(folder) else []
+    wanted = set(only) if only else set(default)
     if "claude-md" in wanted:
         compact = "".join(body for title, body in sections_of(template("CLAUDE.md.sections.md")) if title.lower() == "compact instructions")
-        text = (template("CLAUDE.md.folder.md").replace("{count}", str(len(roots)))
+        text = (template("CLAUDE.md.folder.md").replace("{about}", about_folder(folder, len(roots)))
+                .replace("{rules_for_one}", rules_for_one(roots, setting))
                 .replace("{rows}", "\n".join(repository_row(root) for root in roots)).replace("{compact}", compact + "\n"))
         found = common.root_claude_md(folder)
         relative = found[0] if found else "CLAUDE.md"
@@ -181,8 +237,37 @@ def build_folder(folder, roots, only):
                 plan.add("claude-md", relative, "append sections: " + ", ".join(t for t, _ in missing), do)
             else:
                 plan.add("claude-md", relative, "kept (has every section)")
+    if "claude-readme" in wanted:
+        plan.file("claude-readme", ".claude/README.md", template("claude-readme.md"))
+    if "rules" in wanted:
+        for name in ("before-a-commit.md", "recording-decisions.md"):
+            plan.file("rules", f".claude/rules/{name}", template(f"rules/{name}"))
+    if "skills" in wanted:
+        for name in ("full-checks", "push"):
+            plan.file("skills", f".claude/skills/{name}/SKILL.md", template(f"skills/{name}/SKILL.md"))
     if "config" in wanted:
-        plan.file("config", common.CONFIG_FILE, template("bowline.json"))
+        plan.file("config", common.CONFIG_FILE, folder_config(setting))
+    if "gitignore" in wanted:
+        path = os.path.join(folder, ".gitignore")
+        existing = common.read_text(path) if os.path.isfile(path) else ""
+        lines = existing.split("\n")
+        wanted_lines = GITIGNORE_LINES[1:] + [f"/{os.path.basename(r)}/" for r in roots]
+        missing = [l for l in wanted_lines if l not in lines]
+        if not missing:
+            plan.add("gitignore", ".gitignore", "kept (has the entries)")
+        else:
+            header = "# The repositories this folder holds side by side; each is a git repository of its own (bowline init)."
+            def do(path=path, existing=existing, missing=missing, header=header):
+                body = [l for l in missing if l in GITIGNORE_LINES[1:]]
+                repos = [l for l in missing if l not in GITIGNORE_LINES[1:]]
+                parts = [existing.rstrip("\n")] if existing else []
+                if body:
+                    parts.append(GITIGNORE_LINES[0] + "\n" + "\n".join(body))
+                if repos:
+                    parts.append(header + "\n" + "\n".join(repos))
+                with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                    handle.write("\n\n".join(parts) + "\n")
+            plan.add("gitignore", ".gitignore", "append entries: " + ", ".join(missing), do)
     return plan
 
 
@@ -193,6 +278,9 @@ def main(argv=None):
     parser.add_argument("--write", action="store_true", help="do it: create what is missing, append missing sections, never overwrite")
     parser.add_argument("--only", help="a comma-separated list of items: " + ", ".join(ITEMS) + " (for a folder of repositories: " + ", ".join(FOLDER_ITEMS) + ")")
     parser.add_argument("--each", action="store_true", help="from a folder of repositories: plan or write the repository scaffold in every one of them")
+    parser.add_argument("--leave-repositories", action="store_true",
+                        help="from a folder of repositories: keep bowline's files in the folder and write nothing into the repositories"
+                             " (writeToRepositories false in the folder's new .claude/bowline.json)")
     options = parser.parse_args(argv)
     workspace, roots = common.roots_for(options.repo)
     root = None if workspace else (roots[0] if roots else None)
@@ -204,12 +292,27 @@ def main(argv=None):
     if only and any(i not in items for i in only):
         print("bowline init: unknown item; the items are " + ", ".join(items), file=sys.stderr)
         return 2
+    if root and not common.writes_allowed(root):
+        print(f"bowline init: {common.left_alone(root)}. Run init from the folder, {common.folder_of(root)}, to keep its "
+              "files there.", file=sys.stderr)
+        return 1
     if root:
         plans = [(root, build(root, common.load_config(root), only))]
     elif options.each:
-        plans = [(r, build(r, common.load_config(r), only)) for r in roots]
+        allowed = [r for r in roots if common.writes_allowed(r)]
+        for r in roots:
+            if r not in allowed:
+                print(f"bowline init: {common.left_alone(r)}; skipped.")
+        if not allowed:
+            print("bowline init: nothing to do; the folder keeps the files of all its repositories. Run init without --each.")
+            return 0
+        plans = [(r, build(r, common.load_config(r), only)) for r in allowed]
     else:
-        plans = [(workspace, build_folder(workspace, roots, only))]
+        plans = [(workspace, build_folder(workspace, roots, only, options.leave_repositories))]
+        setting = folder_setting(workspace, options.leave_repositories)
+        if options.leave_repositories and setting is not False and os.path.isfile(os.path.join(workspace, common.CONFIG_FILE)):
+            print(f"bowline init: the folder's {common.CONFIG_FILE} exists and init never edits it; to leave the repositories "
+                  f"untouched, set \"writeToRepositories\": false in it, then run init again.")
     total = 0
     for index, (where, plan) in enumerate(plans):
         if index:
@@ -222,15 +325,24 @@ def main(argv=None):
         if options.write:
             for item, path, verb, do in pending:
                 do()
-    names = ", ".join(os.path.basename(r) for r in roots)
+    if workspace and not options.each:
+        setting = folder_setting(workspace, options.leave_repositories)
+        own = [os.path.basename(r) for r in roots if common.allowed_by(setting, r)]
+        kept = [os.path.basename(r) for r in roots if not common.allowed_by(setting, r)]
     if not options.write:
         print(f"\n{total} change(s) would be made. Run with --write to make them; nothing that exists is overwritten.")
         if workspace and not options.each:
-            print(f"The folder's {len(roots)} repositories ({names}) get their own scaffold with --each.")
+            if own:
+                print(f"The folder's repositories {', '.join(own)} get their own scaffold with --each.")
+            if kept:
+                print(f"bowline writes nothing into {', '.join(kept)}: their rules go in this folder's .claude/rules/<repository>/.")
         return 0
     if workspace and not options.each:
-        print(f"\n{total} change(s) made. Next: say in CLAUDE.md's table what each repository is, in a line; then `bowline init --each` for the"
-              " repositories' own scaffold, and `bowline doctor`.")
+        then = (" then `bowline init --each` for the own scaffold of " + ", ".join(own) + ";") if own else ""
+        keep = (f" put what this folder needs about {', '.join(kept)} in .claude/rules/<repository>/, scoped with paths;"
+                if kept else "")
+        print(f"\n{total} change(s) made. Next: say in CLAUDE.md's table what each repository is, in a line;{then}{keep}"
+              " and run `bowline doctor`.")
         return 0
     print(f"\n{total} change(s) made. Next: fill the placeholders in .claude/skills/*/SKILL.md, run `git config core.hooksPath .githooks` "
           "to let git run the gate, and run `bowline doctor`.")

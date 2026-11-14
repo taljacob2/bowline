@@ -184,7 +184,7 @@ class WorkspaceTests(ScratchRepo):
         self.assertIn("bowline init: " + self.workspace, out)
         self.assertIn("CLAUDE.md", out)
         self.assertIn(".claude/bowline.json", out)
-        self.assertIn("The folder's 2 repositories (repo1, repo2) get their own scaffold with --each.", out)
+        self.assertIn("The folder's repositories repo1, repo2 get their own scaffold with --each.", out)
         self.assertFalse(os.path.exists(os.path.join(self.workspace, "CLAUDE.md")))
         code, out, err = self.bowline("init", "--write")
         self.assertEqual(code, 0, out + err)
@@ -211,9 +211,9 @@ class WorkspaceTests(ScratchRepo):
         self.assertEqual(code, 0, out + err)
         self.assertTrue(os.path.isfile(os.path.join(self.repo1, ".claude", "bowline.json")))
         self.assertTrue(os.path.isfile(os.path.join(self.repo2, ".claude", "rules", "before-a-commit.md")))
-        code, out, err = self.bowline("init", "--only", "rules")                     # not a folder item
+        code, out, err = self.bowline("init", "--only", "githook")                   # not a folder item
         self.assertEqual(code, 2)
-        self.assertIn("the items are claude-md, config", err)
+        self.assertIn("the items are claude-md, claude-readme, rules, skills, config, gitignore", err)
 
 
 if __name__ == "__main__":

@@ -180,9 +180,9 @@ def run_many(roots, options):
         print(f"{name}: {checked} {what} checked, {len(problems)} problem(s), {len(warnings)} warning(s).")
         total += len(problems)
     if total:
-        print(f"bowline gate: {total} problem(s) across {len(roots)} repositories. Fix them before committing.")
+        print(f"bowline gate: {total} problem(s) across {common.count(len(roots), 'repository', 'repositories')}. Fix them before committing.")
         return 1
-    print(f"bowline gate: nothing found across {len(roots)} repositories.")
+    print(f"bowline gate: nothing found across {common.count(len(roots), 'repository', 'repositories')}.")
     return 0
 
 

@@ -317,9 +317,16 @@ def main(argv=None):
     options = parser.parse_args(argv)
     if not options.repo and getattr(options, "file", None):
         options.repo = os.path.dirname(os.path.abspath(options.file)) or None     # the file's own repository, from any folder
-    if not common.repo_root(options.repo):
+    root = common.repo_root(options.repo)
+    if not root:
         print("bowline move: not inside a git repository. From a folder of repositories, pass --repo <the one the files are in>.", file=sys.stderr)
         return 2
+    writes = options.command in ("run", "pointers", "place") and not getattr(options, "check", False)
+    if writes and not common.writes_allowed(root):
+        print(f"bowline move: {common.left_alone(root)}, and this would write into it. Nothing was changed. "
+              f"Plan and check still work (--check); to keep what this folder needs about the repository, put it in the "
+              f"folder's own .claude/rules/{os.path.basename(root)}/.", file=sys.stderr)
+        return 1
     commands = {"plan": do_plan, "run": do_run, "find-pointers": do_find_pointers, "pointers": do_pointers, "place": do_place}
     return commands[options.command](options)
 

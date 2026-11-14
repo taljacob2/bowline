@@ -84,5 +84,7 @@
   "outsidePathsWhy": "An instruction file that names a session's scratch folder, a temp folder, a home folder or a memory note by its file points at something no other contributor and no other machine can see.",
   "conventionsDir": "docs/conventions",
   "rulesDir": ".claude/rules",
-  "skillsDir": ".claude/skills"
+  "skillsDir": ".claude/skills",
+  "writeToRepositories": true,
+  "writeToRepositoriesWhy": "Read from the .claude/bowline.json of a folder of repositories: whether bowline writes into the repositories under it. true, the default, lets init --each, move and autosplit write into each one; false keeps every file bowline writes in the folder, for repositories you cannot or would rather not write into; a list of names allows those only. A repository's own file cannot change it, because the choice belongs to the person who works from the folder."
 }

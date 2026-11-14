@@ -179,6 +179,15 @@ def waiting_reason(root, config, path):
 # The hook
 
 
+def repositories_to_split(start):
+    """The repositories autosplit may work in from a path: the folder itself when it is a folder of repositories with a
+    git repository of its own, and every repository bowline may write into. A split is a branch in the repository, so
+    a repository the folder leaves untouched never gets one."""
+    workspace, roots = common.roots_for(start)
+    own = [workspace] if workspace and common.is_repository(workspace) else []
+    return own + [root for root in roots if common.writes_allowed(root)]
+
+
 def do_hook(options):
     """What the Stop and SessionEnd hooks run: prints nothing, exits 0, starts at most one worker per oversized file."""
     if os.environ.get(WORKER_MARK):
@@ -190,8 +199,7 @@ def do_hook(options):
             cwd = facts.get("cwd") or None
     except Exception:
         cwd = None
-    _, roots = common.roots_for(cwd or options.repo or os.getcwd())
-    for root in roots:
+    for root in repositories_to_split(cwd or options.repo or os.getcwd()):
         config = common.load_config(root)
         if not settings(config).get("enabled"):
             continue
@@ -524,6 +532,8 @@ def describe(state):
 def findings(root, config, facts):
     """The doctor's findings about autosplit: a split ready, running or failed, and why one has not started."""
     out = []
+    if not common.writes_allowed(root):
+        return out
     enabled = bool(settings(config).get("enabled"))
     states = {s["file"]: s for s in all_states(root)}
     for path, lines, chars, why in oversized(root, config, facts):
@@ -640,7 +650,10 @@ def do_status(root, config):
         if state:
             print(f"  {path}: {describe(state)}")
             continue
-        reason = waiting_reason(root, config, path) if enabled else "autosplit is off"
+        if not common.writes_allowed(root):
+            reason = common.left_alone(root)
+        else:
+            reason = waiting_reason(root, config, path) if enabled else "autosplit is off"
         print(f"  {path}: over the limits ({why}); " + (f"waiting: {reason}" if reason else "starts after the next reply"))
     for path, state in states.items():
         print(f"  {path}: {describe(state)} (the file is within the limits now)")
@@ -740,17 +753,16 @@ def main(argv=None):
     if not options.command:
         parser.print_help()
         return 2
-    root = common.repo_root(options.repo or os.getcwd())
     if options.command == "status":
-        if root:
-            return do_status(root, common.load_config(root))
-        _, roots = common.roots_for(options.repo or os.getcwd())
+        workspace, roots = common.roots_for(options.repo or os.getcwd())
         if not roots:
             print("bowline autosplit: not inside a git repository, and this folder holds none.", file=sys.stderr)
             return 2
-        for root in roots:
+        targets = ([workspace] if workspace and common.is_repository(workspace) else []) + roots
+        for index, root in enumerate(targets):
+            if index:
+                print()
             do_status(root, common.load_config(root))
-            print()
         return 0
     root, path = locate(options.file, options.repo)
     if not root:
@@ -760,6 +772,10 @@ def main(argv=None):
         return 2
     config = common.load_config(root)
     if options.command in ("run", "worker"):
+        if not common.writes_allowed(root):
+            print(f"bowline autosplit: {common.left_alone(root)}, and a split is a branch in it. "
+                  f"Split {path} by hand in a clone of your own, or ask the repository's owners.", file=sys.stderr)
+            return 1
         return do_run(root, config, path, foreground=options.command == "run")
     if options.command == "show":
         return do_show(root, path)

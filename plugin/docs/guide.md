@@ -161,6 +161,16 @@ the sections every root file needs, and the shared `.claude/bowline.json`; `init
 `move` and `autosplit` take the repository from the file they are given, as a path from the folder; the few commands
 that take no file want `--repo`. The skills say the same, so Claude needs no reminding.
 
+The folder decides whether bowline writes into its repositories at all. With `"writeToRepositories": false` in the
+folder's `.claude/bowline.json`, for repositories you cannot or would rather not write into, every file bowline writes
+stays in the folder: a rule for one repository goes in the folder's `.claude/rules/<repository>/`, scoped with
+`paths: ["<repository>/**"]`, because the documentation says a rule's patterns are relative to "the directory that
+contains the rule's .claude folder". `init --each`, `move` and autosplit then write nothing into the repositories, and
+the doctor measures them in notes that say why. Such files serve sessions started in the folder: a session started
+inside a repository reads the folder's `CLAUDE.md`, but Claude Code looks for skills only "up to the repository root".
+The folder can also be a git repository of its own, which holds what its repositories share without tracking them,
+so that its files are versioned like any repository's.
+
 ## What bowline does, and what it leaves to you
 
 The mechanics are automatic: the memory push after every reply, the gate before a commit, the one-line finding at a

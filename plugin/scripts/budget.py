@@ -167,7 +167,7 @@ def main(argv=None):
     if findings:
         problems = common.print_findings(findings, "bowline budget")
         return 1 if problems else 0
-    print(f"bowline budget: within limits across the folder and its {len(roots)} repositories.")
+    print(f"bowline budget: within limits across the folder and its {common.count(len(roots), 'repository', 'repositories')}.")
     for line in summaries:
         print(line)
     return 0

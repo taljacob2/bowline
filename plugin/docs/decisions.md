@@ -144,3 +144,34 @@ JavaScript so that node alone would do: a larger change than the problem.
 short list of types only from Verified organizations, which Anthropic chooses, with no way to apply yet. bowline is
 hooks that run scripts, so that rule, when it comes, applies to it whatever its layout. bowline's own marketplace is
 not affected by any of the directory's rules.
+
+## 2026-11-14: a folder may keep bowline's files itself, and may be a git repository of its own
+
+**The question.** The first user works from a folder that holds several repositories side by side, and asked for a
+second way to use bowline there: with every file bowline writes kept in the folder, because a person may have no write
+access to the repositories, or may not want them touched. How is that chosen, and where are the folder's files kept?
+
+**The decision.** A setting, `writeToRepositories`, in the folder's own `.claude/bowline.json`: true by default, which
+is how bowline worked until now; false, so that nothing is written into the repositories; or a list of the names
+bowline may write into, for a person who owns some of them. Only the folder's file counts, because the choice belongs
+to the person who works from the folder, and a repository someone else owns must not be able to grant itself writes.
+Where it is false, everything that writes into a repository refuses and says why: init with --each, move, and
+autosplit, whose split is a branch in the repository. The doctor still measures those repositories, but every finding
+about them is a note that says why bowline changes nothing and what the person can do instead, because a fix the person
+may not make should not repeat at the start of every session. What the folder needs about a repository lives in the
+folder's own rules, scoped to that repository's files: Claude Code documents a rule's patterns as relative to the
+folder that holds its .claude folder, so a rule there with paths repo1/** applies to repo1's files.
+
+**The folder as a repository.** The first user agreed that the folder may be a git repository of its own, because a
+folder that keeps instructions but is not versioned keeps them on one machine, which is the loss bowline exists to
+prevent. bowline sees a folder of repositories when a repository's top folder holds other repositories that it does
+not track; init writes the .gitignore lines that keep them out. A submodule is tracked, so it stays part of the
+repository that holds it. The memory is unchanged: Claude Code keys it on the repository's top folder, which is the
+same folder.
+
+**Not chosen, for now.** Making an oversized CLAUDE.md in a repository bowline may not write into fully read, by copying
+it into the folder's rules and hiding the original through Claude Code's claudeMdExcludes setting: the copy would drift
+from the repository's own file as its owners change it. The first user accepted leaving such a file to its owners for
+now. Also known and left as it is: a session started inside one of the repositories reads the folder's CLAUDE.md, but
+Claude Code looks for skills only up to the repository's root, and does not document whether it reads the folder's
+rules, so the folder's files serve sessions started in the folder.

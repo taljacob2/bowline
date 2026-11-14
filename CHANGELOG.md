@@ -4,6 +4,31 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.7.0 (2026-11-14)
+
+A folder of repositories can keep bowline's files itself, and can be a git repository of its own.
+
+- A new setting, `writeToRepositories`, read from the folder's `.claude/bowline.json`: `true`, the default and the
+  behaviour so far; `false`, so that bowline writes nothing into the repositories under the folder, for repositories a
+  person cannot or would rather not write into; or a list of the names it may write into. A repository's own file
+  cannot change it. `init --leave-repositories` from the folder writes it as `false`.
+- With the repositories left untouched: `init` from the folder writes the README, the starter rules and the skills into
+  the folder as well, and its `CLAUDE.md` says that a rule for one repository goes in `.claude/rules/<repository>/`
+  with `paths: ["<repository>/**"]`. `init --each` skips those repositories and says why; `init` run inside one refuses
+  and points at the folder. `move run`, `pointers` and `place` refuse to write into them and change nothing, while
+  `plan` and `--check` still work. Autosplit never starts there, and `autosplit run` refuses. The doctor still measures
+  them, but as notes that say why bowline changes nothing and what the person can do: ask the owners, or keep what the
+  folder needs in its own rules. So the line at a session's start never repeats a fix the person may not make.
+- The folder can be a git repository of its own, which holds what its repositories share without tracking them:
+  bowline sees a folder of repositories when a repository's top folder holds other repositories it does not track. A
+  submodule is tracked, so it stays part of the repository. `init` there writes the `.gitignore` lines that keep the
+  repositories out, the folder's `CLAUDE.md` says what kind of folder it is, the folder's own files get the doctor's
+  checks of a repository (the gate, the configuration, autosplit), and the folder's `.claude/bowline.json` is the layer
+  its repositories share, as for a plain folder.
+- The messages that count repositories say "1 repository" rather than "1 repositories".
+- `plugin/docs/facts.md` has two rows on how Claude Code loads a folder's rules and skills, with the documentation's
+  words; `plugin/docs/decisions.md` says why the setting is the folder's and why a folder may be a repository.
+
 ## 0.6.2 (2026-11-14)
 
 - bowline has a privacy policy, `plugin/PRIVACY.md`, and the manifest names it in `privacyPolicyUrl`, the field

@@ -220,7 +220,11 @@ class Survey:
         self.findings = []
         shared = common.load_config(self.workspace)
         budget_findings, facts = budget.measure(self.workspace, shared)
-        own = workspace_findings(self.workspace, facts) + budget_findings
+        own = claude_md_findings(self.workspace, shared, facts) + workspace_findings(self.workspace, facts) + budget_findings
+        if common.is_repository(self.workspace):
+            # A folder that is its own git repository: its own files are committed, gated and split like a repository's.
+            own += autosplit.findings(self.workspace, shared, facts) + layout_findings(self.workspace)
+            autosplit.adjust(own, self.workspace)
         self.findings += label(own, os.path.basename(self.workspace))
         self.parts.append((os.path.basename(self.workspace), self.workspace, facts, shared))
         for root in self.roots:
@@ -236,8 +240,16 @@ class Survey:
 
 
 def repository_findings(root, config):
-    """One repository's findings, in the doctor's order, and the sizes measured on the way."""
+    """One repository's findings, in the doctor's order, and the sizes measured on the way. In a repository bowline
+    leaves untouched, each finding is a note that says so and what the person can do instead, because a fix bowline may
+    not make is not theirs to make either, and the line at a session's start should not repeat it every time."""
     budget_findings, facts = budget.measure(root, config)
+    if not common.writes_allowed(root):
+        findings = claude_md_findings(root, config, facts) + budget_findings + root_claude_md_findings(root, facts)
+        for finding in findings:
+            finding.level = "note"
+            finding.fix = common.left_alone_fix(root)
+        return findings, facts
     findings = claude_md_findings(root, config, facts)
     findings += autosplit.findings(root, config, facts)
     findings += budget_findings
@@ -376,7 +388,7 @@ def main(argv=None):
     config = survey.parts[0][3]
     if survey.workspace:
         names = ", ".join(os.path.basename(r) for r in survey.roots)
-        print(f"bowline doctor: {survey.workspace}, a folder of {len(survey.roots)} repositories: {names}")
+        print(f"bowline doctor: {survey.workspace}, a folder of {common.count(len(survey.roots), 'repository', 'repositories')}: {names}")
         with_config = [name for name, root, _, _ in survey.parts if os.path.isfile(os.path.join(root, common.CONFIG_FILE))]
         suffix = f", with {common.CONFIG_FILE} in {', '.join(with_config)}" if with_config else ""
     else:
