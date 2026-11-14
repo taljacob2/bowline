@@ -251,7 +251,7 @@ def workspace_findings(workspace, facts):
         return [common.Finding(
             "note", "The folder itself has no CLAUDE.md.",
             "A session started in the folder loads a CLAUDE.md there whole, at its start; it is the place to say in a few lines what the repositories are and how they relate.",
-            "Write one by hand, under 200 lines; bowline init does not scaffold a folder of repositories yet.")]
+            "/bowline:init writes one from the folder: a table of the repositories, what applies to all of them, the Compact Instructions and the memory section; --each scaffolds every repository.")]
     return root_claude_md_findings(workspace, facts)
 
 

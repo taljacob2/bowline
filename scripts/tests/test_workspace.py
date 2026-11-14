@@ -98,9 +98,9 @@ class WorkspaceTests(ScratchRepo):
         self.assertIn("does not exist yet", out)
         name = re.sub(r"[^A-Za-z0-9]", "-", os.path.normpath(self.workspace))
         self.assertIn(os.path.join(self.config_dir, "projects", name, "memory"), out)
-        code, out, err = self.bowline("init", "--plan")
-        self.assertEqual(code, 2)
-        self.assertIn("holds 2 repositories (repo1, repo2): run init inside each", err)
+        code, out, err = self.bowline("init", "--plan")                                 # the folder's own scaffold
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("get their own scaffold with --each", out)
         code, out, err = self.bowline("move", "plan", "--file", "repo1/sub/CLAUDE.md")      # the file's own repository
         self.assertEqual(code, 0, out + err)
         self.assertIn("First", out)
@@ -163,6 +163,43 @@ class WorkspaceTests(ScratchRepo):
         self.assertIn("repo2: CLAUDE.md has 207 lines", out)
         name = re.sub(r"[^A-Za-z0-9]", "-", os.path.normpath(self.workspace))
         self.assertTrue(os.path.isfile(os.path.join(self.config_dir, "projects", name, "bowline", "watch.json")))
+
+    def test_init_scaffolds_the_folder_itself_and_each_repository_on_request(self):
+        code, out, err = self.bowline("init", "--plan")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("bowline init: " + self.workspace, out)
+        self.assertIn("CLAUDE.md", out)
+        self.assertIn(".claude/bowline.json", out)
+        self.assertIn("The folder's 2 repositories (repo1, repo2) get their own scaffold with --each.", out)
+        self.assertFalse(os.path.exists(os.path.join(self.workspace, "CLAUDE.md")))
+        code, out, err = self.bowline("init", "--write")
+        self.assertEqual(code, 0, out + err)
+        text = read(os.path.join(self.workspace, "CLAUDE.md"))
+        self.assertIn("It holds 2 repositories side by side", text)
+        self.assertIn("| `repo1/` | (say in a line what it is) |", text)            # repo1's CLAUDE.md is a heading only
+        self.assertIn("| `repo2/` | Keep. |", text)                                   # repo2's first line that is not a heading
+        self.assertIn("## Compact Instructions", text)
+        self.assertIn("one memory for the whole folder", text)
+        self.assertLess(len(text.splitlines()), 200)
+        self.assertTrue(os.path.isfile(os.path.join(self.workspace, ".claude", "bowline.json")))
+        code, out, _ = self.bowline("init", "--plan")
+        self.assertIn("kept (has every section)", out)
+        self.assertIn("kept (exists)", out)
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertNotIn("has no CLAUDE.md", out)
+        self.assertNotIn('services: CLAUDE.md has no "Compact Instructions"', out)
+        code, out, err = self.bowline("init", "--each", "--plan")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("bowline init: " + self.repo1, out)
+        self.assertIn("bowline init: " + self.repo2, out)
+        self.assertFalse(os.path.exists(os.path.join(self.repo1, ".claude", "bowline.json")))
+        code, out, err = self.bowline("init", "--each", "--write", "--only", "config,rules")
+        self.assertEqual(code, 0, out + err)
+        self.assertTrue(os.path.isfile(os.path.join(self.repo1, ".claude", "bowline.json")))
+        self.assertTrue(os.path.isfile(os.path.join(self.repo2, ".claude", "rules", "before-a-commit.md")))
+        code, out, err = self.bowline("init", "--only", "rules")                     # not a folder item
+        self.assertEqual(code, 2)
+        self.assertIn("the items are claude-md, config", err)
 
 
 if __name__ == "__main__":

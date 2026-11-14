@@ -4,6 +4,14 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
+## Unreleased
+
+- `init` from a folder of repositories scaffolds the folder itself: its own `CLAUDE.md` from `templates/folder-CLAUDE.md`,
+  an index with a table of the repositories (a line for each, taken from its own `CLAUDE.md`), what applies to every
+  repository, the Compact Instructions and a memory section that says the memory is one for the whole folder; and the
+  shared `.claude/bowline.json`. `init --each` plans or writes the repository scaffold in every repository of the folder.
+  Nothing that exists is overwritten, as before. The doctor's note for a folder without a `CLAUDE.md` points at it.
+
 ## 0.4.0 (2026-11-14)
 
 - The gate hook finds the repository a commit names, from `git -C <path>` or `cd <path> &&` in the command, resolved

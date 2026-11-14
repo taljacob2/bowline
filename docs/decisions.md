@@ -89,4 +89,7 @@ anyway.
 
 **Not chosen.** Looking deeper than one level: a repository inside a repository is that repository's business, and a
 folder of folders of repositories is rare enough to wait for someone who has one. Scaffolding the folder itself with
-init: the folder's CLAUDE.md is a few lines naming the repositories, written by hand for now. Both can come when asked.
+init was left out at first and asked for the same day: `init` from the folder now writes the folder's own CLAUDE.md,
+an index of the repositories with a table (a line for each, taken from its own CLAUDE.md), what applies to every
+repository, the Compact Instructions and a memory section that says the memory is one for the whole folder, plus the
+shared .claude/bowline.json; `init --each` scaffolds every repository. The depth stays at one level.

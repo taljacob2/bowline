@@ -52,3 +52,13 @@ or without `--only` for all. Then show `git status` so they see exactly what app
 
 Never edit an existing `CLAUDE.md` beyond appending the missing sections; what a repository already says is the
 person's.
+
+## From a folder of repositories
+
+When the session runs in a folder that is not a repository but holds several, `init --plan` plans the folder's own
+scaffold: `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/folder-CLAUDE.md`, an index with a table of the
+repositories, what applies to every repository, the Compact Instructions and a memory section that says the memory is
+one for the whole folder; and the shared `.claude/bowline.json`, the layer every repository's own lies over. Show the
+template, write with `--write`, then fill the table with the person: a line for each repository and how they call one
+another. `init --each --plan` plans the repository scaffold above in every repository of the folder, and
+`init --each --write --only <items>` writes it; show the plan before writing into several repositories at once.

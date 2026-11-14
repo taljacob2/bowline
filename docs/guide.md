@@ -156,8 +156,9 @@ the project root is used instead". bowline follows the same shape. The doctor, t
 session's start and the reminders measure the folder's own `CLAUDE.md` and every repository directly under it, and name
 the repository in each finding. The gate finds the repository a commit names. Autosplit works per repository, each
 split on a branch of its own repository, and a `.claude/bowline.json` in the folder is the layer every repository
-shares, under its own. `init` and `move` work inside one repository at a time; from the folder, `move` takes the
-repository from the file it is given, and `init` says to run it inside each repository.
+shares, under its own. From the folder, `init` writes the folder's own `CLAUDE.md`, an index of the repositories with
+the sections every root file needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repository;
+`move` takes the repository from the file it is given.
 
 ## What bowline does, and what it leaves to you
 

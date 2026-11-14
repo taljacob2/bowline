@@ -1,6 +1,7 @@
 """Scaffolds the repository's side of the layout: the files a plugin cannot ship.
 
     python -I scripts/bowline.py init [--repo <path>] [--plan | --write] [--only item,item]
+    python -I scripts/bowline.py init [--each] [--plan | --write]        from a folder of repositories
 
 Items, each a file or a set of files under the repository:
   claude-md      the root CLAUDE.md gets three sections (appended when missing, the file created when absent):
@@ -16,6 +17,12 @@ Items, each a file or a set of files under the repository:
 
 --plan prints what each item would do and changes nothing. --write does it: it creates what is missing and appends
 the missing sections, and never overwrites or edits what exists. Without a flag it behaves as --plan.
+
+From a folder that is not a repository but holds several, init scaffolds the folder itself: its own CLAUDE.md, the
+file that loads whole at the start of a session started there, as an index of the repositories (a table with a line
+for each, taken from the repository's own CLAUDE.md), what applies to every repository, the Compact Instructions and
+the memory section, which for a folder says that the memory is one for the whole folder; and the shared
+.claude/bowline.json. With --each it plans or writes the repository scaffold in every repository of the folder instead.
 """
 
 import argparse
@@ -30,6 +37,7 @@ import common  # noqa: E402
 TEMPLATES = os.path.join(common.PLUGIN_ROOT, "templates")
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 ITEMS = ["claude-md", "claude-readme", "rules", "skills", "scripts", "githook", "config", "gitignore"]
+FOLDER_ITEMS = ["claude-md", "config"]
 GITIGNORE_LINES = [
     "# A person's own Claude Code settings and worktrees for this repository, never the team's (bowline init).",
     ".claude/settings.local.json",
@@ -129,35 +137,94 @@ def build(root, config, only):
     return plan
 
 
+def repository_row(root):
+    """A row of the folder's table: the repository's name and the first line of its own CLAUDE.md that is not a heading."""
+    words = "(say in a line what it is)"
+    path = os.path.join(root, "CLAUDE.md")
+    if os.path.isfile(path):
+        for line in common.read_text(path).split("\n"):
+            line = line.strip()
+            if line and not line.startswith("#") and not line.startswith("<!--") and not line.startswith("|"):
+                words = line[:100].rstrip() + ("..." if len(line) > 100 else "")
+                break
+    return f"| `{os.path.basename(root)}/` | {words} |"
+
+
+def build_folder(folder, roots, only):
+    """The scaffold for a folder of repositories: its own CLAUDE.md, an index of the repositories with the sections every
+    root file needs, and the shared .claude/bowline.json. The repositories get their own scaffold with --each."""
+    plan = Plan(folder, None)
+    wanted = set(only) if only else set(FOLDER_ITEMS)
+    if "claude-md" in wanted:
+        compact = "".join(body for title, body in sections_of(template("CLAUDE.md.sections.md")) if title.lower() == "compact instructions")
+        text = (template("folder-CLAUDE.md").replace("{count}", str(len(roots)))
+                .replace("{rows}", "\n".join(repository_row(root) for root in roots)).replace("{compact}", compact + "\n"))
+        path = os.path.join(folder, "CLAUDE.md")
+        existing = common.read_text(path) if os.path.isfile(path) else ""
+        if not existing:
+            plan.file("claude-md", "CLAUDE.md", text)
+        else:
+            have = {title.lower() for title, _ in sections_of(existing)}
+            missing = [(t, b) for t, b in sections_of(text) if t.lower() not in have]
+            if missing:
+                def do(path=path, existing=existing, missing=missing):
+                    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                        handle.write(existing.rstrip("\n") + "\n\n" + "\n".join(b for _, b in missing))
+                plan.add("claude-md", "CLAUDE.md", "append sections: " + ", ".join(t for t, _ in missing), do)
+            else:
+                plan.add("claude-md", "CLAUDE.md", "kept (has every section)")
+    if "config" in wanted:
+        plan.file("config", common.CONFIG_FILE, template("bowline.json"))
+    return plan
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Scaffolds the repository's side of bowline's layout.")
     parser.add_argument("--repo")
     parser.add_argument("--plan", action="store_true", help="print what would be done (the default)")
     parser.add_argument("--write", action="store_true", help="do it: create what is missing, append missing sections, never overwrite")
-    parser.add_argument("--only", help="a comma-separated list of items: " + ", ".join(ITEMS))
+    parser.add_argument("--only", help="a comma-separated list of items: " + ", ".join(ITEMS) + " (for a folder of repositories: " + ", ".join(FOLDER_ITEMS) + ")")
+    parser.add_argument("--each", action="store_true", help="from a folder of repositories: plan or write the repository scaffold in every one of them")
     options = parser.parse_args(argv)
-    root = common.repo_root(options.repo)
-    if not root:
-        _, repos = common.roots_for(options.repo)
-        hint = (f" This folder holds {len(repos)} repositories ({', '.join(os.path.basename(r) for r in repos)}): run init inside each;"
-                " a scaffold for the folder itself is not here yet.") if repos else ", and this folder holds none."
-        print("bowline init: not inside a git repository" + hint, file=sys.stderr)
+    workspace, roots = common.roots_for(options.repo)
+    root = None if workspace else (roots[0] if roots else None)
+    if not roots:
+        print("bowline init: not inside a git repository, and this folder holds none.", file=sys.stderr)
         return 2
+    items = FOLDER_ITEMS if workspace and not options.each else ITEMS
     only = [i.strip() for i in options.only.split(",")] if options.only else None
-    if only and any(i not in ITEMS for i in only):
-        print("bowline init: unknown item; the items are " + ", ".join(ITEMS), file=sys.stderr)
+    if only and any(i not in items for i in only):
+        print("bowline init: unknown item; the items are " + ", ".join(items), file=sys.stderr)
         return 2
-    plan = build(root, common.load_config(root), only)
-    print(f"bowline init: {root}")
-    for item, path, verb, do in plan.actions:
-        print(f"  {item:14} {path:40} {verb}")
-    pending = [a for a in plan.actions if a[3] is not None]
+    if root:
+        plans = [(root, build(root, common.load_config(root), only))]
+    elif options.each:
+        plans = [(r, build(r, common.load_config(r), only)) for r in roots]
+    else:
+        plans = [(workspace, build_folder(workspace, roots, only))]
+    total = 0
+    for index, (where, plan) in enumerate(plans):
+        if index:
+            print()
+        print(f"bowline init: {where}")
+        for item, path, verb, do in plan.actions:
+            print(f"  {item:14} {path:40} {verb}")
+        pending = [a for a in plan.actions if a[3] is not None]
+        total += len(pending)
+        if options.write:
+            for item, path, verb, do in pending:
+                do()
+    names = ", ".join(os.path.basename(r) for r in roots)
     if not options.write:
-        print(f"\n{len(pending)} change(s) would be made. Run with --write to make them; nothing that exists is overwritten.")
+        print(f"\n{total} change(s) would be made. Run with --write to make them; nothing that exists is overwritten.")
+        if workspace and not options.each:
+            print(f"The folder's {len(roots)} repositories ({names}) get their own scaffold with --each.")
         return 0
-    for item, path, verb, do in pending:
-        do()
-    print(f"\n{len(pending)} change(s) made. Next: fill the placeholders in .claude/skills/*/SKILL.md, run `git config core.hooksPath .githooks` "
+    if workspace and not options.each:
+        print(f"\n{total} change(s) made. Next: say in CLAUDE.md's table what each repository is, in a line; then `bowline init --each` for the"
+              " repositories' own scaffold, and `bowline doctor`.")
+        return 0
+    print(f"\n{total} change(s) made. Next: fill the placeholders in .claude/skills/*/SKILL.md, run `git config core.hooksPath .githooks` "
           "to let git run the gate, and run `bowline doctor`.")
     return 0
 
