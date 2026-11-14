@@ -61,7 +61,11 @@ def measure(root, config):
     limits = config["limits"]
     outside = outside_pattern(config)
     rules_dir = config.get("rulesDir", ".claude/rules").replace("\\", "/")
-    skills_dir = config.get("skillsDir", ".claude/skills").replace("\\", "/")
+    skills_dirs = config.get("skillsDir", ".claude/skills")
+    if isinstance(skills_dirs, str):
+        skills_dirs = [skills_dirs]
+    if os.path.isdir(os.path.join(root, ".claude-plugin")) or os.path.isdir(os.path.join(root, "skills")):
+        skills_dirs = list(skills_dirs) + ["skills"]       # a plugin repository's own skills count too
     findings = []
     facts = {"claudeMd": [], "rules": [], "areas": {}, "unscoped": 0, "skills": []}
 
@@ -113,7 +117,10 @@ def measure(root, config):
             "problem", f"the unscoped rules load {facts['unscoped']:,} characters in every session; the limit is under {limits['unscopedChars']:,}.",
             config["limitsWhy"]["unscopedChars"], "Give a rule a paths: list when it concerns one part of the code."))
 
-    for path in common.tracked_files(root, skills_dir + "/*"):
+    skill_paths = []
+    for folder in skills_dirs:
+        skill_paths += common.tracked_files(root, folder.replace("\\", "/") + "/*")
+    for path in sorted(set(skill_paths)):
         if not path.endswith("SKILL.md"):
             continue
         text = common.read_text(os.path.join(root, path))

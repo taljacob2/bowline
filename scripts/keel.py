@@ -5,6 +5,7 @@
     python -I scripts/keel.py budget [--repo <path>]
     python -I scripts/keel.py memory setup|restore <remote> [--no-hook] | status | push [--hook]
     python -I scripts/keel.py init [--plan | --write] [--only item,item]
+    python -I scripts/keel.py move plan --file <CLAUDE.md> | run --file <CLAUDE.md> --spec <json> [--check] | find-pointers --name <words> | pointers --spec <json> [--check]
 
 Each command is its own module beside this file and can be run directly with the same arguments.
 """
@@ -20,10 +21,9 @@ COMMANDS = {
     "budget": ("budget", "refuse an instruction file over the sizes Claude Code reads"),
     "memory": ("memory", "back up the memory folder: setup <remote>, restore <remote>, status, push"),
     "init": ("init", "scaffold the repository side: --plan to see, --write to do"),
+    "move": ("move", "move an oversized CLAUDE.md into pages, rules and an index: plan, run --spec, find-pointers, pointers"),
 }
-LATER = {
-    "move": "round 3 brings the move of an oversized CLAUDE.md into pages and rules",
-}
+LATER = {}
 
 
 def usage():

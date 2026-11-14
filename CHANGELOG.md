@@ -22,3 +22,9 @@ Facts checked against the Claude Code documentation on 2026-11-14 (`docs/facts.m
   the pre-commit hook, `.claude/keel.json` and the `.gitignore` entries.
 - The `bin/keel` and `bin/keel.cmd` launchers, the plugin's `hooks/hooks.json` (the memory push after every reply, the
   gate before a `git commit`), and tests on Windows and Linux in CI (macOS by hand while the repository is private).
+- `move`: `plan` lists a CLAUDE.md's sections with where Claude Code's cutoffs fall; `run --spec` moves named sections
+  verbatim into pages and rules (normalizing only the characters a gate refuses, counted) and writes the index;
+  `find-pointers` and `pointers --spec` update every mention, each matched exactly once.
+- The six skills the plugin ships: `doctor`, `init`, `memory-backup`, `curate-memory` (with its rubric),
+  `split-instructions` (with the brief for the condensing subagents) and `conventions` (with its templates); the guide's
+  `docs/conventions.md` and `docs/migrating.md`.

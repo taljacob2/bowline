@@ -36,9 +36,19 @@ python -I keel/scripts/keel.py init --repo <your repository> --write
 python -I keel/scripts/keel.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
 ```
 
-The skills that curate the memory and split an oversized file, and the plugin packaging, follow in the next rounds
-(see `CHANGELOG.md`). The facts everything rests on, with sources and the date checked, are in
-[`docs/facts.md`](docs/facts.md).
+| `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention. |
+
+## The skills, for Claude Code
+
+`skills/` holds the six procedures Claude runs these tools through, with the person in the loop: `doctor`, `init`,
+`memory-backup`, `curate-memory` (sort the memory with a map you approve), `split-instructions` (move first, condense
+second) and `conventions` (a decisions section, a roadmap with slots, a notes queue, offered one at a time). The plugin
+packaging that installs them with one command is the next round; until then, start a session with
+`claude --plugin-dir <this folder>` once the manifest lands.
+
+The guide: [`docs/facts.md`](docs/facts.md) (what keel measures against, with sources and the date checked),
+[`docs/conventions.md`](docs/conventions.md) (the conventions and the loss each prevents) and
+[`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory).
 
 ## Requirements
 
