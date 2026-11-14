@@ -1,0 +1,139 @@
+# The guide: why keel exists, and how it thinks
+
+This page is for someone who has used Claude Code for a month, keeps a `CLAUDE.md`, and wonders why it seems to be
+ignored more as it grows. It gives the problem in a page, the three homes knowledge can live in, the budgets and where
+their numbers come from, and the four flows that decide what Claude actually has in front of it at any moment. The
+facts with their sources are in [facts.md](facts.md); the conventions in [conventions.md](conventions.md); the
+migration in [migrating.md](migrating.md).
+
+## The problem, in a page
+
+Claude Code reads your repository's instructions in three different ways, and only one of them is "whole, always".
+
+The root `CLAUDE.md` is read whole at the start of every session and again after every compaction. Everything in it
+costs context on every turn, so it should be short; the documentation's target is 200 lines, and it warns above that.
+
+A `CLAUDE.md` in a subfolder, and a rules file scoped to paths, load on demand, when a file under that folder is read or
+edited. They are cut at a fixed size: 40,000 characters on a 200K context window, 150,000 on a 1M window. Past the cut,
+Claude gets a note that it may read the rest with the Read tool, and in practice it does not. A repository whose web
+UI conventions have grown to 465 KB in one file is applying the first third of them, and nothing says so. That was the
+real number in the repository keel came from, and the sections past the cut held the owner's own visual standards for
+the product.
+
+The memory Claude keeps about your project is a folder per person per machine, outside the repository. At a session's
+start only its index loads, and only the first 200 lines or 25 KB of it; the notes are read on demand. Nothing backs
+the folder up; a reinstalled machine loses months of it. And it is personal by design: a checked-in setting cannot point
+a team at one shared folder, so what a project needs every contributor to know cannot live there.
+
+A long conversation is summarized when the context fills, and after about an hour of quiet. Without a section telling
+the summary what to keep, the state of the work is kept or lost at the summary's discretion.
+
+None of this is hidden; it is spread over six documentation pages, and nobody measures their own repository against it.
+keel measures, and says what to do.
+
+## Three homes, by kind
+
+The fix is not to write less. It is to put each kind of knowledge where the tool loads it.
+
+| Kind | What it is | Where it lives | When Claude has it |
+|---|---|---|---|
+| A rule | An imperative with its one-sentence why: "do this, because". | `.claude/rules/<area>/*.md`, with a `paths:` list | Whole, whenever a file in its area is touched |
+| A procedure | How to run the checks, do a live check, push a round. | `.claude/skills/<name>/SKILL.md` | Its description always; its body only when used |
+| A decision or a story | Why something is the way it is; what was tried; the history. | `docs/`: a decisions section, the roadmap, `docs/conventions/` for the long form of the rules | On demand, when someone asks why |
+| The standing rules | What every session must know: how to write for a person, where decisions are recorded, what a summary must keep, what the memory is for. | The root `CLAUDE.md`, under 200 lines | Whole, every session |
+| An index | What a part of the code is, and where its rules, skills and pages are. | A nested `CLAUDE.md`, under 200 lines | Whole, when a file in that part is touched |
+
+The budgets follow from the cuts: every `CLAUDE.md` under 200 lines; every rules file under 200 lines and 40,000
+characters, so it loads whole for everyone; the scoped rules of one area under 40,000 characters together, about
+10,000 tokens, the price of touching a file there; the rules every session loads under 10,000 characters, because
+those are the most expensive per character. `keel budget` checks these, `keel doctor` explains each finding, and
+`defaults.json` carries every number with its reason, laid over by a repository's `.claude/keel.json`.
+
+## The four flows
+
+### What loads when a session starts
+
+```mermaid
+flowchart TB
+  A[A session starts in the repository] --> B[Root CLAUDE.md, whole]
+  A --> C[Rules with no paths, whole]
+  A --> D[MEMORY.md: the first 200 lines or 25 KB]
+  A --> E[Every skill's description, not its body]
+  B --> F[Claude's context]
+  C --> F
+  D --> F
+  E --> F
+  G[Nested CLAUDE.md files] -.not yet.-> F
+  H[Rules with paths] -.not yet.-> F
+  I[The memory's notes] -.on demand.-> F
+```
+
+The root file and the unscoped rules are the whole standing knowledge. Everything else waits for a reason.
+
+### What loads when a file is touched
+
+```mermaid
+flowchart TB
+  A[Claude reads or edits webui/src/pages/Home.tsx] --> B[webui/CLAUDE.md loads]
+  A --> C[Every rule whose paths match webui/** loads]
+  B --> D{Under the cutoff?}
+  C --> D
+  D -- yes --> E[Whole, in context]
+  D -- no --> F[Cut at 40,000 or 150,000 characters; a note says the rest exists]
+  F -.rarely.-> G[Claude reads on]
+```
+
+This is why a nested `CLAUDE.md` becomes an index and the rules move into files that are each under the cut: the same
+knowledge, loaded whole instead of cut.
+
+### What survives a compaction
+
+```mermaid
+flowchart TB
+  A[The conversation nears the limit, or sits an hour idle] --> B[A summary replaces it]
+  S[Compact Instructions in the root CLAUDE.md] --> B
+  B --> C[Re-read from disk: root CLAUDE.md, unscoped rules, MEMORY.md, skills to a cap]
+  B --> D[Only when their file is touched again: nested CLAUDE.md files, scoped rules]
+  B --> E[Kept only if the summary kept it: decisions made in chat, the round's state, open questions]
+  C --> F[The next reply]
+  D -.later.-> F
+  E --> F
+```
+
+The state of the work survives a compaction only if it was written down before it: in the roadmap, a progress note, or
+the memory. The Compact Instructions section tells the summary to keep exactly that, and the convention of writing the
+state before a round closes makes sure there is something to keep.
+
+### A new machine, a new contributor
+
+```mermaid
+flowchart TB
+  A[git clone the repository] --> B[.claude/: rules, skills, scripts, keel.json come with it]
+  A --> C[claude plugin install keel@keel]
+  C --> D[The hooks: a session-start finding, the memory push, the gate]
+  C --> E[The skills: /keel:doctor and the rest]
+  B --> F[The first session reads the root CLAUDE.md and the unscoped rules]
+  G[The owner, on a new machine] --> H[/keel:memory-backup restore remote/]
+  H --> I[Their personal notes are back]
+  J[A new contributor] --> K[Their own memory starts empty and fills as they work]
+  K --> L[/keel:memory-backup setup their own private remote/]
+```
+
+The repository carries everything the project needs every contributor to know. The memory carries what is personal,
+and each person's goes to that person's private remote. Nothing personal is ever shared by copying a memory; what the
+project needs is promoted into the repository, written for a contributor, by `/keel:curate-memory`.
+
+## What keel does, and what it leaves to you
+
+The mechanics are automatic: the memory push after every reply, the gate before a commit, the one-line finding at a
+session's start when something is over budget or unbacked. Every change to your knowledge is a skill you or Claude
+invoke, with a plan you approve before anything moves: scaffolding the layout, sorting the memory, splitting a file,
+adopting a convention. A tool that rewrote your rules or your notes in the background would be the one thing keel
+exists to prevent.
+
+## Where to start
+
+1. `claude plugin marketplace add taljacob2/keel` and `claude plugin install keel@keel`.
+2. In a repository, `/keel:doctor`. Read the report; each finding names the skill that fixes it.
+3. `/keel:init` for the layout, `/keel:memory-backup` for the backup, and `/keel:split-instructions` when a
+   `CLAUDE.md` is over the line. `/keel:conventions` when decisions keep getting lost.

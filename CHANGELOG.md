@@ -31,3 +31,5 @@ Facts checked against the Claude Code documentation on 2026-11-14 (`docs/facts.m
 - The plugin manifest and a one-plugin marketplace, so `claude plugin marketplace add taljacob2/keel` and
   `claude plugin install keel@keel` work; `doctor --brief` and the SessionStart hook that runs it, so a session learns
   in one line when something is over budget or unbacked, and hears nothing when all is well.
+- The guide (`docs/guide.md`: the problem in a page, the three homes, the budgets, the four flows drawn) and the
+  comparison (`docs/compared.md`).

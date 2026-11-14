@@ -62,9 +62,12 @@ second) and `conventions` (a decisions section, a roadmap with slots, a notes qu
 packaging that installs them with one command is the next round; until then, start a session with
 `claude --plugin-dir <this folder>` once the manifest lands.
 
-The guide: [`docs/facts.md`](docs/facts.md) (what keel measures against, with sources and the date checked),
-[`docs/conventions.md`](docs/conventions.md) (the conventions and the loss each prevents) and
-[`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory).
+The guide: [`docs/guide.md`](docs/guide.md) (the problem in a page, the three homes, the budgets, the four flows
+drawn), [`docs/facts.md`](docs/facts.md) (what keel measures against, with sources and the date checked),
+[`docs/conventions.md`](docs/conventions.md) (the conventions and the loss each prevents),
+[`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory) and
+[`docs/compared.md`](docs/compared.md) (how it differs from doing it by hand, from `claude-md-management`, and from
+Claude Code's own features).
 
 ## Requirements
 
