@@ -1,10 +1,10 @@
 # Changelog
 
 Every version names the date its facts were last checked against the Claude Code documentation, because the limits
-keel measures against are Claude Code's, not keel's. When a limit moves, `defaults.json` and `docs/facts.md` change
-together and the entry here says which.
+bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
+change together and the entry here says which.
 
-## Unreleased
+## 0.3.0 (2026-11-14)
 
 `autosplit`: when a repository turns it on, bowline prepares the split of a `CLAUDE.md` that outgrew the limits in the
 background, on a branch of its own, and the person reviews and merges.
