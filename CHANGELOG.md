@@ -4,6 +4,17 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.6.2 (2026-11-14)
+
+- bowline has a privacy policy, `plugin/PRIVACY.md`, and the manifest names it in `privacyPolicyUrl`, the field
+  Anthropic's plugin directory reads; the directory warned that none was found. The page says who is behind bowline and
+  that they receive nothing, what leaves the machine and only when the person turns it on (the memory backup to a git
+  remote they name, autosplit's Claude Code session to Anthropic), what bowline reads and writes, the personal data the
+  memory can hold, how long anything is kept, that it is not intended for anyone under 18, and where to ask. The URL
+  follows the `release` branch, so it always shows the policy of the version the directory serves.
+- The README's data section becomes "Privacy": a short summary of the two features and a link to the policy, so the
+  full text lives in one place. The code is unchanged.
+
 ## 0.6.1 (2026-11-14)
 
 - The plugin's README has a section, "What bowline reads, writes and sends", for the data-handling questions of
