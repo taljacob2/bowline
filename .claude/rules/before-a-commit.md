@@ -3,7 +3,7 @@
 These rules apply to every commit in this repository, whichever part it touches. The `push` skill is the procedure
 that follows them.
 
-- **Run the gate before every commit.** `python -I scripts/bowline.py gate` checks the staged lines for a token-shaped
+- **Run the gate before every commit.** `python -I plugin/scripts/bowline.py gate` checks the staged lines for a token-shaped
   string, a control byte, a carriage return, a byte-order mark, characters the repository does not accept, and the
   words of a private never-commit list. One hit stops the commit and the push. Never print a count and go on: a pushed
   secret cannot be taken back.

@@ -15,7 +15,7 @@ Run `/bowline:doctor` if it has not run in this session, so the person knows wha
 ## 2. Show the plan
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" init --plan
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" init --plan
 ```
 
 It lists every item with its target path and what would happen: create, append sections, or kept. For each item the
@@ -35,7 +35,7 @@ Say in one sentence per item what it is for. Ask which items they want; the defa
 ## 3. Write
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" init --write --only <the items they chose, comma-separated>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" init --write --only <the items they chose, comma-separated>
 ```
 
 or without `--only` for all. Then show `git status` so they see exactly what appeared.

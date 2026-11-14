@@ -13,7 +13,7 @@ repository's name, and the memory finding is the folder's.
 ## Run it
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" doctor
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" doctor
 ```
 
 Add `--no-memory` when the memory folder is not this person's concern (CI, a shared machine). Add `--repo <path>` to

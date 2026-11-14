@@ -1,6 +1,4 @@
 # Every text file is stored and checked out with LF line endings on every system, so the gate's carriage-return rule
-# and the tests' byte counts mean the same thing on Windows, Linux and macOS.
+# and the tests' byte counts mean the same thing on Windows, Linux and macOS. No rule converts a file on the way out:
+# Anthropic's plugin directory validates only a repository whose checkout gives byte for byte what git stores.
 * text=auto eol=lf
-# A Windows batch file needs CRLF, so it is stored with CRLF and never converted: what a checkout or an archive gives is
-# byte for byte what git stores, which Anthropic's plugin directory requires to validate the repository.
-*.cmd -text

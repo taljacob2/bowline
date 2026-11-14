@@ -1,0 +1,85 @@
+{
+  "description": "At a session's start, measures the repository and the memory and puts a one-line finding into Claude's context when something is over budget or unbacked (nothing when clean); after every reply, measures again and shows the person one reminder when something new crosses a limit, which Claude hears at the next prompt; pushes the memory folder's backup after every reply and when a session ends (only when the folder is a git repository); at the same moments, when the repository turned autosplit on, starts the background worker that prepares the split of a CLAUDE.md over the limits on a branch of its own; and runs the commit gate before a git commit that Claude issues, blocking it on a hit. Every hook runs node with scripts/run.mjs, which finds Python 3 and runs scripts/bowline.py.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "doctor", "--pending"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "doctor", "--brief"],
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "doctor", "--watch"],
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "memory", "push", "--hook"],
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "autosplit", "--hook"],
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "memory", "push", "--hook"],
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "autosplit", "--hook"],
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs", "gate", "--hook"],
+            "if": "Bash(git commit*)",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

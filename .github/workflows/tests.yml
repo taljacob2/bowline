@@ -29,11 +29,12 @@ jobs:
           # 3.8 is the oldest Python bowline supports and runs on the Windows and macOS runners; the Linux runner's
           # image no longer offers 3.8, so it runs a newer one.
           python-version: ${{ matrix.python }}
+      # The runners have Node installed, so the tests of the plugin's Node launcher run on all three systems.
       - name: Run the tests on scratch repositories
-        run: python -I -m unittest discover -s scripts/tests -p "test_*.py" -v
+        run: python -I -m unittest discover -s tests -p "test_*.py" -v
       - name: bowline's own gate over every tracked file
-        run: python -I scripts/bowline.py gate --all
+        run: python -I plugin/scripts/bowline.py gate --all
       - name: bowline's own budget and doctor
         run: |
-          python -I scripts/bowline.py budget
-          python -I scripts/bowline.py doctor --no-memory || true
+          python -I plugin/scripts/bowline.py budget
+          python -I plugin/scripts/bowline.py doctor --no-memory || true

@@ -6,15 +6,17 @@ so that a first-time reader understands it without guessing.
 
 ## What bowline is
 
-bowline is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads:
-`docs/facts.md` holds the limits with their sources, `defaults.json` the same as settings, `scripts/` the tools
-(`doctor`, `gate`, `budget`, `memory`, `init`, `move`, `autosplit`), `skills/` the procedures Claude runs them through,
-`hooks/hooks.json` the plugin's hooks, `templates/` what `init` writes into a repository, and `scripts/tests/` the tests
-on scratch repositories. bowline is its own first user: this file and `.claude/` were written by `bowline init`. Every file
-here is ASCII only, written for a stranger, Python 3.8 standard library only, with no dependency and no server.
-Before a push: `python -I -m unittest discover -s scripts/tests -p "test_*.py"`, then `python -I scripts/bowline.py gate`
-and `budget`. The plan and its rounds are in the commit messages and `CHANGELOG.md`; the design questions that
-settled, with their reasoning, in `docs/decisions.md`.
+bowline is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads.
+The plugin, exactly as it ships, is the folder `plugin/`: `docs/facts.md` holds the limits with their sources,
+`defaults.json` the same as settings, `scripts/` the tools (`doctor`, `gate`, `budget`, `memory`, `init`, `move`,
+`autosplit`) and `run.mjs`, the Node launcher the hooks and skills start, `skills/` the procedures Claude runs them
+through, `hooks/hooks.json` the plugin's hooks, and `templates/` what `init` writes into a repository. Outside it are
+what does not ship: `tests/`, the tests on scratch repositories; this folder; CI; and the marketplace file. bowline is
+its own first user: this file and `.claude/` were written by `bowline init`. Every file here is ASCII only, written for
+a stranger, Python 3.8 standard library only (and the launcher Node's built-in modules only), with no dependency and no
+server. Before a push: `python -I -m unittest discover -s tests -p "test_*.py"`, then
+`python -I plugin/scripts/bowline.py gate` and `budget`. The plan and its rounds are in the commit messages and
+`CHANGELOG.md`; the design questions that settled, with their reasoning, in `plugin/docs/decisions.md`.
 
 ## Where the rest of the rules are
 

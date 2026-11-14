@@ -15,8 +15,8 @@ on a branch of its own and the person's part is the review at the end; the last 
 ## 1. Measure and propose
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" doctor
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move plan --file <the CLAUDE.md>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" doctor
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" move plan --file <the CLAUDE.md>
 ```
 
 The plan lists each `## ` section with its lines, its size and where the two cutoffs fall. Propose, section by section:
@@ -27,13 +27,13 @@ area. Write the proposal as a table and ask the person; they know which sections
 
 ## 2. The move, as a spec
 
-Write the approved proposal as a spec file (the shape is in `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move --help`), and the
+Write the approved proposal as a spec file (the shape is in `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" move --help`), and the
 new index as a Markdown file under 200 lines: what the folder is, what to read first, where its rules, skills and pages
 are, its commands. Then:
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move run --file <the CLAUDE.md> --spec <spec> --check
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move run --file <the CLAUDE.md> --spec <spec>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" move run --file <the CLAUDE.md> --spec <spec> --check
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" move run --file <the CLAUDE.md> --spec <spec>
 ```
 
 `--check` prints every target with its size, the characters it will normalize (em dashes and the like, when the
@@ -49,14 +49,14 @@ saying whether it became a rule, stays in the page only, or was dropped and why 
 enforced by a named test or lint rule the subagent confirmed, or a one-off that is over). Review each draft against
 its page: every imperative traceable, every named file or test real, nothing personal, nothing dated without a reason.
 Trim to the area's budget; a dropped rule stays in the page. Place the approved drafts with
-`"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move place --spec <json>` when the Write tool may not write under `.claude/`.
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" move place --spec <json>` when the Write tool may not write under `.claude/`.
 
-Then `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" budget` must pass, and the doctor must show the file as an index.
+Then `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" budget` must pass, and the doctor must show the file as an index.
 
 ## 4. Update the pointers
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" move find-pointers --name <the old file's path>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" move find-pointers --name <the old file's path>
 ```
 
 lists every line in the repository that names it. For each that points at a moved section (a code comment, a doc, a
@@ -111,7 +111,7 @@ The doctor, and the one-line finding at a session's start, say when a split is r
 the branch bowline/split/<name>". Then, with the person:
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" autosplit show --file <the CLAUDE.md>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" autosplit show --file <the CLAUDE.md>
 ```
 
 prints the branch, its two commits with their messages (the proposal and the MAPs), the files it adds and changes, and
@@ -120,7 +120,7 @@ from the diff. When they say yes, take the two commits onto the current branch a
 
 ```
 git cherry-pick <base>..bowline/split/<name>
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" autosplit done --file <the CLAUDE.md>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" autosplit done --file <the CLAUDE.md>
 ```
 
 `show` prints both commands with the real names. A cherry-pick that conflicts means the file changed since the split

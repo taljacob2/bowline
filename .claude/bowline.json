@@ -2,5 +2,6 @@
   "gate": {
     "nonAscii": "refuse",
     "acceptedCharacters": []
-  }
+  },
+  "skillsDir": [".claude/skills", "plugin/skills"]
 }

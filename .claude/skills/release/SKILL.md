@@ -8,32 +8,32 @@ description: Release a version of bowline so that `claude plugin update` and Ant
 bowline reaches people through two channels, and a release feeds both.
 
 - **bowline's own marketplace.** Claude Code reads no release page and no tag. A person's
-  `claude plugin update bowline@bowline` fetches the default branch of this repository and installs it when the
-  `version` in `.claude-plugin/plugin.json` differs from the one they have. So changing that field is the release, and a
-  commit pushed without it reaches nobody.
-- **Anthropic's plugin directory.** It follows the `release` branch, not main, and checks every new commit there,
-  scans it and, by default, has an Anthropic reviewer publish it. The `release` branch moves only at the end of a
-  release (step 5), so the directory sees the released versions and nothing in between. Until a new version is
-  published there, the directory keeps serving the last one.
+  `claude plugin update bowline@bowline` fetches the default branch of this repository and installs its `plugin/`
+  folder, the source the marketplace file names, when the `version` in `plugin/.claude-plugin/plugin.json` differs from
+  the one they have. So changing that field is the release, and a commit pushed without it reaches nobody.
+- **Anthropic's plugin directory.** It follows the `release` branch, not main, with `plugin` as the plugin's path, and
+  checks every new commit there, scans it and, by default, has an Anthropic reviewer publish it. The `release` branch
+  moves only at the end of a release (step 5), so the directory sees the released versions and nothing in between.
+  Until a new version is published there, the directory keeps serving the last one.
 
 The git tag is for people and for history.
 
 ## 1. Check
 
 - Release from main: `git checkout main`, `git pull --ff-only`, a clean tree.
-- The `full-checks` skill: the tests, the gate over every tracked file, the budget, the doctor.
-- `claude plugin validate . --strict` passes, as the directory asks of every version. Anything it reports is fixed
-  before the release.
+- The `full-checks` skill: the tests, the gate over every tracked file, the budget, the doctor, and the two
+  validations. `claude plugin validate plugin --strict` must pass, as the directory asks of every version; anything it
+  reports is fixed before the release.
 
 ## 2. Name the version
 
 - The form is X.Y.Z, plain. A new command, hook or setting raises Y. A fix or a wording change raises Z. X rises when a
   setting or a command changes its meaning for someone who installed the previous version; it stays 0 while the first
   users are still shaping the plugin.
-- `.claude-plugin/plugin.json` gets `"version": "X.Y.Z"`. Nowhere else: the marketplace entry carries no version on
-  purpose, because the manifest's value wins and `validate` reports a mismatch.
+- `plugin/.claude-plugin/plugin.json` gets `"version": "X.Y.Z"`. Nowhere else: the marketplace entry carries no
+  version on purpose, because the manifest's value wins and `validate` reports a mismatch.
 - In `CHANGELOG.md`, the `## Unreleased` heading becomes `## X.Y.Z (YYYY-MM-DD)`. When a limit moved, the entry says
-  which, and `docs/facts.md` changed in the same round.
+  which, and `plugin/docs/facts.md` changed in the same round.
 
 ## 3. Commit and push
 
@@ -51,7 +51,7 @@ git push origin X.Y.Z
 
 Plain `X.Y.Z`, as every tag so far. Not `bowline--vX.Y.Z`, the form `claude plugin tag` would make: one plugin lives
 here, the repository's name already says which, and the tag is read by people, not by Claude Code. The reasoning is in
-`docs/decisions.md`.
+`plugin/docs/decisions.md`.
 
 ## 5. Move the release branch
 

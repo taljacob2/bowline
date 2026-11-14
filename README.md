@@ -7,111 +7,59 @@
 
 # bowline
 
-Claude Code reads less of your `CLAUDE.md` than you think. A nested one is cut at a fixed size and the rest is never
-applied; the documentation's target is 200 lines, and real files grow to thousands. The memory Claude keeps about your
-project lives on one machine, loads only its index at the start of a session, and is lost with the machine. A long
-conversation is summarized while you are away, and nothing tells the summary what to keep.
+bowline is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads. It
+measures your `CLAUDE.md` files, rules, skills and memory against the limits Claude Code loads them by, and says what to
+do; it scaffolds a layout where each kind of knowledge lives where the tool loads it, backs up and curates the memory,
+moves an oversized instruction file into that layout without losing a line, and refuses a commit that carries what must
+never be committed.
 
-bowline is a small set of tools and one explanation. It measures a repository and a machine against what Claude Code
-actually reads and says what to do; it scaffolds a layout where each kind of knowledge lives where the tool loads it;
-it backs up and curates the personal memory; it moves an oversized instruction file into that layout without losing a
-line; and it refuses a commit that carries what must never be committed. Every number it uses is a visible, dated
-setting with its source. The name is the sailor's knot that holds fast under load and still comes undone by hand:
-knowledge tied down so that it holds, with nothing locked.
+The plugin's own README, [`plugin/README.md`](plugin/README.md), says what it does and how to use it, and its guide
+starts at [`plugin/docs/guide.md`](plugin/docs/guide.md).
 
 ## Install
-
-As a Claude Code plugin, so its skills and hooks are there in every session:
 
 ```
 claude plugin marketplace add taljacob2/bowline
 claude plugin install bowline@bowline
 ```
 
-Then, in any repository, `/bowline:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
-one-line finding into Claude's context when something is over budget or unbacked, and nothing when all is well; after
-every reply the memory folder is pushed to its backup once `/bowline:memory-backup` has tied it to a private remote; and
-before every `git commit` Claude issues, the gate checks the staged lines. During a session, when a `CLAUDE.md` or the
-memory index crosses a limit, you get one reminder in the doctor's words, and Claude gets the same line at your next
-message. A repository that turns `autosplit` on in
-`.claude/bowline.json` gets one more: when a `CLAUDE.md` outgrows the limits, the hook after a reply starts a worker
-that prepares its split in the background, on a branch of its own, for you to review and merge. Everything else is a
-skill you or Claude invoke, with you approving before anything moves on your branch.
+## Without installing
 
-To try it without installing, start a session with `claude --plugin-dir <a clone of this repository>`, or run the
-scripts directly:
+Start a Claude Code session with the plugin folder of a clone, `claude --plugin-dir <the clone>/plugin`, or run the
+scripts directly with Python:
 
 ```
 git clone https://github.com/taljacob2/bowline
-python -I bowline/scripts/bowline.py doctor --repo <your repository>
+python -I bowline/plugin/scripts/bowline.py doctor --repo <your repository>
+python -I bowline/plugin/scripts/bowline.py init --repo <your repository> --plan
+python -I bowline/plugin/scripts/bowline.py init --repo <your repository> --write
+python -I bowline/plugin/scripts/bowline.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
 ```
 
-The doctor prints three lines per finding: what it found, why it matters, and what to do. Nothing is changed.
+## What is in this repository
 
-## What is here today
-
-| Command | What it does |
+| Path | What it holds |
 |---|---|
-| `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap and its backup, and the repository against the layout. As hooks: `--brief` at a session's start, `--watch` after every reply (one reminder when something new crosses a limit), `--pending` before a prompt (the same line for Claude). |
-| `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
-| `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
-| `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. |
-| `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/bowline.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. |
+| `plugin/` | The plugin exactly as it ships: its manifest, hooks, skills, scripts, templates, defaults and guide. |
+| `.claude-plugin/marketplace.json` | This repository as a marketplace with one plugin, the one in `plugin/`. |
+| `tests/` | The tests, each on a scratch repository. They do not ship. |
+| `.claude/` | The instructions, rules and skills for working on bowline itself. They do not ship. |
+| `assets/` | The icon's vector sources, for this page. The image the plugin ships is in `plugin/assets/`. |
+| `CHANGELOG.md` | Every version, with what changed and why. |
 
-```
-python -I bowline/scripts/bowline.py init --repo <your repository> --plan
-python -I bowline/scripts/bowline.py init --repo <your repository> --write
-python -I bowline/scripts/bowline.py memory setup git@github.com:<you>/<private memory repo>.git --repo <your repository>
-```
-
-| `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
-| `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `deliver` chooses between that branch (the default) and merging onto your branch on its own when your tree is clean. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
-
-## A folder of repositories
-
-Claude Code can be started in a folder that is not a repository but holds several, as with services cloned side by
-side. bowline works there too. The doctor, the budget, the one-line finding at a session's start and the reminders
-measure the folder's own `CLAUDE.md` and every repository directly under it, and name the repository in each finding.
-The gate finds the repository a commit names (`git -C repo1 commit`, `cd repo1 && git commit`). The memory is the
-folder's one memory, as Claude Code keeps it. Autosplit works per repository, each split on a branch of its own
-repository, and a `.claude/bowline.json` in the folder is the layer every repository shares, under its own. From the
-folder, `init` writes the folder's own `CLAUDE.md`, an index of the repositories with the sections every root file
-needs, and the shared `.claude/bowline.json`; `init --each` scaffolds every repository. `move` and `autosplit` take the
-repository from the file they are given, as a path from the folder (`repo1/sub/CLAUDE.md`); the few commands that take
-no file want `--repo`.
-
-## The skills, for Claude Code
-
-`skills/` holds the six procedures Claude runs these tools through, with the person in the loop: `doctor`, `init`,
-`memory-backup`, `curate-memory` (sort the memory with a map you approve), `split-instructions` (move first, condense
-second) and `conventions` (a decisions section, a roadmap with slots, a notes queue, offered one at a time). The plugin
-packaging that installs them with one command is the next round; until then, start a session with
-`claude --plugin-dir <this folder>` once the manifest lands.
-
-The guide: [`docs/guide.md`](docs/guide.md) (the problem in a page, the three homes, the budgets, the five flows
-drawn), [`docs/facts.md`](docs/facts.md) (what bowline measures against, with sources and the date checked),
-[`docs/conventions.md`](docs/conventions.md) (the conventions and the loss each prevents),
-[`docs/migrating.md`](docs/migrating.md) (move first, condense second; sorting a memory),
-[`docs/compared.md`](docs/compared.md) (how it differs from doing it by hand, from `claude-md-management`, and from
-Claude Code's own features) and [`docs/decisions.md`](docs/decisions.md) (the design questions that settled, and why).
-
-## Requirements
-
-Python 3.8 or later (standard library only) and git. Windows, Linux and macOS.
-
-## Configuration
-
-`defaults.json` holds every limit and policy with its reason. A repository lays its own values over them in
-`.claude/bowline.json`, for example to make characters outside ASCII a refusal rather than a warning, to name the
-characters it accepts, or to turn `autosplit` on.
+A version reaches people in two ways. bowline's own marketplace serves `plugin/` from the main branch, and Claude Code
+installs it when its version changes. Anthropic's plugin directory follows the `release` branch, which moves only when
+a version is released. The `release` skill under `.claude/skills/` is the procedure, and `plugin/docs/decisions.md`
+says why.
 
 ## Tests
 
 ```
-python -I -m unittest discover -s scripts/tests -p "test_*.py"
+python -I -m unittest discover -s tests -p "test_*.py"
 ```
 
-Every test runs on a scratch repository under the system's temp folder and removes it afterwards.
+Every test runs on a scratch repository under the system's temp folder and removes it afterwards. The tests of the
+Node launcher need `node`, and are skipped on a machine without it.
 
 ## License
 

@@ -1,8 +1,33 @@
 # Changelog
 
 Every version names the date its facts were last checked against the Claude Code documentation, because the limits
-bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
-change together and the entry here says which.
+bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
+`plugin/docs/facts.md` change together and the entry here says which.
+
+## 0.6.0 (2026-11-14)
+
+What Anthropic's plugin directory asked when it validated 0.5.3: the validation passed, with three holds for a
+reviewer, two warnings and several notes. This version answers the ones bowline can answer.
+
+- The plugin is its own folder, `plugin/`, and the marketplace names it as the source (`"./plugin"`). The directory now
+  sees only what ships. The instructions, rules and skills for working on bowline stay in `.claude/` at the
+  repository's root, and the tests move to `tests/`; neither ships. This clears the note about files in a
+  `.claude/skills` folder and the half of a hold that read the contributors' `CLAUDE.md` as code.
+- The hooks name their program and arguments, as the directory asks: `node` with `scripts/run.mjs`, a small launcher
+  that finds Python by the name the machine gives it (`python3`, `python` or `py -3`) and runs `scripts/bowline.py`,
+  passing standard input, output and the exit code through. Claude Code's hooks documentation gives node with a script
+  as the form that works on every system, because a hook given this way runs with no shell, and on Windows its program
+  must be a real executable. The skills use the same launcher. This clears the eight notes that a hook named a plugin
+  file as its program.
+- The shell launchers in `bin/` are gone, which clears the note about files in `bin/`, which Claude Code adds to the
+  PATH. Node.js is now a requirement beside Python and git, and the README says so.
+- The changelog no longer names the icon's image file in code formatting, which held the plugin for review as if a
+  text pointed a program at an image.
+- The plugin's README, which the directory shows on the listing, no longer carries the clone-and-run lines it warned
+  about. They are in the repository's new front page, `README.md` at the root, with the layout of the repository and
+  the tests.
+- For a person who installed 0.5.x: nothing to do. `claude plugin update bowline@bowline` installs the plugin from its
+  new folder. In Anthropic's portal, the plugin's path is now `plugin`.
 
 ## 0.5.3 (2026-11-14)
 
@@ -27,11 +52,11 @@ change together and the entry here says which.
 
 ## 0.5.1 (2026-11-14)
 
-- bowline has an icon: a bowline knot in off-white on a navy tile, made by the author with recraft.ai.
-  `assets/icon.svg` is its source, and `assets/icon.png`, 1024 pixels with transparent corners, is the file the
-  manifest's `icon` field names for Anthropic's plugin directory. Claude Code itself does not show it.
-- The README shows the icon at its top. On a page in dark mode GitHub shows `assets/icon-for-dark-pages.svg`
-  instead, the same knot with the two colours swapped, because the navy tile's edge fades into a dark page.
+- bowline has an icon: a bowline knot in off-white on a navy tile, made by the author with recraft.ai. A vector file is
+  its source, and a 1024-pixel image with transparent corners is the file the manifest's `icon` field names for
+  Anthropic's plugin directory. Claude Code itself does not show it.
+- The README shows the icon at its top. On a page in dark mode GitHub shows a second vector file instead, the same knot
+  with the two colours swapped, because the navy tile's edge fades into a dark page.
 
 ## 0.5.0 (2026-11-14)
 

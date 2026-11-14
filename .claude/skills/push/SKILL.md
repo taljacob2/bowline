@@ -16,7 +16,7 @@ The `full-checks` skill: the tests, then bowline's own gate, budget and doctor.
 Stage the files you changed by name. Then:
 
 ```
-python -I scripts/bowline.py gate
+python -I plugin/scripts/bowline.py gate
 ```
 
 Exit code 0 lets you go on. Any hit stops here: fix the line, stage again, run again. Never commit past a hit.

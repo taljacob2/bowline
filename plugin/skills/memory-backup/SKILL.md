@@ -26,7 +26,7 @@ back that one up; run them from the folder.
    per-machine hook is needed:
 
    ```
-   "${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory setup <remote> --no-hook
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" memory setup <remote> --no-hook
    ```
 
    It clones the remote when the folder is empty (a new machine), initializes and pushes a first backup when the folder
@@ -34,7 +34,7 @@ back that one up; run them from the folder.
    Claude Code has made no project folder yet, a session has to run in the repository, or in the folder, once first;
    this one counts, so run it again.
 
-3. Show the result of `"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory status`: the index's size against its cap, the remote,
+3. Show the result of `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" memory status`: the index's size against its cap, the remote,
    the last commit, what is not yet pushed.
 
 If the plugin's hook cannot run on this machine (Windows without Git Bash), run the setup without `--no-hook`: it then
@@ -43,7 +43,7 @@ writes a per-machine hook into Claude Code's settings with the absolute path of 
 ## On a new machine
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/bin/bowline" memory restore <remote> --no-hook
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" memory restore <remote> --no-hook
 ```
 
 after one session has run in the repository. Then `/memory` in a new session shows the notes read.

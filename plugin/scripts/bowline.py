@@ -1,4 +1,4 @@
-"""bowline's one entry point. The launchers in bin/ run it; so can you:
+"""bowline's one entry point. The plugin's hooks and skills run it through run.mjs beside it; so can you:
 
     python -I scripts/bowline.py doctor [--repo <path>] [--no-memory]
     python -I scripts/bowline.py gate [--all | --hook] [--never-commit <file>]

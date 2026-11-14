@@ -114,3 +114,33 @@ checks and, under the default setting, a reviewer, and a version could go live i
 changed in the portal at every release, or a moving tag such as `stable`, which reads like a version and confuses the
 plain version tags. A branch that only moves forward says what it is, and git itself refuses a push that would move it
 backward.
+
+## 2026-11-14: the plugin is its own folder, and its hooks start node
+
+**The question.** Anthropic's plugin directory validated bowline 0.5.3 and passed it, with holds for a reviewer and
+notes about what a later release of the directory may refuse. Some came from files that do not ship to anyone: the
+contributors' instructions under .claude/ and the tests. Others came from how the hooks were written: one line of text
+whose program was a shell script of the plugin, which the directory asks to see as a named program with its arguments.
+
+**The decision.** The plugin is the folder plugin/, and the marketplace entry names it as the source. What is for
+working on bowline, the .claude/ folder, the tests, CI and the marketplace file, stays outside it, so the directory
+reads only what a person installs. The hooks are written as a program and its arguments: node, with scripts/run.mjs,
+which finds Python and runs scripts/bowline.py. The skills use the same launcher, and the shell launchers in bin/ are
+gone, so there is one way in.
+
+**Why node.** A hook written as a program and arguments runs with no shell, and on Windows its program must be a real
+executable. Python has no name that works on every system: Windows usually has python and the py launcher, macOS and
+Linux have python3, and on Windows a missing Python can still answer to python3 as the Microsoft Store's placeholder.
+Claude Code's hooks documentation gives node with a script as the form that works on every system, and the directory
+names it too. The cost is a second requirement, Node.js, beside Python; the README says so, and a machine without node
+gets hooks that fail to start rather than ones that block anything.
+
+**Not chosen.** Keeping one-line hooks through a shell: they work today, in Git Bash on Windows, but the directory
+notes them and may refuse them later, and without Git Bash Claude Code runs them in PowerShell, which cannot start the
+shell launcher. Naming python3 or python as the program: each fails on one family of systems. Rewriting bowline in
+JavaScript so that node alone would do: a larger change than the problem.
+
+**What it does not change.** The directory says that later it will accept command hooks, scripts and files outside a
+short list of types only from Verified organizations, which Anthropic chooses, with no way to apply yet. bowline is
+hooks that run scripts, so that rule, when it comes, applies to it whatever its layout. bowline's own marketplace is
+not affected by any of the directory's rules.

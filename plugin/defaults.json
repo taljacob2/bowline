@@ -70,7 +70,7 @@
     "maxBudgetUsd": "The most one split may spend, passed as --max-budget-usd; a session that reaches it stops, and the split is reported as failed with its log, rather than running on. One turn of the largest model with its system prompt cost about half a dollar when this was measured, and a split with condensing subagents takes dozens.",
     "timeoutMinutes": "The worker stops the session after this long and reports the split as failed, so a hung session cannot run forever.",
     "model": "A model for the worker's session, or null for the person's default.",
-    "args": "Extra arguments for the command, for example --plugin-dir with a clone of bowline on a machine where the plugin is not installed."
+    "args": "Extra arguments for the command, for example --plugin-dir with the plugin folder of a clone of bowline on a machine where the plugin is not installed."
   },
   "outsidePaths": [
     "scratchpad['`\\\\/]",

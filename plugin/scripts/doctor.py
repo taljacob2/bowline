@@ -107,7 +107,7 @@ def root_claude_md_findings(root, facts):
         findings.append(common.Finding(
             "warning", f"{name} {has} no \"Compact Instructions\" section.",
             "Claude Code replaces a long conversation with a summary, when the context fills and after about an hour of quiet; this section tells every summary what to keep.",
-            "Add the section: /bowline:init offers the text, or see docs/conventions.md."))
+            "Add the section: /bowline:init offers the text, and bowline's docs/conventions.md says what it is for."))
     if not re.search(r"^#+\s*memory between sessions", text, re.IGNORECASE | re.MULTILINE):
         findings.append(common.Finding(
             "note", f"{name} {says} what the memory folder is for.",

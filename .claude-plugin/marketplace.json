@@ -8,10 +8,7 @@
     {
       "name": "bowline",
       "description": "Measure, scaffold, back up, curate, move and gate: a project's knowledge kept within what Claude Code actually reads, across sessions, machines and contributors.",
-      "source": {
-        "source": "github",
-        "repo": "taljacob2/bowline"
-      },
+      "source": "./plugin",
       "category": "productivity",
       "homepage": "https://github.com/taljacob2/bowline"
     }
