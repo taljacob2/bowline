@@ -4,6 +4,14 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `defaults.json` and `docs/facts.md`
 change together and the entry here says which.
 
+## 0.5.3 (2026-11-14)
+
+- Anthropic's plugin directory can validate the repository. It refused with "Couldn't validate that repository",
+  naming `.gitattributes` rules among the causes: the rule `*.cmd text eol=crlf` stored `bin/bowline.cmd` with LF and
+  turned it into CRLF on every checkout and archive, so the files the directory received differed from what git
+  stores. The launcher is now stored with CRLF and the rule is `*.cmd -text`, so git never converts it. What a person
+  gets on disk is the same 629 bytes as before; every file of the repository now archives byte for byte as stored.
+
 ## 0.5.2 (2026-11-14)
 
 - `claude plugin validate . --strict` passes, which Anthropic's plugin directory asks of a submission. It failed on one
