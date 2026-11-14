@@ -49,7 +49,7 @@ characters, so it loads whole for everyone; the scoped rules of one area under 4
 those are the most expensive per character. `bowline budget` checks these, `bowline doctor` explains each finding, and
 `defaults.json` carries every number with its reason, laid over by a repository's `.claude/bowline.json`.
 
-## The four flows
+## The five flows
 
 ### What loads when a session starts
 
@@ -123,13 +123,35 @@ The repository carries everything the project needs every contributor to know. T
 and each person's goes to that person's private remote. Nothing personal is ever shared by copying a memory; what the
 project needs is promoted into the repository, written for a contributor, by `/bowline:curate-memory`.
 
+### When a CLAUDE.md outgrows its limit, with autosplit on
+
+```mermaid
+flowchart TB
+  A[A reply ends and the hook measures every CLAUDE.md] --> B{One over the limits, committed clean, autosplit on?}
+  B -- no --> C[Nothing happens]
+  B -- yes --> D[A worktree on a new branch, from the committed HEAD]
+  D --> E[A headless Claude Code session runs the split skill unattended]
+  E --> F[Two commits: the move, then the rules, the index and the pointers]
+  F --> G{A clean tree, the file under the target, the budget passing?}
+  G -- yes --> H[The worktree goes and the branch stays. The next session hears that the split is ready]
+  G -- no --> I[Reported as failed, with the log. Nothing on your branch changed]
+  H --> J[You read the proposal and the MAP, then cherry-pick the two commits]
+```
+
+Autocompact is the one thing Claude Code does to your work unasked, and it can, because a conversation's context is
+nobody else's input. A `CLAUDE.md` is every future session's input, so autosplit borrows the trigger, a limit crossed
+and noticed by the hook that already runs after every reply, but not the silence: the whole split happens while you
+work, on a branch of its own, and the one step left to you is the merge. It is off until a repository turns it on in
+`.claude/bowline.json`, and the doctor says at every stage what is happening and why.
+
 ## What bowline does, and what it leaves to you
 
 The mechanics are automatic: the memory push after every reply, the gate before a commit, the one-line finding at a
 session's start when something is over budget or unbacked. Every change to your knowledge is a skill you or Claude
 invoke, with a plan you approve before anything moves: scaffolding the layout, sorting the memory, splitting a file,
-adopting a convention. A tool that rewrote your rules or your notes in the background would be the one thing bowline
-exists to prevent.
+adopting a convention. A tool that rewrote the rules you work from in the background would be the one thing bowline
+exists to prevent, and autosplit keeps to that: it prepares the split of an oversized `CLAUDE.md` while you work, on a
+branch of its own, and leaves the merge to you.
 
 ## Where to start
 

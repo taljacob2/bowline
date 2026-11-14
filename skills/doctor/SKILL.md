@@ -28,6 +28,9 @@ means for this repository, in plain words, and name the skill that fixes it:
 - No `Compact Instructions` or `Memory between sessions` section, no `.claude/bowline.json`, no gate: `/bowline:init`.
 - The memory index near or over its cap: `/bowline:curate-memory`.
 - The memory not backed up, or no hook pushing it: `/bowline:memory-backup`.
+- A split that autosplit prepared in the background, ready on its branch: `/bowline:split-instructions review <file>`.
+  One that failed: read its log with the person, then `/bowline:split-instructions` by hand, or
+  `bowline autosplit discard --file <file>` to let autosplit try again.
 
 Then stop. Do not fix anything from this skill; each fix is its own skill with the person's yes. If the report is clean,
 say so in one line and what the numbers were.

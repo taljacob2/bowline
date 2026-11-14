@@ -24,6 +24,10 @@ whether it was observed on a machine.
 | Compaction while idle | on by default (`idleCompaction`): a conversation that has reached 200,000 tokens and has been quiet for about an hour is summarized before the next message | Documented | settings-reference.md |
 | What survives a compaction from disk | the root `CLAUDE.md`, unscoped rules, the memory index and skill bodies (to a cap) are re-injected; nested `CLAUDE.md` files and scoped rules only when their trigger file is read again | Documented | context-window.md |
 | A plugin can ship skills, hooks, agents and scripts, but not a `CLAUDE.md` or rules | "A `CLAUDE.md` at the plugin root isn't loaded as context" | Documented | plugins-reference.md |
+| A headless session, which autosplit's worker starts | `claude -p` prints the answer and exits; `--permission-mode acceptEdits` accepts file edits in the working folder; `--permission-prompts none` denies anything that would ask a person; `--allowedTools` lists what may run without asking; `--max-budget-usd` caps the spend; `--output-format json` ends with one object carrying `total_cost_usd`, `num_turns`, `session_id`, `is_error` and, on an error, `subtype` and `errors` | Documented; the flags and the result observed with Claude Code 2.1.319, and a session started from inside another session's hook environment | headless.md |
+| What a Stop or SessionEnd hook receives on its standard input | JSON with `session_id`, `transcript_path`, `cwd` and `hook_event_name` | Documented | hooks.md |
+| Edits under `.claude/` by the Edit and Write tools | are sensitive-file edits that need a person's approval even in `acceptEdits` mode and even with an allow rule for the path; with `--permission-prompts none` they are denied, while a script run through an allowed Bash command writes there (which is how `move run` and `move place` write rule files) | Observed with Claude Code 2.1.319; the refusal reads "Claude requested permissions to edit `.claude/rules/probe.md` which is a sensitive file"; not found in the documentation | (observed) |
+| Which shell runs a hook's `command` | `sh -c` on macOS and Linux; Git Bash on Windows, or PowerShell when Git Bash is not found (a hook may name its shell with a `shell` field; `CLAUDE_CODE_GIT_BASH_PATH` names the bash to use). In PowerShell a quoted script path followed by arguments is a parse error, so bowline's shell-form hooks need Git Bash on Windows; a headless session started from an environment that hides Git Bash fell back to PowerShell and its hooks failed | Documented; the fallback observed on Windows with Claude Code 2.1.319 | hooks.md |
 
 ## What follows from these facts
 
@@ -52,3 +56,5 @@ whether it was observed on a machine.
 - https://code.claude.com/docs/en/how-claude-code-works.md
 - https://code.claude.com/docs/en/large-codebases.md
 - https://code.claude.com/docs/en/plugins-reference.md
+- https://code.claude.com/docs/en/headless.md
+- https://code.claude.com/docs/en/hooks.md

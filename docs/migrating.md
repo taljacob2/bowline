@@ -56,6 +56,16 @@ What the first memory measured: 89 notes and 1.4 MB became 20 notes and 137 KB; 
 turned out to be mostly project standards and went into the repository's rules; 51 "state of an item" notes were
 mostly history the roadmap already held; 3 references stayed personal.
 
+## Letting bowline prepare it in the background
+
+A repository that sets `autosplit.enabled` in `.claude/bowline.json` has the two steps done for it: after a reply in
+which a `CLAUDE.md` is found over the limits, committed and clean, a headless Claude Code session makes the move and the
+condensing on a branch of its own, in two commits whose messages hold the proposal and the MAPs, and the doctor says
+when the branch is ready. What is left to you is the review described above, from the diff rather than from a
+conversation, and the merge: `bowline autosplit show` prints the cherry-pick that takes the two commits onto your
+branch. The unattended section of the split-instructions skill says what the worker decides on its own, and
+`docs/decisions.md` says why the merge stays yours.
+
 ## What to watch for
 
 - A pointer from an instruction file to a memory note, a scratch folder or a temp path: a contributor cannot follow

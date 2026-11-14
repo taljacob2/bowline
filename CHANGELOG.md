@@ -4,6 +4,52 @@ Every version names the date its facts were last checked against the Claude Code
 keel measures against are Claude Code's, not keel's. When a limit moves, `defaults.json` and `docs/facts.md` change
 together and the entry here says which.
 
+## Unreleased
+
+`autosplit`: when a repository turns it on, bowline prepares the split of a `CLAUDE.md` that outgrew the limits in the
+background, on a branch of its own, and the person reviews and merges.
+
+- Why: the first user asked for the split to happen the way autocompact happens, noticed and done in the background of
+  their work. A `CLAUDE.md` is every future session's input, so the result waits on a branch rather than landing
+  unasked; `docs/decisions.md` has the reasoning.
+- `autosplit --hook` runs from the plugin's Stop and SessionEnd hooks: when `autosplit.enabled` is set in
+  `.claude/bowline.json` and a `CLAUDE.md` is over the limits, committed and clean, it starts a detached worker. The
+  worker adds a git worktree on the branch `bowline/split/<file>` from the committed HEAD, runs a headless Claude Code
+  session there (`-p`, `acceptEdits`, `--permission-prompts none`, an allowlist of tools, `--max-budget-usd`, a time
+  limit, the parent session's marks removed from the environment) with the unattended procedure of the
+  split-instructions skill, checks the result (a clean tree, the file under the line target, the budget passing),
+  removes the worktree, keeps the branch and records the outcome under the repository's `.git/bowline/autosplit/`,
+  beside the session's log.
+- The doctor, in full and in brief, says when a split is ready, running or failed, and why one has not started (an
+  uncommitted file, a missing command, a branch that exists); a ready split points the file's own finding at the review.
+- `autosplit run` does the same work now, in the foreground; `status`; `show` prints the commits with the proposal and
+  the MAPs and the cherry-pick that takes them; `done` after the merge; `discard` for a split not wanted, or to try
+  again.
+- The split-instructions skill gains the unattended procedure and the review; `defaults.json` gains the `autosplit`
+  settings with their reasons (off by default, `claude` as the command, 20 dollars, 60 minutes); the template
+  `.claude/bowline.json` shows the switch; the guide, the comparison, the facts and the migrating page say what changed.
+- `move place --spec` copies finished drafts from a scratch folder into instruction files only (a rule, a skill, a page,
+  a CLAUDE.md), normalized as `move run` normalizes. The unattended procedure places the condensed rules and the index
+  with it, because an unattended session cannot write under `.claude/` itself: Claude Code treats that as a
+  sensitive-file edit that only a person may approve, which the first live run found (`docs/facts.md` has the row, and
+  `docs/decisions.md` says why the worker was not given `bypassPermissions` instead).
+- Left out, with the reason in `docs/decisions.md`: a setting that merges the result onto the person's branch on its
+  own.
+- The tests run the worker against a stand-in for the `claude` command (`scripts/tests/fake_claude.py`), so the suite
+  starts no session. That a headless session starts from inside another session's hook environment and returns the JSON
+  result was checked by hand on Windows, with a ten-cent cap.
+- What that check also found: Claude Code runs a shell-form hook in Git Bash on Windows and falls back to PowerShell
+  when it does not find Git Bash, and there bowline's quoted-path hooks are a parse error (`docs/facts.md` has the
+  row). The worker therefore hands the session it starts the path of Git for Windows' bash through
+  `CLAUDE_CODE_GIT_BASH_PATH` when nothing names one. The hook claims a split by creating its record exclusively, so
+  two hooks firing at once cannot start two workers.
+- The live check, on a clone of the first user's repository with the line target lowered so that the docs site's
+  `CLAUDE.md` (199 lines) counted as oversized, with Sonnet and a ten-dollar cap: the first run stopped at the
+  sensitive-file refusal and was reported as failed with its branch and first commit kept; after `move place`, the
+  second run finished in four minutes for 1.84 dollars: two commits, 199 lines to 52, four pages, four scoped rules,
+  one pointer updated, the proposal and the MAPs in the commit messages, the budget passing, the worktree gone, and
+  the doctor's one line saying the split was ready.
+
 ## 0.2.0 (2026-11-14)
 
 The plugin is renamed from keel to bowline, hours after 0.1.1. Nothing else changes.

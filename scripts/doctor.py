@@ -10,7 +10,9 @@ For each finding it prints three lines: what it found, why it matters, what to d
 - the memory folder Claude Code keeps for this repository on this machine: its index against the cap, whether the
   folder is a git repository with a remote, and whether the push hook is installed;
 - whether the root CLAUDE.md has a compaction section, whether the gate and the budget check are installed, and
-  whether the repository has a .claude/bowline.json.
+  whether the repository has a .claude/bowline.json;
+- a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
+  not started, when the repository turned autosplit on.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run.
 """
@@ -22,6 +24,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import autosplit  # noqa: E402
 import budget  # noqa: E402
 import common  # noqa: E402
 
@@ -195,11 +198,13 @@ def main(argv=None):
     if options.brief:
         try:
             budget_findings, facts = budget.measure(root, config)
-            findings = claude_md_findings(root, config, facts)
+            findings = [f for f in autosplit.findings(root, config, facts) if f.level != "note"]
+            findings += claude_md_findings(root, config, facts)
             findings += [f for f in budget_findings if f.level == "problem"]
             findings += [f for f in root_claude_md_findings(root, facts) if f.level != "note"]
             if not options.no_memory:
                 findings += [f for f in memory_findings(root, config) if f.level != "note"]
+            autosplit.adjust(findings, root)
         except Exception:
             return 0
         urgent = [f for f in findings if f.level in ("problem", "warning")]
@@ -216,6 +221,7 @@ def main(argv=None):
     budget_findings, facts = budget.measure(root, config)
     findings = []
     findings += claude_md_findings(root, config, facts)
+    findings += autosplit.findings(root, config, facts)
     findings += [f for f in budget_findings if "names a path" in f.what or "lines; the target" in f.what or "characters" in f.what]
     findings += root_claude_md_findings(root, facts)
     if not options.no_memory:
@@ -227,6 +233,7 @@ def main(argv=None):
     areas = ", ".join(f"{name} {chars:,}" for name, chars in sorted(facts["areas"].items())) or "none"
     print(f"  scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; skills: {len(facts['skills'])}")
     print()
+    autosplit.adjust(findings, root)
     problems = common.print_findings(findings, "bowline doctor")
     return 1 if problems else 0
 
