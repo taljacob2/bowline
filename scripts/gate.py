@@ -167,21 +167,20 @@ def main(argv=None):
             return 0
 
     problems, warnings, checked = run(root, policy, options.all)
+    what = "tracked lines" if options.all else "added lines"
+    private = "with the never-commit list" if policy.private else "without a never-commit list"
+    if problems and options.hook:
+        # A hook's stderr is what Claude Code shows as the reason for blocking; stdout would be ignored or duplicated.
+        print(f"keel gate: {len(problems)} problem(s) in {checked} {what}. The commit is blocked until they are fixed.", file=sys.stderr)
+        for line in problems[:20]:
+            print(line, file=sys.stderr)
+        return 2
     for line in warnings:
         print("warning: " + line)
     for line in problems:
         print(line)
-
-    what = "tracked lines" if options.all else "added lines"
-    private = "with the never-commit list" if policy.private else "without a never-commit list"
     if problems:
-        summary = f"keel gate: {len(problems)} problem(s) in {checked} {what}. Fix them before committing."
-        if options.hook:
-            print(summary, file=sys.stderr)
-            for line in problems[:20]:
-                print(line, file=sys.stderr)
-            return 2
-        print(summary)
+        print(f"keel gate: {len(problems)} problem(s) in {checked} {what}. Fix them before committing.")
         return 1
     if checked == 0 and not options.all:
         print("keel gate: nothing is staged.")
