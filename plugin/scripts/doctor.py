@@ -4,6 +4,7 @@
     python -I scripts/doctor.py --brief [--no-memory]      one line per problem or warning, nothing when clean (the SessionStart hook)
     python -I scripts/doctor.py --watch                    after a reply: one reminder to the person when something new crosses a limit (the Stop hook)
     python -I scripts/doctor.py --pending                  before a prompt: the same reminder, once, for Claude (the UserPromptSubmit hook)
+    python -I scripts/doctor.py [--verbose] [--folder-only]  from a folder of repositories: every finding one by one, or the folder alone
 
 For each finding it prints three lines: what it found, why it matters, what to do and which skill does it. It reports:
 - every CLAUDE.md against the line target, and for a nested one how much of it is never read on a 200K and on a 1M
@@ -32,10 +33,12 @@ identity is its words with the numbers blanked, so a file that keeps growing is 
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import re
 import sys
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autosplit  # noqa: E402
@@ -98,7 +101,8 @@ def root_claude_md_findings(root, facts):
         findings.append(common.Finding(
             "warning", "The repository has no root CLAUDE.md.",
             "The root CLAUDE.md is the one file every session loads whole and re-reads after a compaction; without it nothing standing survives a summary.",
-            "Create one with the writing rules, where decisions are recorded, and a Compact Instructions section: /bowline:init."))
+            "Create one with the writing rules, where decisions are recorded, and a Compact Instructions section: /bowline:init.",
+            many="{count} repositories have no root CLAUDE.md."))
         return findings
     # CLAUDE.md and .claude/CLAUDE.md both load whole, so a section in either one counts.
     text = "\n".join(common.read_text(os.path.join(root, path)) for path in roots)
@@ -209,26 +213,43 @@ def layout_findings(root):
         findings.append(common.Finding(
             "note", f"The repository has no {common.CONFIG_FILE}; the defaults apply.",
             "The file holds the repository's own limits and gate policy, so every contributor measures against the same numbers.",
-            "/bowline:init writes it with the defaults and their reasons."))
+            "/bowline:init writes it with the defaults and their reasons.",
+            many="{count} repositories have no " + common.CONFIG_FILE + "; the defaults apply."))
     gate_local = os.path.isfile(os.path.join(root, ".claude", "scripts", "gate.py")) or os.path.isfile(os.path.join(root, ".githooks", "pre-commit"))
     hooks_path = common.run_git(["-C", root, "config", "--get", "core.hooksPath"], check=False).strip()
     if not gate_local and not hooks_path:
         findings.append(common.Finding(
             "note", "No commit gate is installed for this repository.",
             "A gate reads the staged lines before every commit and refuses a token, a stray byte or a word that must never be committed; a pushed secret cannot be taken back.",
-            "/bowline:init installs a repository-local copy and the pre-commit hook; the bowline plugin's hook runs it from Claude Code too."))
+            "/bowline:init installs a repository-local copy and the pre-commit hook; the bowline plugin's hook runs it from Claude Code too.",
+            many="{count} repositories have no commit gate installed."))
     return findings
+
+
+# How many repositories of a folder are measured at once. The work is git calls and file reads, which wait on the disk
+# rather than the processor, so a few at a time hide most of the waiting; more would only crowd a slow mount.
+WORKERS = 8
+
+
+def measure_one(root):
+    """One repository of a folder: its configuration, findings and sizes, ready to be labelled."""
+    config = common.load_config(root)
+    findings, facts = repository_findings(root, config)
+    return config, findings, facts
 
 
 class Survey:
     """What the doctor finds from a path. `workspace` is the folder of repositories when the path is in one and not in a
     repository, else None; `roots` the repository roots; `parts` (name, root, facts, config) for the sizes, the name
     None for a single repository; `findings` every finding, each prefixed with its repository's name when there are
-    several, or None when the path is in no repository and holds none."""
+    several, or None when the path is in no repository and holds none. In a folder, the repositories are measured
+    WORKERS at a time; on_part is called with each part in order as soon as it and every one before it are done, and
+    on_progress with (done, total) as each completes. folder_only measures the folder itself and no repository."""
 
-    def __init__(self, start, no_memory):
+    def __init__(self, start, no_memory, folder_only=False, on_part=None, on_progress=None):
         self.workspace, self.roots = common.roots_for(start)
         self.parts, self.findings = [], None
+        self.folder_only = folder_only
         if not self.roots:
             return
         if self.workspace is None:
@@ -250,11 +271,27 @@ class Survey:
             autosplit.adjust(own, self.workspace)
         self.findings += label(own, os.path.basename(self.workspace))
         self.parts.append((os.path.basename(self.workspace), self.workspace, facts, shared))
-        for root in self.roots:
-            config = common.load_config(root)
-            findings, facts = repository_findings(root, config)
-            self.findings += label(findings, os.path.basename(root))
-            self.parts.append((os.path.basename(root), root, facts, config))
+        if on_part:
+            on_part(self.parts[-1])
+        if not folder_only and self.roots:
+            done, lock, total = [0], threading.Lock(), len(self.roots)
+
+            def measured(future):
+                with lock:
+                    done[0] += 1
+                    if on_progress:
+                        on_progress(done[0], total)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(WORKERS, total)) as pool:
+                futures = [pool.submit(measure_one, root) for root in self.roots]
+                for future in futures:
+                    future.add_done_callback(measured)
+                for root, future in zip(self.roots, futures):
+                    config, findings, facts = future.result()
+                    self.findings += label(findings, os.path.basename(root))
+                    self.parts.append((os.path.basename(root), root, facts, config))
+                    if on_part:
+                        on_part(self.parts[-1])
         if not no_memory:
             self.findings += memory_findings(self.workspace, shared)
 
@@ -272,6 +309,7 @@ def repository_findings(root, config):
         for finding in findings:
             finding.level = "note"
             finding.fix = common.left_alone_fix(root)
+            finding.fix_many = common.left_alone_fix(root, "<repository>")
         return findings, facts
     findings = claude_md_findings(root, config, facts)
     findings += autosplit.findings(root, config, facts)
@@ -296,10 +334,38 @@ def workspace_findings(workspace, facts):
 def label(findings, name):
     """Prefixes each finding with its repository's name, and names the repository in the commands a fix gives."""
     for finding in findings:
+        finding.where, finding.bare = name, finding.what
         finding.what = f"{name}: {finding.what}"
         if finding.fix and "--file " in finding.fix:
+            finding.fix_many = re.sub(r"(--file \S+)", lambda m: f"{m.group(1)} --repo <repository>", finding.fix)
             finding.fix = re.sub(r"(--file \S+)", lambda m: f"{m.group(1)} --repo {name}", finding.fix)
     return findings
+
+
+def grouped(findings, verbose=False, folder=None):
+    """A folder's findings for a reader: a finding found the same in several repositories, the same severity, words, why
+    and fix, is one finding that names them, with its why and fix once; one found in a single place stays as it is.
+    In the order each first appears. A finding about the folder itself (named folder) stands alone: the folder is not
+    one of its repositories. With verbose, every finding one by one, as before grouping."""
+    if verbose:
+        return findings
+    groups = {}
+    for finding in findings:
+        mine = finding.where and finding.where != folder
+        key = (finding.level, finding.bare, finding.why, finding.fix_many or finding.fix) if mine else id(finding)
+        groups.setdefault(key, []).append(finding)
+    out = []
+    for members in groups.values():
+        if len(members) == 1:
+            out.append(members[0])
+            continue
+        first = members[0]
+        count = len(members)
+        what = first.many.format(count=count) if first.many else f"In {count} repositories: {first.bare}"
+        one = common.Finding(first.level, what, first.why, first.fix_many or first.fix)
+        one.names = common.names([m.where for m in members]) + (" (--verbose lists each finding)" if count > 10 else "")
+        out.append(one)
+    return out
 
 
 def finding_key(finding):
@@ -382,6 +448,10 @@ def main(argv=None):
                         help="one line per problem or warning and nothing when clean; always exit 0 (for a SessionStart hook)")
     parser.add_argument("--watch", action="store_true", help="after a reply: one reminder when something new crosses a limit (the Stop hook)")
     parser.add_argument("--pending", action="store_true", help="before a prompt: the pending reminder for Claude, once (the UserPromptSubmit hook)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="in a folder of repositories: every finding one by one, every repository's sizes, every name")
+    parser.add_argument("--folder-only", action="store_true",
+                        help="in a folder of repositories: measure the folder itself and its memory, no repository, for a quick check")
     options = parser.parse_args(argv)
     if options.watch or options.pending:
         try:
@@ -404,32 +474,62 @@ def main(argv=None):
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
         return 0
 
-    survey = Survey(options.repo, options.no_memory)
-    if survey.findings is None:
+    workspace, roots = common.roots_for(options.repo)
+    if not roots:
         print("bowline doctor: not inside a git repository, and this folder holds none.", file=sys.stderr)
         return 2
-    config = survey.parts[0][3]
-    if survey.workspace:
-        names = ", ".join(os.path.basename(r) for r in survey.roots)
-        print(f"bowline doctor: {survey.workspace}, a folder of {common.count(len(survey.roots), 'repository', 'repositories')}: {names}")
-        with_config = [name for name, root, _, _ in survey.parts if os.path.isfile(os.path.join(root, common.CONFIG_FILE))]
-        suffix = f", with {common.CONFIG_FILE} in {', '.join(with_config)}" if with_config else ""
+    if workspace:
+        whole = common.count(len(roots), "repository", "repositories")
+        print(f"bowline doctor: {workspace}, a folder of {whole}: {common.names([os.path.basename(r) for r in roots], options.verbose)}")
+        with_config = [os.path.basename(r) for r in [workspace] + roots if os.path.isfile(os.path.join(r, common.CONFIG_FILE))]
+        suffix = f", with {common.CONFIG_FILE} in {common.names(with_config, options.verbose)}" if with_config else ""
+        config = common.load_config(workspace)
     else:
-        print(f"bowline doctor: {survey.roots[0]}")
-        suffix = f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(survey.roots[0], common.CONFIG_FILE)) else ""
-        parent = os.path.dirname(survey.roots[0])
+        print(f"bowline doctor: {roots[0]}")
+        suffix = f", with {common.CONFIG_FILE}" if os.path.isfile(os.path.join(roots[0], common.CONFIG_FILE)) else ""
+        parent = os.path.dirname(roots[0])
         if os.path.isfile(os.path.join(parent, common.CONFIG_FILE)) and common.repo_root(parent) is None:
             suffix += f", over the folder's shared {os.path.join(parent, common.CONFIG_FILE)}"
+        config = common.load_config(roots[0])
+        if options.folder_only:
+            print("bowline doctor: --folder-only is for a folder of repositories; this is one repository, measured whole.",
+                  file=sys.stderr)
     print(f"limits from defaults.json (facts checked against the Claude Code docs on {config.get('checkedAgainstDocs')})" + suffix)
     print()
-    for name, root, facts, _ in survey.parts:
+    sys.stdout.flush()
+
+    def sizes(part):
+        """A part's sizes, printed as soon as it is measured: each CLAUDE.md, and the rules and skills unless all zero."""
+        name, root, facts, _ = part
         head = f"{name}: " if name else ""
         for path, lines, chars in facts["claudeMd"]:
             print(f"  {head}{path}: {lines} lines, {chars:,} characters")
-        areas = ", ".join(f"{area} {chars:,}" for area, chars in sorted(facts["areas"].items())) or "none"
-        print(f"  {head}scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; skills: {len(facts['skills'])}")
+        if facts["areas"] or facts["unscoped"] or facts["skills"] or options.verbose or not workspace:
+            areas = ", ".join(f"{area} {chars:,}" for area, chars in sorted(facts["areas"].items())) or "none"
+            print(f"  {head}scoped rules per area: {areas}; unscoped: {facts['unscoped']:,}; skills: {len(facts['skills'])}")
+        sys.stdout.flush()
+
+    measuring = workspace and not options.folder_only
+    if measuring:
+        print(f"bowline doctor: measuring {common.count(len(roots), 'repository', 'repositories')}, up to {WORKERS} at a time.",
+              file=sys.stderr, flush=True)
+    step = max(1, len(roots) // 10)
+
+    def progress(done, total):
+        if done % step == 0 or done == total:
+            print(f"bowline doctor: {done} of {total} measured.", file=sys.stderr, flush=True)
+
+    survey = Survey(options.repo, options.no_memory, folder_only=options.folder_only, on_part=sizes,
+                    on_progress=progress if measuring else None)
+    if not survey.workspace:
+        for part in survey.parts:
+            sizes(part)
     print()
-    problems = common.print_findings(survey.findings, "bowline doctor")
+    shown = grouped(survey.findings, options.verbose, os.path.basename(survey.workspace)) if survey.workspace else survey.findings
+    problems = common.print_findings(shown, "bowline doctor", counted=survey.findings)
+    if survey.workspace and options.folder_only:
+        print(f"The folder's {common.count(len(roots), 'repository', 'repositories')} were not measured (--folder-only); "
+              "run the doctor without it to measure them.")
     return 1 if problems else 0
 
 

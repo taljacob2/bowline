@@ -63,7 +63,11 @@ def branch_of(path):
 
 
 def state_dir(root):
-    """Where the splits' records live: inside the repository's git folder, shared by its worktrees, never committed."""
+    """Where the splits' records live: inside the repository's git folder, shared by its worktrees, never committed.
+    A main checkout's .git folder is its common folder, read without starting git; a worktree's .git file asks git."""
+    dot = os.path.join(root, ".git")
+    if os.path.isdir(dot):
+        return os.path.join(os.path.normpath(dot), "bowline", "autosplit")
     code, out = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
     folder = os.path.normpath(out.strip()) if code == 0 and out.strip() else os.path.join(root, ".git")
     return os.path.join(folder, "bowline", "autosplit")

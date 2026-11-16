@@ -37,11 +37,11 @@ The doctor prints three lines per finding: what it found, why it matters, and wh
 
 | Command | What it does |
 |---|---|
-| `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap, its notes against the commits each one names (a note that keeps finished work like a log) and its backup, and the repository against the layout. As hooks: `--brief` at a session's start, `--watch` after every reply (one reminder when something new crosses a limit), `--pending` before a prompt (the same line for Claude). |
+| `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap, its notes against the commits each one names (a note that keeps finished work like a log) and its backup, and the repository against the layout. From a folder of repositories it measures eight at a time, prints each repository as it is measured, and groups a finding found the same in several of them into one that names them; `--verbose` lists every finding, size and name one by one, and `--folder-only` measures the folder alone. As hooks: `--brief` at a session's start, `--watch` after every reply (one reminder when something new crosses a limit), `--pending` before a prompt (the same line for Claude). |
 | `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
 | `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
 | `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. |
-| `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/bowline.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. |
+| `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/bowline.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. From a folder of repositories it writes the folder's own scaffold; `--no-describe` leaves the table of repositories for you to fill, and `--verbose` names every repository in a list. |
 | `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
 | `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `deliver` chooses between that branch (the default) and merging onto your branch on its own when your tree is clean. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
 
@@ -73,6 +73,23 @@ repositories share, so that its files are versioned and backed up like any repos
 of repositories, as long as the folder does not track them: `init` writes the `.gitignore` lines that keep them out,
 and a submodule, which the folder does track, counts as part of it. The folder's own files are then committed, gated and
 split like a repository's.
+
+**A folder of many repositories.** The doctor measures eight repositories at a time and prints each one as it is
+measured, with a line on standard error every tenth of the way, so a folder of a hundred repositories takes seconds and
+a person sees it work. A finding found the same in several repositories is one finding that names them (the first ten,
+and how many more), with its why and its fix once; `--verbose` restores one finding per repository. `--folder-only`
+measures the folder alone, for a quick check. `init` names at most ten repositories in a list and says how many more.
+It fills each row of the folder's table from the repository's README, its package description, or the first sentence
+at the opening of its `CLAUDE.md` that describes it, never a warning, a rule or a list item, and the plan says which
+rows came from where; `--no-describe` leaves every row for you. In a folder that is a git repository, `init` also
+installs the gate, as for a repository: `.claude/scripts/` and `.githooks/pre-commit`. In a plain folder it cannot,
+since no commit is made there, and the folder's rules and skills say so in place of naming a gate that is not there.
+
+The `.gitignore` that keeps the repositories out of the folder's history has one line per repository, because git
+cannot ignore "every folder that holds a `.git`". Running `init` again adds a line for a repository cloned since. If
+you would rather not list them, an allowlist does it by hand: `/*` ignores everything at the folder's top, and lines
+such as `!/.claude/`, `!/.githooks/`, `!/CLAUDE.md` and `!/.gitignore` bring back the folder's own files, new clones
+staying out.
 
 ## The skills, for Claude Code
 

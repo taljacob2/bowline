@@ -56,7 +56,7 @@ class FolderKeepsTheFilesTests(ScratchRepo):
         code, out, err = self.bowline("init", "--leave-repositories", "--plan")
         self.assertEqual(code, 0, out + err)
         self.assertIn(".claude/rules/before-a-commit.md", out)
-        self.assertIn("bowline writes nothing into repo1, repo2", out)
+        self.assertIn("bowline writes nothing into its 2 repositories (repo1, repo2), because", out)
         code, out, err = self.bowline("init", "--leave-repositories", "--write")
         self.assertEqual(code, 0, out + err)
         config = json.loads(read(os.path.join(self.workspace, ".claude", "bowline.json")))
@@ -64,7 +64,7 @@ class FolderKeepsTheFilesTests(ScratchRepo):
         for path in ("CLAUDE.md", ".claude/README.md", ".claude/rules/before-a-commit.md", ".claude/skills/push/SKILL.md"):
             self.assertTrue(os.path.isfile(os.path.join(self.workspace, path)), path)
         text = read(os.path.join(self.workspace, "CLAUDE.md"))
-        self.assertIn("a rule for one repository goes here too, in `.claude/rules/<repository>/`", text)
+        self.assertIn("a rule for one repository goes here too, in `.claude/rules/<repository>/`", " ".join(text.split()))
         self.assertIn("| `repo1/` | The first service. |", text)
         self.assertTrue(self.untouched(self.repo1) and self.untouched(self.repo2))
         code, out, err = self.bowline("init", "--each", "--write")
@@ -85,8 +85,8 @@ class FolderKeepsTheFilesTests(ScratchRepo):
         self.assertTrue(self.untouched(self.repo1))
         self.assertTrue(os.path.isfile(os.path.join(self.repo2, ".claude", "bowline.json")))
         code, out, err = self.bowline("init", "--plan")
-        self.assertIn("The folder's repositories repo2 get their own scaffold with --each.", out)
-        self.assertIn("bowline writes nothing into repo1", out)
+        self.assertIn("1 of its 2 repositories (repo2) gets its own scaffold with --each.", out)
+        self.assertIn("bowline writes nothing into 1 of its 2 repositories (repo1), because", out)
 
     def test_the_doctor_notes_why_instead_of_asking_for_a_fix(self):
         self.folder_config({"writeToRepositories": False})

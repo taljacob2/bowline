@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = ".claude/bowline.json"
@@ -38,12 +39,41 @@ def run_git(args, cwd=None, check=True):
     return result.stdout.decode("utf-8", "replace")
 
 
+# What a run learns about the folders' layout, kept for the rest of the run: which folder is a repository's top, and which
+# repositories a folder holds. A doctor over a folder of N repositories asked both for each repository, and each answer
+# rescanned the folder and started git, about N squared calls, minutes on a slow mount. A run of bowline is short and
+# creates no repository, so an answer stays true for it; file listings are never kept, since a run writes files.
+_LAYOUT = {}
+_LAYOUT_LOCK = threading.Lock()
+
+
+def _remembered(kind, path, compute):
+    key = (kind, os.path.normcase(os.path.normpath(os.path.abspath(path))))
+    with _LAYOUT_LOCK:
+        if key in _LAYOUT:
+            return _LAYOUT[key]
+    value = compute()
+    with _LAYOUT_LOCK:
+        _LAYOUT.setdefault(key, value)
+        return _LAYOUT[key]
+
+
+def forget_layout():
+    """Drops what the run learned about the folders' layout, for a caller that changes it."""
+    with _LAYOUT_LOCK:
+        _LAYOUT.clear()
+
+
 def repo_root(start=None):
     """The repository's top folder for the given path, or None when it is not inside a git repository."""
-    result = subprocess.run(["git", "-C", start or os.getcwd(), "rev-parse", "--show-toplevel"], capture_output=True)
-    if result.returncode != 0:
-        return None
-    return os.path.normpath(result.stdout.decode("utf-8", "replace").strip())
+    start = start or os.getcwd()
+
+    def compute():
+        result = subprocess.run(["git", "-C", start, "rev-parse", "--show-toplevel"], capture_output=True)
+        if result.returncode != 0:
+            return None
+        return os.path.normpath(result.stdout.decode("utf-8", "replace").strip())
+    return _remembered("root", start, compute)
 
 
 def child_repositories(folder):
@@ -59,14 +89,29 @@ def child_repositories(folder):
 
 def untracked_child_repositories(root):
     """The git repositories directly under a repository's top folder that the repository does not track: repositories
-    kept side by side inside one that holds only what they share. A submodule is tracked, so it is not one of them."""
-    return [child for child in child_repositories(root)
-            if not run_git(["-C", root, "ls-files", "-z", "--", os.path.basename(child)], check=False)]
+    kept side by side inside one that holds only what they share. A submodule is tracked, so it is not one of them.
+    One git call for all of them: the tracked paths under any child, by their first part."""
+    children = child_repositories(root)
+    if not children:
+        return []
+    names = [os.path.basename(child) for child in children]
+    out = run_git(["-C", root, "ls-files", "-z", "--", *names], check=False)
+    tracked = {path.replace("\\", "/").split("/")[0] for path in out.split("\0") if path}
+    return [child for child, name in zip(children, names) if name not in tracked]
 
 
 def count(number, one, many):
     """A number with its noun: 1 repository, 2 repositories."""
     return f"{number} {one if number == 1 else many}"
+
+
+def names(items, verbose=False, limit=10):
+    """A list of names as a reader takes it in: all of them up to the limit, else the first ones and how many more, so
+    a folder of a hundred repositories is one line, not a page. verbose lists every one."""
+    items = list(items)
+    if verbose or len(items) <= limit:
+        return ", ".join(items)
+    return ", ".join(items[:limit]) + f" and {len(items) - limit} more"
 
 
 def is_repository(folder):
@@ -78,7 +123,12 @@ def roots_for(start=None):
     """Where bowline works from a path, as (folder of repositories or None, repository roots). A folder of repositories
     holds repositories side by side, as with services cloned next to one another: either a plain folder, or a git
     repository of its own that holds what they share and does not track them. From one: (the folder, their roots).
-    Inside any other repository: (None, [its root]). Anywhere else: (None, [])."""
+    Inside any other repository: (None, [its root]). Anywhere else: (None, []). Worked out once per run and path."""
+    workspace, roots = _remembered("roots", start or os.getcwd(), lambda: _roots_for(start))
+    return workspace, list(roots)
+
+
+def _roots_for(start):
     root = repo_root(start)
     if root:
         children = untracked_child_repositories(root)
@@ -115,9 +165,10 @@ def allowed_by(setting, root):
     return bool(setting)
 
 
-def left_alone(root):
-    """Why bowline writes nothing into this repository, in one sentence, for every message that says so."""
-    name = os.path.basename(os.path.normpath(root))
+def left_alone(root, name=None):
+    """Why bowline writes nothing into this repository, in one sentence, for every message that says so. name stands in
+    for the repository's own when one sentence speaks for several (the doctor's grouped findings)."""
+    name = name or os.path.basename(os.path.normpath(root))
     setting = load_config(folder_of(root) or root).get("writeToRepositories", True)
     if isinstance(setting, list):
         return (f"bowline leaves {name} untouched: the folder's {CONFIG_FILE} lists in writeToRepositories the "
@@ -125,10 +176,10 @@ def left_alone(root):
     return f"bowline leaves {name} untouched: the folder's {CONFIG_FILE} sets writeToRepositories to false"
 
 
-def left_alone_fix(root):
+def left_alone_fix(root, name=None):
     """What a person can do about a finding in a repository bowline leaves untouched."""
-    name = os.path.basename(os.path.normpath(root))
-    return (f"{left_alone(root)}. Ask the repository's owners to change it, or put what this folder needs about {name} "
+    name = name or os.path.basename(os.path.normpath(root))
+    return (f"{left_alone(root, name)}. Ask the repository's owners to change it, or put what this folder needs about {name} "
             f"in the folder's .claude/rules/{name}/, with paths: [\"{name}/**\"] in each rule's front matter.")
 
 
@@ -220,6 +271,21 @@ def tracked_files(root, pattern):
     return sorted({p for p in out.split("\0") if p})
 
 
+def listed_files(root):
+    """Every file under a repository that git tracks or would add (committed, staged and untracked, ignored ones left
+    out), or under a folder that is not one every file on disk but its child repositories': one listing, which a caller
+    filters with matching(), so measuring a repository asks git once rather than once per pattern."""
+    if repo_root(root) is None:
+        return walk_files(root, ".")
+    out = run_git(["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"])
+    return sorted({p for p in out.split("\0") if p})
+
+
+def matching(files, pattern):
+    """The paths of a listing that a git-style pattern matches, as tracked_files would give them: '*' crosses folders."""
+    return [path for path in files if pattern == "." or fnmatch.fnmatchcase(path, pattern)]
+
+
 def walk_files(root, pattern):
     """The files under a folder whose path, relative to it, matches a git-style pattern ('.' means every file); child
     repositories, .git folders and node_modules are not entered."""
@@ -276,27 +342,41 @@ def accepted_characters(values):
 class Finding:
     """One thing the doctor or a check found: what it is, why it matters, what to do. level is problem, warning or note."""
 
-    def __init__(self, level, what, why, fix=None):
+    def __init__(self, level, what, why, fix=None, many=None):
         self.level = level
         self.what = what
         self.why = why
         self.fix = fix
+        # How the finding reads for several repositories at once, with {count}: "{count} repositories have no root
+        # CLAUDE.md." The doctor groups identical findings in a folder of repositories; without one it says "In N
+        # repositories: <what>".
+        self.many = many
+        self.where = None       # the repository's name, in a folder of repositories (doctor.label)
+        self.bare = what        # what it found, without the repository's name in front
+        self.fix_many = None    # the fix with <repository> for the name, when the fix names the repository
+        self.names = None       # for a grouped finding: the repositories it is found in, as a reader takes them in
 
     def lines(self):
         head = {"problem": "PROBLEM", "warning": "WARNING", "note": "NOTE"}[self.level]
-        out = [f"{head}  {self.what}", f"         why: {self.why}"]
+        out = [f"{head}  {self.what}"]
+        if self.names:
+            out.append(f"         in: {self.names}")
+        out.append(f"         why: {self.why}")
         if self.fix:
             out.append(f"         fix: {self.fix}")
         return out
 
 
-def print_findings(findings, prefix="bowline"):
+def print_findings(findings, prefix="bowline", counted=None):
+    """Prints each finding and the totals; counted, when given, is the list the totals are taken from (the findings one
+    by one when those printed are grouped), so the totals and the exit code never depend on the grouping."""
     for finding in findings:
         for line in finding.lines():
             print(line)
         print()
-    problems = sum(1 for f in findings if f.level == "problem")
-    warnings = sum(1 for f in findings if f.level == "warning")
-    notes = sum(1 for f in findings if f.level == "note")
+    counted = findings if counted is None else counted
+    problems = sum(1 for f in counted if f.level == "problem")
+    warnings = sum(1 for f in counted if f.level == "warning")
+    notes = sum(1 for f in counted if f.level == "note")
     print(f"{prefix}: {problems} problem(s), {warnings} warning(s), {notes} note(s).")
     return problems

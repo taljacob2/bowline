@@ -55,21 +55,47 @@ person's.
 
 ## From a folder of repositories
 
-When the session runs in a folder that is not a repository but holds several, `init --plan` plans the folder's own
-scaffold: `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.folder.md`, an index with a table of the
-repositories, what applies to every repository, the Compact Instructions and a memory section that says the memory is
-one for the whole folder; and the shared `.claude/bowline.json`, the layer every repository's own lies over. Show the
-template, write with `--write`, then fill the table with the person: a line for each repository and how they call one
-another. `init --each --plan` plans the repository scaffold above in every repository of the folder, and
-`init --each --write --only <items>` writes it; show the plan before writing into several repositories at once.
+When the session runs in a folder that holds several repositories side by side, `init --plan` plans the folder's own
+scaffold. What it offers depends on two things: whether bowline may write into the repositories, and whether the folder
+is a git repository of its own.
 
 Before the first plan, unless the folder's `.claude/bowline.json` already sets `writeToRepositories`, ask the person
 once: may bowline write into the repositories, or should its files stay in this folder? They may have no write access,
 or not want the repositories touched. If the files should stay here, plan and write with `init --leave-repositories`:
-the folder's `.claude/bowline.json` gets `"writeToRepositories": false`, the folder gets the README, the starter rules
-and the skills too, and a rule for one repository goes in `.claude/rules/<repository>/` with
-`paths: ["<repository>/**"]`. A list of names in `writeToRepositories` lets bowline write into those repositories only;
-`--each` skips the others and says so. Tell the person the one limit: a session started inside a repository reads the
-folder's `CLAUDE.md`, but not its skills. When the folder is not a git repository, offer to make it one, so that its
-files are versioned like any repository's: `git init` in the folder, then `init` again writes the `.gitignore` lines
-that keep the repositories out of it.
+the folder's `.claude/bowline.json` gets `"writeToRepositories": false`, and a rule for one repository goes in
+`.claude/rules/<repository>/` with `paths: ["<repository>/**"]`. A list of names in `writeToRepositories` lets bowline
+write into those repositories only; `--each` skips the others and says so.
+
+The items for the folder, each with the template to show from `${CLAUDE_PLUGIN_ROOT}/templates/`:
+
+- `claude-md`: `CLAUDE.md.folder.md`, an index with a table of the repositories, what applies to every repository, the
+  Compact Instructions and a memory section that says the memory is one for the whole folder. Each row of the table is
+  filled from the repository's README, its package description, or the first sentence of its `CLAUDE.md` that
+  describes it, never a warning, a rule or a list item; the plan says which rows came from where, and the rest wait
+  for the person. `--no-describe` leaves every row for the person.
+- `config`: the shared `.claude/bowline.json`, the layer every repository's own lies over.
+- `claude-readme`, `rules`, `skills`: the folder's versions, `folder/claude-readme.md`, `folder/rules/` and
+  `folder/skills/`, worded for a folder: a commit is made in a repository below it. Planned by default when the folder
+  keeps the files of repositories bowline leaves untouched.
+- `scripts` and `githook`: the copy of the gate and the budget check in `.claude/scripts/`, and `.githooks/pre-commit`,
+  as for a repository. They need the folder to be a git repository, because a gate checks the commits made where it is
+  installed; in a plain folder init refuses them and says so.
+- `gitignore`: the entries for a person's own Claude Code files and one line per repository, so that the folder's own
+  history never takes in a repository below it. Planned when the folder is a git repository.
+
+Without the gate in the folder, the rules, skills and README say so in place of naming it: the bowline plugin's hook
+still gates every commit Claude issues in a repository below, and a commit made outside Claude Code is not checked. The
+plan marks those files "without the gate".
+
+When the folder is not a git repository, the plan says what `git init` would add: the gate items and the `.gitignore`
+entries. Offer it, so that the folder's files are versioned like any repository's: `git init` in the folder, then
+`init --plan` again, and write the new items. A rule or a skill already written without the gate stays as it is; tell
+the person to delete those files first if they want the version that names the gate, because init never overwrites.
+
+Write with `--write --only <items>`, then fill the table with the person: a line for each repository still waiting,
+and how the repositories call one another. `init --each --plan` plans the repository scaffold above in every repository
+bowline may write into, and `init --each --write --only <items>` writes it; show the plan before writing into several
+repositories at once. Tell the person the one limit: a session started inside a repository reads the folder's
+`CLAUDE.md`, but not its skills.
+
+The plan names at most ten repositories in a list and says how many more there are; `--verbose` lists them all.

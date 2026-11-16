@@ -19,6 +19,12 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" doctor
 Add `--no-memory` when the memory folder is not this person's concern (CI, a shared machine). Add `--repo <path>` to
 measure another repository.
 
+From a folder of many repositories, the doctor measures eight at a time and prints each repository's sizes as it is
+measured, with progress on standard error; let it finish rather than move it to the background. A finding found the
+same in several repositories is printed once, with an `in:` line naming them; read it with the person as one finding.
+`--verbose` prints every finding, every repository's sizes and every name; `--folder-only` measures the folder itself
+and stops, for a quick check.
+
 ## Read the report with the person
 
 Go through the findings in order, worst first: PROBLEM, then WARNING, then NOTE. For each, say in one sentence what it

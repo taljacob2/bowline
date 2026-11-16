@@ -68,8 +68,9 @@ def measure(root, config):
         skills_dirs = list(skills_dirs) + ["skills"]       # a plugin repository's own skills count too
     findings = []
     facts = {"claudeMd": [], "rules": [], "areas": {}, "unscoped": 0, "skills": []}
+    files = common.listed_files(root)        # one listing for every pattern below: one git call per repository
 
-    for path in common.tracked_files(root, "*CLAUDE.md"):
+    for path in common.matching(files, "*CLAUDE.md"):
         if os.path.basename(path) != "CLAUDE.md":
             continue        # Claude Code loads files named exactly CLAUDE.md; a template or a note named like one is not read
         text = common.read_text(os.path.join(root, path))
@@ -85,7 +86,7 @@ def measure(root, config):
                 "problem", f"{path} names a path outside the repository.", config["outsidePathsWhy"],
                 "Replace the pointer with one every contributor can follow, or remove it."))
 
-    for path in common.tracked_files(root, rules_dir + "/*"):
+    for path in common.matching(files, rules_dir + "/*"):
         if not path.endswith(".md"):
             continue
         text = common.read_text(os.path.join(root, path))
@@ -121,7 +122,7 @@ def measure(root, config):
 
     skill_paths = []
     for folder in skills_dirs:
-        skill_paths += common.tracked_files(root, folder.replace("\\", "/") + "/*")
+        skill_paths += common.matching(files, folder.replace("\\", "/") + "/*")
     for path in sorted(set(skill_paths)):
         if not path.endswith("SKILL.md"):
             continue

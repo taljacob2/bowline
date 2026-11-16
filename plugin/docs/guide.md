@@ -169,7 +169,13 @@ contains the rule's .claude folder". `init --each`, `move` and autosplit then wr
 the doctor measures them in notes that say why. Such files serve sessions started in the folder: a session started
 inside a repository reads the folder's `CLAUDE.md`, but Claude Code looks for skills only "up to the repository root".
 The folder can also be a git repository of its own, which holds what its repositories share without tracking them,
-so that its files are versioned like any repository's.
+so that its files are versioned like any repository's. Then it can hold its own copy of the gate, as a repository does;
+a plain folder cannot, since no commit is made there, so its rules and skills name the plugin's hook instead.
+
+A folder may hold a hundred repositories or more. The doctor then measures several at once and prints each as it is
+measured, and a finding found the same in many repositories is said once, with the names. A list of repositories in
+any output shows the first ten and how many more, because a line that names a hundred repositories is one nobody reads
+and every session pays for in its context.
 
 ## What bowline does, and what it leaves to you
 

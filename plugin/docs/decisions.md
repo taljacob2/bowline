@@ -231,3 +231,62 @@ finding's words with the numbers blanked, so a note that keeps growing is one re
 
 **Not chosen.** A line or byte limit per note, for the reason above. A note-level finding, for the reason above.
 Counting dated entries: a note keeps the dates that carry meaning, so dates do not mark finished work.
+
+## 2026-11-16: a folder of many repositories
+
+**The question.** A person ran `init` and the doctor from a plain folder of well over a hundred repositories on a slow
+mount. Four
+things went wrong. `init` could not install the gate there, yet wrote a rule and two skills that told Claude to run
+`.claude/scripts/gate.py`, which did not exist, and said "this repository" of a folder. Each row of the folder's table
+took the first line of the repository's `CLAUDE.md`, which was as often a warning or a rule as a description, cut at a
+hundred characters. The doctor ran past Claude Code's two-minute command limit and printed close to two thousand lines, most of them
+three findings repeated for every repository, and nothing until the end. And `init` printed every name twice.
+
+**The decisions.**
+
+- The gate goes where commits are made. `scripts` and `githook` are folder items when the folder is a git repository,
+  installed as for a repository; in a plain folder `init` refuses them and says that `git init` comes first. The
+  folder's rules, skills and README have their own templates, `templates/folder/`, worded for a folder, and name the
+  folder's copy of the gate only when there is one; otherwise they say that none is installed, why, and that the
+  plugin's hook still gates every commit Claude issues in a repository below. The plan marks those files "without the
+  gate". A repository's own templates are unchanged.
+- A row's description is chosen, not taken. The README's first paragraph that describes, then the package's
+  description (package.json, composer.json, pyproject.toml, Cargo.toml, a .csproj), then the first describing
+  paragraph at the opening of the `CLAUDE.md`, before its first section. A line that starts with a list marker, a
+  bold or quoted mark, a word that instructs (never, always, must, stop, important, and the like), a line in capitals,
+  or a line that ends with a colon never describes. Whole sentences only, up to 160 characters; a first sentence over
+  240 leaves the row for the person. The plan says which rows came from where, and `--no-describe` fills none.
+- The doctor's time was git, not printing. A profile of 139 made-up repositories found 1,534 git processes, eleven per
+  repository: three file listings for the size check, each with its own `rev-parse`, and "which folder is this
+  repository in?", asked three to six times per repository, rescanning the whole folder every time, with one git call
+  per child when the folder is a repository. Now the folder's layout is worked out once per run, the folder's tracked
+  children are one git call, the size check lists a repository's files once, and autosplit reads `.git` without git:
+  three git processes per repository. Eight repositories are measured at once. On Windows the run went from 21
+  seconds to 1.8, and on WSL over `/mnt/c` from 44 to 2, with the report unchanged before the output changes below.
+- The report says a repeated finding once. In a folder, a finding found the same in several repositories, the same
+  severity, words, why and fix, is one finding with an `in:` line naming them, its why and fix once; a finding about
+  the folder itself stands alone, since the folder is not one of its repositories. The totals and the exit code count
+  the findings one by one, as before, and `--brief` and the reminders read them one by one, unchanged. Each
+  repository's sizes print as it completes, in order, a line on standard error marks every tenth of the way, a
+  repository whose rules and skills are all zero gets no line for them, and `--verbose` restores everything one by one.
+  `--folder-only` measures the folder alone.
+- A list of names shows ten. Every list of repositories init or the doctor prints shows the first ten and how many
+  more, and says the count and the reason once; `--verbose` names them all.
+
+**Why the layout may be remembered for a run.** A run of bowline creates no repository, so which folder is a
+repository's top, and which repositories a folder holds, stays true until it ends. File listings are never kept: a run
+writes files, and the autosplit worker measures a worktree it just made.
+
+**Not chosen.** An ignore line for "every folder that holds a `.git`": git cannot express it, so `.gitignore` keeps one
+line per repository, and the README shows the allowlist a person may write instead. Changing `--brief` to show the
+problems first: it was asked to stay as it was.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. The folder's `CLAUDE.md` holds one table row per repository, so with about 140 repositories it passes 200 lines and
+   the doctor flags the file `init` just wrote. The table could move to a page the `CLAUDE.md` points to once the
+   folder holds more repositories than fit.
+2. `budget` from a folder still prints one summary line per repository; it could list only those with something in
+   them, as the doctor now does.
+3. A rule or a skill written without the gate stays as it is after `git init`, because `init` never overwrites; the
+   plan could say which files would read differently now that the gate can be installed.

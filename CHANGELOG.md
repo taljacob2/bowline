@@ -4,6 +4,31 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.9.0 (2026-11-16)
+
+A folder of many repositories: `init` installs the gate where it can and says so where it cannot, describes each
+repository on purpose, and keeps its lists short; the doctor takes seconds, not minutes, and says a repeated finding
+once. No Claude Code limit moved; the facts stay as checked on 2026-11-14. The reasoning is in
+`plugin/docs/decisions.md`, "a folder of many repositories".
+
+- `init` from a folder that is a git repository offers `scripts` and `githook`, installed as for a repository. From a
+  plain folder it refuses them, and its plan says what `git init` would add: the gate and the `.gitignore` entries.
+- The folder's rules, skills and `.claude/README.md` come from `templates/folder/`, worded for a folder, and name the
+  folder's copy of the gate only when there is one; the plan marks the others "without the gate".
+- Each row of the folder's table is described from the README, the package's description, or the opening of the
+  `CLAUDE.md`, never a warning, a rule or a list item, in whole sentences; the plan says which rows came from where.
+  New flag: `--no-describe`.
+- The folder's `CLAUDE.md` has one blank line before "Memory between sessions", and its paragraphs that hold a filled
+  sentence are re-wrapped.
+- The doctor from a folder: the layout worked out once per run, three git processes per repository instead of eleven,
+  eight repositories at a time, each printed as it completes, progress on standard error, a repeated finding said once
+  with an `in:` line, no all-zero rules line. New flags: `--verbose` (every finding, size and name one by one) and
+  `--folder-only`. Exit codes, `--brief` and the reminders are as before.
+- Every list of repositories names ten and says how many more; `--verbose` names them all, in init and the doctor.
+
+Not done in this version: the folder's table moving to a page past 200 lines, `budget`'s one line per repository, and a
+plan that says which files written without the gate would now read differently (the decisions page has them).
+
 ## 0.8.1 (2026-11-16)
 
 - The curate-memory skill's description names the doctor's new warning, a note that keeps finished work like a

@@ -184,14 +184,14 @@ class WorkspaceTests(ScratchRepo):
         self.assertIn("bowline init: " + self.workspace, out)
         self.assertIn("CLAUDE.md", out)
         self.assertIn(".claude/bowline.json", out)
-        self.assertIn("The folder's repositories repo1, repo2 get their own scaffold with --each.", out)
+        self.assertIn("Its 2 repositories (repo1, repo2) get their own scaffold with --each.", out)
         self.assertFalse(os.path.exists(os.path.join(self.workspace, "CLAUDE.md")))
         code, out, err = self.bowline("init", "--write")
         self.assertEqual(code, 0, out + err)
         text = read(os.path.join(self.workspace, "CLAUDE.md"))
         self.assertIn("It holds 2 repositories side by side", text)
         self.assertIn("| `repo1/` | (say in a line what it is) |", text)            # repo1's CLAUDE.md is a heading only
-        self.assertIn("| `repo2/` | Keep. |", text)                                   # repo2's first line that is not a heading
+        self.assertIn("| `repo2/` | (say in a line what it is) |", text)            # "Keep." is in a section, not a description
         self.assertIn("## Compact Instructions", text)
         self.assertIn("one memory for the whole folder", text)
         self.assertLess(len(text.splitlines()), 200)
@@ -211,9 +211,10 @@ class WorkspaceTests(ScratchRepo):
         self.assertEqual(code, 0, out + err)
         self.assertTrue(os.path.isfile(os.path.join(self.repo1, ".claude", "bowline.json")))
         self.assertTrue(os.path.isfile(os.path.join(self.repo2, ".claude", "rules", "before-a-commit.md")))
-        code, out, err = self.bowline("init", "--only", "githook")                   # not a folder item
+        code, out, err = self.bowline("init", "--only", "githook")                   # needs the folder to be a repository
         self.assertEqual(code, 2)
-        self.assertIn("the items are claude-md, claude-readme, rules, skills, config, gitignore", err)
+        self.assertIn("this folder is not a git repository", err)
+        self.assertIn("git init", err)
 
 
 if __name__ == "__main__":
