@@ -4,6 +4,15 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- The doctor warns when a memory note names many commits, so that it keeps finished work like a log
+  (`memoryNoteCommits`, 10 by default, a new setting), and points to `/bowline:curate-memory`. Before, it measured only
+  the index, and the rule that keeps the index short moves the detail into the notes. `bowline memory status` lists
+  every note with its lines, its bytes and the commits it names, the largest first. The memory rule in the templates
+  gains one sentence: once the repository records a finished piece of work, the note keeps a pointer to that record
+  and its last commit.
+
 ## 0.7.0 (2026-11-14)
 
 A folder of repositories can keep bowline's files itself, and can be a git repository of its own.

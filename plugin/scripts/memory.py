@@ -164,7 +164,13 @@ def do_status(options):
         text = common.read_text(index)
         print(f"index: {common.count_lines(text)} lines, {len(text.encode('utf-8')):,} bytes (only the first 200 lines or 25 KB load)")
     notes = [f for f in os.listdir(memory) if f.endswith(".md") and f != "MEMORY.md"]
-    print(f"notes: {len(notes)}")
+    print(f"notes: {len(notes)}, the largest first")
+    # Each note's size and the commits it names: a note that names many keeps finished work like a log, and is the
+    # first one curate-memory trims (the doctor warns at memoryNoteCommits).
+    for name in sorted(notes, key=lambda n: (-os.path.getsize(os.path.join(memory, n)), n)):
+        text = common.read_text(os.path.join(memory, name))
+        print(f"  {name}: {common.count_lines(text)} lines, {len(text.encode('utf-8')):,} bytes, "
+              f"{len(common.commits_named(text))} commit(s) named")
     if not os.path.isdir(os.path.join(memory, ".git")):
         print("backup: none. Run: bowline memory setup <private remote>")
         return 1

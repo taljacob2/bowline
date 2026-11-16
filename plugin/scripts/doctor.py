@@ -10,8 +10,9 @@ For each finding it prints three lines: what it found, why it matters, what to d
   context window, naming the section the cut falls in;
 - the rules per area and the unscoped rules against their budgets, skills against theirs, and pointers outside the
   repository (the budget check);
-- the memory folder Claude Code keeps for this repository on this machine: its index against the cap, whether the
-  folder is a git repository with a remote, and whether the push hook is installed;
+- the memory folder Claude Code keeps for this repository on this machine: its index against the cap, each note
+  against the commits it names (a note that keeps finished work like a log), whether the folder is a git repository
+  with a remote, and whether the push hook is installed;
 - whether the root CLAUDE.md has a compaction section, whether the gate and the budget check are installed, and
   whether the repository has a .claude/bowline.json;
 - a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
@@ -143,6 +144,7 @@ def memory_findings(root, config):
             findings.append(common.Finding(
                 "warning", f"MEMORY.md is at {lines} lines and {size:,} bytes, near the cap of {limits['memoryIndexLines']} lines or {limits['memoryIndexBytes']:,} bytes.",
                 config["limitsWhy"]["memoryIndexLines"], "Curate before it passes the cap: /bowline:curate-memory."))
+    findings.extend(note_findings(folder, config))
     if not os.path.isdir(os.path.join(folder, ".git")):
         findings.append(common.Finding(
             "warning", f"The memory folder {folder} is not backed up.",
@@ -159,6 +161,27 @@ def memory_findings(root, config):
                 "warning", "No hook pushes the memory folder after a reply.",
                 "Without the hook the backup is only as fresh as the last push someone remembered to make.",
                 "/bowline:memory-backup setup <remote> installs it for this machine."))
+    return findings
+
+
+def note_findings(folder, config):
+    """A note that keeps finished work like a log. The rule that keeps the index short moves the detail into the notes,
+    and the index check never sees them, so a careful project's index stays small while one note grows round by round.
+    A warning, not a note, because only problems and warnings reach a person at a session's start."""
+    limit = config["limits"].get("memoryNoteCommits")
+    if not limit or not os.path.isdir(folder):
+        return []
+    findings = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".md") or name == "MEMORY.md":
+            continue
+        commits = common.commits_named(common.read_text(os.path.join(folder, name)))
+        if len(commits) >= limit:
+            findings.append(common.Finding(
+                "warning", f"The memory note {name} names {len(commits)} commits: it keeps finished work like a log.",
+                config["limitsWhy"]["memoryNoteCommits"],
+                "Cut each finished item the repository records down to a pointer and its last commit, and keep what is "
+                "still open: /bowline:curate-memory."))
     return findings
 
 

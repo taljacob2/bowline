@@ -106,6 +106,24 @@ class MemoryTests(ScratchRepo):
         code, out, _ = self.bowline("push")
         self.assertIn("nothing new; nothing to push", out)
 
+    def test_status_lists_each_note_the_largest_first_with_the_commits_it_names(self):
+        folder = self.project_memory(self.repo)
+        os.makedirs(folder)
+        write(os.path.join(folder, "MEMORY.md"), "- [Progress](progress.md)\n- [Machines](machines.md)\n")
+        write(os.path.join(folder, "machines.md"), "---\nname: machines\n---\nThe lab machine is off most days.\n" * 3)
+        write(os.path.join(folder, "progress.md"), "Round one is `1a2b3c4d`, round two is 5e6f7a8b.\n" * 6)
+        code, out, _ = self.bowline("status")
+        self.assertEqual(code, 1, out)                       # no backup yet, said as before
+        self.assertIn("notes: 2, the largest first", out)
+        lines = out.splitlines()
+        first = next(i for i, line in enumerate(lines) if line.startswith("  progress.md"))
+        second = next(i for i, line in enumerate(lines) if line.startswith("  machines.md"))
+        self.assertLess(first, second)
+        size = os.path.getsize(os.path.join(folder, "progress.md"))
+        self.assertIn(f"  progress.md: 6 lines, {size:,} bytes, 2 commit(s) named", out)
+        self.assertIn("  machines.md: 12 lines,", out)
+        self.assertIn("0 commit(s) named", lines[second])
+
     def test_push_leaves_a_plain_folder_alone(self):
         folder = self.project_memory(self.repo)
         os.makedirs(folder)

@@ -200,3 +200,34 @@ the `release` branch stay, because each is right for the marketplace too and kee
 still run code. Agreeing on a generous reading of the statement: an attestation is a promise, and this one would not
 be true. Asking Anthropic first remains open to the author, for whether a plugin that manages CLAUDE.md files and backs
 up Claude Code's memory at the user's request is acceptable, and how a plugin with command hooks should answer.
+
+## 2026-11-16: a memory note that names many commits is a warning
+
+**The question.** The doctor measured the memory index and the backup, never a note. The first user asked whether
+memory notes should be kept to a length, after a search of theirs showed a capped output, and whether bowline's
+documentation already covers it. It does not, for three reasons found in 0.7.0. The rule that keeps the index short
+moves the detail into the notes ("fold its rounds into one line ... and move the detail into its own file"), so a
+project that follows it well has a small index and notes that keep growing. The only thing that shortens a note is
+curate-memory's TRIM verdict, which the doctor suggested only when the index neared its cap, so a careful project was
+never prompted. And a note is read whole whenever it looks relevant, so one that keeps every finished round spends
+context at every read and buries what is still open.
+
+**The decision.** The doctor warns when a note names `memoryNoteCommits` commits or more (10 by default), and points to
+curate-memory. `bowline memory status` lists every note with its lines, its bytes and the commits it names, the largest
+first. The memory rule in the templates and in bowline's own `CLAUDE.md` gains one sentence: once the repository
+records a finished piece of work, the note keeps a pointer to that record and its last commit, nothing more.
+
+**Why commits and not lines.** No Claude Code limit makes a line count meaningful for a note: notes load on demand,
+whole, and the Read tool reads up to 2,000 lines by default, far past any note. On the first user's real memory, 18 notes
+of 15 to 57 lines, sizes did not tell the log from a long reference note (5.0 KB against 4.6 KB), and the commits did:
+the progress note that had become a log named 16, the most of any other was 6, and that was a finished item folded as
+the rule asks. Folding names commits, so the count grows exactly with finished work kept in full. A commit is 7 to 40
+lowercase hex digits with a letter and a digit, standing alone; front matter, UUIDs and path segments do not count,
+because the first run counted a job's scratch folder in a path.
+
+**Why a warning and not a note.** Only problems and warnings reach a person at a session's start and in the reminders;
+a note appears only when someone runs the doctor, which is the gap this closes. The reminder's identity is the
+finding's words with the numbers blanked, so a note that keeps growing is one reminder, not one per reply.
+
+**Not chosen.** A line or byte limit per note, for the reason above. A note-level finding, for the reason above.
+Counting dated entries: a note keeps the dates that carry meaning, so dates do not mark finished work.

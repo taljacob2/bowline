@@ -9,6 +9,7 @@
     "skillLines": 500,
     "memoryIndexLines": 200,
     "memoryIndexBytes": 25000,
+    "memoryNoteCommits": 10,
     "onDemandCutoffSmallWindow": 40000,
     "onDemandCutoffLargeWindow": 150000,
     "skippedFileBytes": 4194304
@@ -22,6 +23,7 @@
     "skillLines": "The documentation's target for a SKILL.md; reference material goes in files beside it, loaded when needed.",
     "memoryIndexLines": "Only the first 200 lines of MEMORY.md load at a session's start; a line past that is a memory the session never knows it has.",
     "memoryIndexBytes": "Or the first 25 KB, whichever comes first.",
+    "memoryNoteCommits": "bowline's own threshold, not a Claude Code limit. A note is read whole whenever it looks relevant, and a finished item needs only a pointer to the record and its last commit, so a note that names ten commits keeps several finished items in full and buries what is still open. Commits, not lines: on the first user's memory, sizes did not tell a log from a long reference note, and the commits did.",
     "onDemandCutoffSmallWindow": "A nested CLAUDE.md or a scoped rule is cut here on a 200K context window; Claude gets a note that it may read the rest, and usually does not.",
     "onDemandCutoffLargeWindow": "The same cut on a 1M context window with current models.",
     "skippedFileBytes": "A CLAUDE.md over 4 MiB is skipped entirely."

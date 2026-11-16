@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Measure this repository and this machine against what Claude Code actually reads - CLAUDE.md sizes and where a nested one is cut, the rules' and skills' budgets, the memory index and its backup, the compaction section, the commit gate - and read the report with the person. Use when asked whether the instructions are in good shape, when a CLAUDE.md feels ignored, or before init, curate-memory or split-instructions.
+description: Measure this repository and this machine against what Claude Code actually reads - CLAUDE.md sizes and where a nested one is cut, the rules' and skills' budgets, the memory index, its notes and its backup, the compaction section, the commit gate - and read the report with the person. Use when asked whether the instructions are in good shape, when a CLAUDE.md feels ignored, or before init, curate-memory or split-instructions.
 ---
 
 # The doctor
@@ -30,6 +30,8 @@ means for this repository, in plain words, and name the skill that fixes it:
 - A path outside the repository in an instruction file: fix the pointer by hand; a contributor cannot follow it.
 - No `Compact Instructions` or `Memory between sessions` section, no `.claude/bowline.json`, no gate: `/bowline:init`.
 - The memory index near or over its cap: `/bowline:curate-memory`.
+- A memory note that names many commits, so it keeps finished work like a log: `/bowline:curate-memory`, whose
+  TRIM verdict cuts each finished item the repository records down to a pointer and its last commit.
 - The memory not backed up, or no hook pushing it: `/bowline:memory-backup`.
 - A split that autosplit prepared in the background, ready on its branch: `/bowline:split-instructions review <file>`.
   One that failed: read its log with the person, then `/bowline:split-instructions` by hand, or

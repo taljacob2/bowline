@@ -93,6 +93,30 @@ class DoctorTests(ScratchRepo):
         code, out, _ = self.run_script("doctor")
         self.assertNotIn("No hook pushes", out)
 
+    def test_a_note_that_keeps_finished_work_like_a_log_is_a_warning_that_reaches_the_session_start(self):
+        write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n")
+        folder = self.project_memory()
+        write(os.path.join(folder, "MEMORY.md"), "- [Progress](progress.md) - the rounds\n")
+        git(folder, "init", "-q", "-b", "main")
+        git(folder, "remote", "add", "origin", "git@example.invalid:someone/memory.git")
+        write(os.path.join(self.config_dir, "settings.json"), json.dumps(
+            {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python", "args": ["-I", "x/push-memory.py"]}]}]}}))
+        # Ids and paths are not commits: the front matter's session id, a UUID in the body, a job folder in a path.
+        front = "---\nname: progress\nmetadata:\n  originSessionId: 1f080fe8-8cad-4ee8-a287-31c4d804b64e\n---\n"
+        ids = "Session 2b7e1d40-5c3a-4f19-9d2e-8a1b3c4d5e6f, scratch C:\\jobs\\8d8686c0\\tmp, run /tmp/9e9e9e9e/x.\n"
+        rounds = "".join(f"- round {i} done in `{i:03d}c0ffee`\n" for i in range(9))
+        write(os.path.join(folder, "progress.md"), front + ids + rounds)
+        code, out, _ = self.run_script("doctor")
+        self.assertNotIn("names 9 commits", out)
+        self.assertNotIn("like a log", out)
+        write(os.path.join(folder, "progress.md"), front + ids + rounds + "- round 9 done in `009dead1`\n")
+        code, out, _ = self.run_script("doctor")
+        self.assertEqual(code, 0, out)
+        self.assertIn("WARNING  The memory note progress.md names 10 commits: it keeps finished work like a log.", out)
+        self.assertIn("/bowline:curate-memory", out)
+        code, out, _ = self.run_script("doctor", "--brief")
+        self.assertIn("progress.md names 10 commits", out)
+
     def test_entry_point_dispatches(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n")
         from support import SCRIPTS

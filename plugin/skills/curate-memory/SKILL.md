@@ -12,8 +12,9 @@ goes. Nothing moves before the person approves the map.
 ## 1. Take stock
 
 Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" memory status`. Confirm the folder is backed up (the history then keeps every
-deleted note); if not, offer `/bowline:memory-backup` first and stop until it is. List the notes with their sizes and
-their `description` lines from the front matter.
+deleted note); if not, offer `/bowline:memory-backup` first and stop until it is. The status lists every note, the
+largest first, with its lines, its bytes and the commits it names; add each note's `description` line from the
+front matter. A note that names many commits keeps finished work like a log, and is the first to read for TRIM.
 
 ## 2. Sort, with the rubric
 

@@ -245,6 +245,21 @@ def count_lines(text):
     return text.count("\n") + (0 if text.endswith("\n") else 1)
 
 
+# A commit as a note names it: 7 to 40 lowercase hexadecimal digits, standing alone. A hyphen, an underscore or a slash
+# next to it means part of a longer id or of a path, such as a session's UUID or a job's folder, so it does not count.
+COMMIT = re.compile(r"(?<![0-9A-Za-z_/\\-])[0-9a-f]{7,40}(?![0-9A-Za-z_/\\-])")
+
+
+def commits_named(text):
+    """The distinct commits a memory note names in its body. The front matter is skipped: it holds ids, not commits.
+    A run of hex digits counts only with a letter and a digit in it, so a plain number or a word is never a commit."""
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            text = text[end + 4:]
+    return {found for found in COMMIT.findall(text) if re.search(r"[a-f]", found) and re.search(r"[0-9]", found)}
+
+
 def accepted_characters(values):
     """The configuration's accepted characters, given as the characters themselves or as U+XXXX."""
     out = set()

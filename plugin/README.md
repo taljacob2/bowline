@@ -24,8 +24,8 @@ claude plugin install bowline@bowline
 Then, in any repository, `/bowline:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
 one-line finding into Claude's context when something is over budget or unbacked, and nothing when all is well; after
 every reply the memory folder is pushed to its backup once `/bowline:memory-backup` has tied it to a private remote; and
-before every `git commit` Claude issues, the gate checks the staged lines. During a session, when a `CLAUDE.md` or the
-memory index crosses a limit, you get one reminder in the doctor's words, and Claude gets the same line at your next
+before every `git commit` Claude issues, the gate checks the staged lines. During a session, when a `CLAUDE.md`, the
+memory index or one of its notes crosses a limit, you get one reminder in the doctor's words, and Claude gets the same line at your next
 message. A repository that turns `autosplit` on in `.claude/bowline.json` gets one more: when a `CLAUDE.md` outgrows
 the limits, the hook after a reply starts a worker that prepares its split in the background, on a branch of its own,
 for you to review and merge. Everything else is a skill you or Claude invoke, with you approving before anything moves
@@ -37,7 +37,7 @@ The doctor prints three lines per finding: what it found, why it matters, and wh
 
 | Command | What it does |
 |---|---|
-| `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap and its backup, and the repository against the layout. As hooks: `--brief` at a session's start, `--watch` after every reply (one reminder when something new crosses a limit), `--pending` before a prompt (the same line for Claude). |
+| `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap, its notes against the commits each one names (a note that keeps finished work like a log) and its backup, and the repository against the layout. As hooks: `--brief` at a session's start, `--watch` after every reply (one reminder when something new crosses a limit), `--pending` before a prompt (the same line for Claude). |
 | `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
 | `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
 | `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. |

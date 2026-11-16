@@ -36,6 +36,10 @@ loaded, and only its first 200 lines or 25 KB, whichever comes first; the files 
 - **Keep the index under the cap.** One line per fact, never one per round. When a piece of work is finished, fold its
   rounds into one line that names the final state and the commit hashes, and move the detail into its own file. Past
   the cap, the newest lines are the ones a fresh session never sees.
+- **Trim a note once the repository records its work.** A note is read whole whenever it looks relevant, so a note
+  that keeps every finished round becomes a log that buries what is still open. When the repository records a
+  finished piece of work, the note keeps a pointer to that record and its last commit, nothing more; the doctor
+  warns when one note names many commits.
 - **Write the state before the closing reply.** The state of the work goes to memory before the reply that closes a
   round, so that a compaction or a fresh session at any moment finds it.
 - **The repository is the record; the memory is the working notes.** The memory folder is not part of the repository
