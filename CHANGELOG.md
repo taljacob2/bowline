@@ -4,7 +4,10 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.8.0 (2026-11-16)
+
+The doctor watches the memory's notes, not only its index. No Claude Code limit moved:
+`memoryNoteCommits` is bowline's own threshold, and the facts stay as checked on 2026-11-14.
 
 - The doctor warns when a memory note names many commits, so that it keeps finished work like a log
   (`memoryNoteCommits`, 10 by default, a new setting), and points to `/bowline:curate-memory`. Before, it measured only
