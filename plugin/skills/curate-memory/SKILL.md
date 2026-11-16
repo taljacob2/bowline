@@ -1,6 +1,6 @@
 ---
 name: curate-memory
-description: Sort Claude Code's memory notes for this repository into what belongs in the repository (promote), what stays personal (keep), what is finished history worth five lines (trim) and what is stale or already recorded (delete), with a map the person approves before anything moves. Use when the memory index nears its cap, when notes have piled up over months, or when the person wants to share what was learned with other contributors.
+description: Sort Claude Code's memory notes for this repository into what belongs in the repository (promote), what stays personal (keep), what is finished history worth five lines (trim) and what is stale or already recorded (delete), with a map the person approves before anything moves. Use when the memory index nears its cap, when the doctor warns that a note keeps finished work like a log, when notes have piled up over months, or when the person wants to share what was learned with other contributors.
 ---
 
 # Curate the memory

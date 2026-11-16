@@ -4,6 +4,12 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.8.1 (2026-11-16)
+
+- The curate-memory skill's description names the doctor's new warning, a note that keeps finished work like a
+  log, among the times to use it. Claude reads the description when it decides whether to offer a skill, and the
+  doctor only reports: without the words, the warning pointed at a skill Claude had no reason to offer.
+
 ## 0.8.0 (2026-11-16)
 
 The doctor watches the memory's notes, not only its index. No Claude Code limit moved:
