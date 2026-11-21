@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.13.3 (2026-11-21)
 
 A fix for Windows: an autosplit worker could stop for good at the moment something else read its record. No Claude
 Code limit moved. The reasoning is in `plugin/docs/decisions.md`, "a record that Windows refuses to replace is tried
