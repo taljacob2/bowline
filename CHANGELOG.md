@@ -4,7 +4,10 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.15.0 (2026-11-21)
+
+The turn makes room by memory, and a removal of a worktree is never stopped halfway. It comes in two parts,
+below.
 
 `crew prune --remove` lets git finish. No Claude Code limit moved. The reasoning is in `plugin/docs/decisions.md`,
 "which worktrees may go, and an order for pushes", corrected the same day.
