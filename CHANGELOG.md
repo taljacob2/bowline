@@ -18,6 +18,23 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
 - Before each removal after the first, the sessions, the processes and the claims are measured again, since each
   removal can take minutes. Each removal is announced as it starts.
 
+The turn makes room by memory, and each session shows what it holds. The reasoning is in `plugin/docs/decisions.md`,
+"the turn makes room by memory, and each session shows what it holds".
+
+- `bowline crew run --small -- <command>` is for a check of one file or a few: it runs beside the full checks, one
+  small check at a time, so that a test of one file no longer waits behind another session's full suite.
+- The new setting `crew.slots` (1) is how many full checks run at once. A heavy process that no `crew run` started
+  takes a slot too, so with one slot a full check waits as before.
+- `crew run` measures the memory its command and every process below it take, says the most when the command ends,
+  and keeps the most of each command's last three runs in the repository's git folder (`peaks.json`). A check that
+  would start beside another waits until that much, and a tenth more, is free. `--sample <seconds>` sets how often
+  it measures (five).
+- The look shows each session's memory beside its name (its own process and every process it started), the machine's
+  memory in use, the largest peaks measured, and every turn held, the small one's too. `crew --json` gives them as
+  `memory`, `slots`, `turns` and `peaks`, and each session's `memory`.
+- On Windows, a process whose command line holds a line break, as `python -c` with a script of several lines does, was
+  missing from the list of processes; it is read whole now.
+
 ## 0.14.0 (2026-11-21)
 
 The crew for a day of many sessions in one repository: it names who works where, puts what waits for the person

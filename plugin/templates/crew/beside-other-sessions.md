@@ -27,7 +27,8 @@ the skill gives its full command.
   tool, never rewrite another session's, and never write such a file from a shell or a script: every worktree shares
   the one memory folder, and the last writer erases what another added since it read the file.
 - **Run a heavy check through the turn.** `bowline crew run -- <command>` waits until no other session's <test suite
-  or build> runs, because two at once crash or time out and the failure looks real.
+  or build> runs, because two at once crash or time out and the failure looks real; `crew run --small` runs a check
+  of a few files beside it.
 - **After a rebase, read the shared records again**: a rebase can succeed and still leave a number twice, or a
   build's stamp naming a commit that is gone. `bowline crew after-rebase` says so.
 - **After a commit or a push, send its hash to whoever waits on it**, and give back the claims a push finished.

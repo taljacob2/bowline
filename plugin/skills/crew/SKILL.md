@@ -39,6 +39,9 @@ by the name `ListAgents` gives it. `crew --json` gives the same as data.
 
 - **Two sessions in one worktree** are both listed, with a warning when both are busy: they may change the same
   files. Ask the person which of them keeps the worktree.
+- **Each session's memory** is beside its name: its own process and every process it started. When the machine is
+  short of memory, the idle sessions that hold nothing are what the person can close to get it back; say which, and
+  never close one yourself.
 - **A worktree that is broken or being removed** has lost the `.git` file in its folder, so git there answers for the
   main checkout. It is named and left out of the counts and of the files changed twice; never work in it.
 
@@ -130,15 +133,25 @@ every heavy check through the turn:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew run -- <the command and its arguments>
 ```
 
-It waits until no process on the machine matches the repository's heavy patterns (`crew.heavy`) and no other
-`crew run` holds the turn, takes the turn, runs the command with its output and its exit code passed through, and
-gives the turn back. Start it in the background, because the wait can be longer than a command may take in the
-foreground. Exit code 3 means the machine did not go quiet within the time allowed (30 minutes unless
-`--timeout <minutes>` or `crew.waitMinutes` says otherwise) and the command did not run; the message names what was
-still running. Then ask that session, or wait; never stop its process.
+It waits for a slot of the turn, takes it, runs the command with its output and its exit code passed through, and
+gives the slot back. `crew.slots` full checks run at a time, one unless the repository says more; a process that
+matches the repository's heavy patterns (`crew.heavy`) and that no `crew run` started takes a slot too. Start it in
+the background, because the wait can be longer than a command may take in the foreground. Exit code 3 means no slot
+came free within the time allowed (30 minutes unless `--timeout <minutes>` or `crew.waitMinutes` says otherwise) and
+the command did not run; the message names what was still running. Then ask that session, or wait; never stop its
+process.
+
+- **A check of one file or a few takes the small turn**: `crew run --small -- <command>`. It runs beside the full
+  checks, one small check at a time, so that a test of one file does not wait twenty minutes behind a full suite. Use
+  it only for a check that is small; the look shows what each check took.
+- **Memory decides how many run at once.** `crew run` measures the memory its command and every process below it
+  take, and says the most when the command ends; a check that would start beside another waits until its own peak,
+  from its last runs, is free. The look shows the largest peaks and the memory in use. When the person asks whether
+  two full checks can run at once, read the two numbers to them: two fit when twice the largest peak is less than what
+  is free while no check runs. `crew.slots` is theirs to set.
 
 The order of a repository's own checks, and which of them may run together, stay the repository's rules. The turn
-adds one thing to them: one heavy command at a time, across every session.
+adds one thing to them: as many heavy commands at a time as the repository's slots allow, across every session.
 
 **Take a place in the push queue before your full checks.** When two worktrees change one file, the second should
 rebase onto the first's push before its full checks, not after: checks that ran on code about to change must run
@@ -228,6 +241,8 @@ keys and their reasons are in `${CLAUDE_PLUGIN_ROOT}/defaults.json`:
   an edit off.
 - `changedCacheSeconds`: how old the record of what each worktree changed may be before the warning has it measured
   again in the background; 60 unless the person asks for another value.
+- `slots`: how many full checks run at once; 1 until the look's largest peaks show that two fit in the memory free
+  while no check runs.
 
 Then offer the rule in `${CLAUDE_PLUGIN_ROOT}/templates/crew/beside-other-sessions.md`: show it, adapt its words to
 the repository, and with the person's yes write it to `.claude/rules/beside-other-sessions.md`. It holds both halves,

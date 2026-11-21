@@ -923,3 +923,54 @@ that the folder is left without its `.git` file and that nothing in it is lost.
    in `crew.heavy` the repository marks as full) could join the queue when the session has no place.
 2. `crew prune` could offer to finish a removal that git stopped partway: a worktree git lists as prunable whose
    folder holds only files of the commit it was on and ignored files. Until then the person deletes such a folder.
+
+## 2026-11-21: the turn makes room by memory, and each session shows what it holds
+
+**The question.** The turn for a heavy check let one command run at a time, and the first user asked why. The answer
+was memory, not processors: their machine has 32 cores and 32 GB, and that day 29.9 GB were in use, 19.9 GB of it held
+by Claude Code's 39 processes. The repository's heavy patterns match every `dotnet test` and every `vitest`, so a test
+of one file waited twenty minutes behind another session's full suite. Two changes were proposed: let a small check run
+beside a full suite, then let two checks run at once where memory allows, sized from what the checks were measured to
+take; and show each session's memory, so that the person sees what closing a finished one gives back. The user agreed:
+"ok for all".
+
+**The decision, for a small check.** `crew run --small -- <command>` is for a check of one file or a few. It runs
+beside the full checks, one small check at a time, and waits for them only when they already take more than the slots,
+as when heavy processes no `crew run` started run in two worktrees at once. The session says which kind its check is,
+because only it knows: a heavy pattern over a command line cannot tell `vitest run` from `vitest run
+src/parser.test.ts` in every repository, and a pattern that tried would be one more thing for the person to write.
+
+**The decision, for more than one at a time.** `crew.slots` (1 unless the repository says more) is how many full checks
+may run at once. A heavy process that no `crew run` started takes a slot too, one per worktree it runs in, so that with
+one slot a full check waits as it did before, except that a small check no longer holds it up. The heavy processes
+below a turn's holder are its own and take no slot of their own. `crew run` measures the memory its command takes,
+sampled every five seconds over the command and every process below it, and keeps the peak of each command's last three
+runs in the repository's git folder. A check that would start beside another one, full or small, first waits until the
+machine's free memory is at least that peak and a tenth more, when its peak is known; a check alone on the machine
+starts at once, since it must run some time. The look shows the heaviest checks measured, so that the person can choose
+`crew.slots` from numbers: two at a time fit when twice the largest peak is below what is free while no check runs.
+
+**The decision, for each session's memory.** Each session `claude agents --json` lists comes with its process id; the
+look adds the memory of that process and of every process below it, and shows it beside the session's name, with the
+machine's memory in use in one line. It is the working set, the memory a process has in RAM, as Task Manager and `ps`
+report it.
+
+**How it stays compatible.** The first slot is still the file `turn.json`, so a session that runs an older version of
+bowline sees the newer one's first turn and waits for it; the other slots are `turn-2.json` and on, and the small
+check's is `turn-small.json`. An older version also waits for every heavy process on the machine, the newer one's
+checks included, so a mixed day is slower, never unsafe.
+
+**Not chosen.** Choosing the number of slots on its own from the measured peaks: memory free at one moment says little
+about the next, and the person knows what else they will open. Stopping a check that grows past its share: bowline
+never stops a process. Counting a small check that turns out to be large against the session: the peaks are shown, and
+the person sees it.
+
+**What the numbers are not.** A working set counts memory that several processes share, such as a library loaded by
+each, once per process, so a sum over many processes says more than they hold together. A peak between two samples is
+missed. On macOS the memory free is read from `vm_stat` (the pages free, inactive and speculative); where the system
+would not say, the turn does not wait for memory.
+
+**Left for later**, a concrete piece of work this round did not do:
+
+1. A check could record its peak under the repository's own name for it (a key in `crew.heavy`), so that `vitest run`
+   and `vitest run --coverage` are told apart without being two unrelated commands.

@@ -7,7 +7,7 @@
     python -I scripts/bowline.py crew claim <key> [--why <words>]          take a note, a file or a number, or refuse
     python -I scripts/bowline.py crew claim <list> --new [--why <words>]   take the next free number of a numbered list
     python -I scripts/bowline.py crew release <key>... | --all             give back what this worktree took
-    python -I scripts/bowline.py crew run [--timeout <minutes>] [--every <seconds>] -- <command> [<argument>...]
+    python -I scripts/bowline.py crew run [--small] [--timeout <minutes>] [--every <seconds>] -- <command> [<argument>...]
     python -I scripts/bowline.py crew after-rebase [--hook]                what a rebase changed: numbers and stamps
     python -I scripts/bowline.py crew after-push [--hook]                  who waits on this worktree's push
     python -I scripts/bowline.py crew after-commit [--hook]                who waits on this worktree's commit
@@ -29,7 +29,8 @@ the repository's git folder (sessions.json) for the hooks, which never start cla
 transcript written lately stands for a session, named by the title line at its end. A process belongs to the worktree
 of its session, else to the one its command line names, else to that of its children when all of them agree, else to
 that of its nearest parent with one. A worktree whose folder has no .git file of its own, as while it is being
-removed, is named as broken and left out, because git asked there answers for the main checkout.
+removed, is named as broken and left out, because git asked there answers for the main checkout. Each session comes
+with the memory its process and every process below it hold, and the look says how much of the machine's is in use.
 
 The printout puts what matters first, each worktree once: WAITS FOR YOU (a session asks the person a question or is
 blocked, or its sessions are idle and it holds files not committed or commits not on the pushed branch), AT WORK (a
@@ -47,7 +48,8 @@ crew run says the same, and after a push that the pushed branch holds, the hook 
 comes next with the same files. prune names the worktrees that are safe to remove (every file committed, every
 commit's change on the pushed branch, no session, process, claim, lock or place in the queue, and no sign of work
 for crew.pruneHours) and why each other one is not; --remove removes the ones named, each checked again, with plain
-`git worktree remove`, which takes ignored files and refuses a change, so nothing is ever forced; the branch stays.
+`git worktree remove` and no time limit, which takes ignored files and refuses a change, so nothing is ever forced;
+the branch stays.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -65,10 +67,14 @@ says this worktree waits for another's push, named by its folder or its branch, 
 `claim waits:live-logs --why "the parser fix"`.
 A claim of a worktree that no longer exists is dropped, and so is a number that has reached the pushed branch.
 
-run waits until no process on the machine matches the repository's heavy patterns (crew.heavy, regular expressions
-over command lines) and no other `crew run` of the repository holds the turn, takes the turn, runs the command with
-its output and its exit code passed through, and gives the turn back. It never stops a process. After the timeout it
-names what still runs and exits with code 3 without running the command.
+run waits for a slot of the turn, takes it, runs the command with its output and its exit code passed through, and
+gives the slot back. crew.slots (1) full checks run at a time; a process that matches the repository's heavy patterns
+(crew.heavy, regular expressions over command lines) and that no `crew run` started takes a slot too, one for each
+worktree it runs in, so with one slot run waits for a quiet machine. --small is for a check of one file or a few: it
+runs beside the full checks, one small check at a time. run measures the memory its command and every process below
+it take, every five seconds, and keeps the most of each command's last three runs in the repository's git folder
+(peaks.json); a check that would start beside another waits until that much and a tenth more is free. It never stops
+a process. After the timeout it names what still runs and exits with code 3 without running the command.
 
 after-rebase says, and only when something is wrong, that a number appears twice in a numbered list, that a number this
 worktree claimed has reached the pushed branch, or that a stamp (crew.stamps, a file whose text names a commit) names
@@ -467,45 +473,140 @@ def places_words(places):
 # The processes and the ports.
 
 def processes():
-    """Every process on the machine as {pid, ppid, name, command}, or [] when the system would not say."""
+    """Every process on the machine as {pid, ppid, name, command, memory}, or [] when the system would not say. The
+    memory is the process's working set in bytes, the memory it has in RAM as Task Manager and ps report it, or None."""
     try:
         if WINDOWS and shutil.which("wmic"):
             # wmic answers in about a third of the time PowerShell takes to start, which matters on the busy machine
             # this command is for; newer Windows no longer installs it, and PowerShell below is the way there. Its
             # table has the columns in the alphabet's order, the command line first, so a comma inside one is kept.
-            result = subprocess.run(["wmic", "process", "get", "CommandLine,Name,ParentProcessId,ProcessId", "/format:csv"],
+            result = subprocess.run(["wmic", "process", "get", "CommandLine,Name,ParentProcessId,ProcessId,WorkingSetSize",
+                                     "/format:csv"],
                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=60)
-            found = []
+            found, pending = [], ""
+            node = (os.environ.get("COMPUTERNAME") or "").lower() + ","
             for line in result.stdout.decode("oem", "replace").splitlines():
-                parts = line.strip().split(",", 1)[-1].rsplit(",", 3)
-                if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit():
+                # A command line can hold a line break, as `python -c` with a script of several lines does, and wmic
+                # writes it as it is: the row goes on until a line ends with the process's numbers. A row is begun
+                # by the machine's name, so a row that never ended is let go when the next one begins.
+                if not pending and (not line.strip() or line.startswith("Node,")):
+                    continue
+                if pending and node != "," and line.lower().startswith(node):
+                    pending = ""
+                pending = pending + "\n" + line if pending else line.strip()
+                parts = pending.rstrip().split(",", 1)[-1].rsplit(",", 4)
+                memory = parts[-1].strip()
+                if len(parts) == 5 and parts[2].isdigit() and parts[3].isdigit() and (memory.isdigit() or not memory):
+                    pending, parts[4] = "", memory
                     # wmic's table is made by a style sheet that writes &, < and > as &amp;, &lt; and &gt;: a build
                     # showed as "tsc -b &amp;&amp; vite build", and a heavy pattern was matched against that text.
                     command, name = html.unescape(parts[0]), html.unescape(parts[1])
-                    found.append({"pid": int(parts[3]), "ppid": int(parts[2]), "name": name, "command": command or name})
+                    found.append({"pid": int(parts[3]), "ppid": int(parts[2]), "name": name, "command": command or name,
+                                  "memory": int(parts[4]) if parts[4].isdigit() else None})
             if found:
                 return found
         if WINDOWS:
             script = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process | "
-                      "Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress")
+                      "Select-Object ProcessId,ParentProcessId,Name,CommandLine,WorkingSetSize | ConvertTo-Json -Compress")
             result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=60)
             rows = json.loads(result.stdout.decode("utf-8", "replace") or "[]")
             rows = [rows] if isinstance(rows, dict) else rows
             return [{"pid": int(row.get("ProcessId") or 0), "ppid": int(row.get("ParentProcessId") or 0),
-                     "name": row.get("Name") or "", "command": row.get("CommandLine") or row.get("Name") or ""}
+                     "name": row.get("Name") or "", "command": row.get("CommandLine") or row.get("Name") or "",
+                     "memory": int(row["WorkingSetSize"]) if str(row.get("WorkingSetSize") or "").isdigit() else None}
                     for row in rows]
-        result = subprocess.run(["ps", "-e", "-ww", "-o", "pid=,ppid=,args="], stdout=subprocess.PIPE,
+        result = subprocess.run(["ps", "-e", "-ww", "-o", "pid=,ppid=,rss=,args="], stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=60)
         found = []
         for line in result.stdout.decode("utf-8", "replace").splitlines():
-            parts = line.split(None, 2)
-            if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            parts = line.split(None, 3)
+            if len(parts) == 4 and parts[0].isdigit() and parts[1].isdigit():
                 found.append({"pid": int(parts[0]), "ppid": int(parts[1]),
-                              "name": os.path.basename(parts[2].split(" ")[0]), "command": parts[2]})
+                              "name": os.path.basename(parts[3].split(" ")[0]), "command": parts[3],
+                              "memory": int(parts[2]) * 1024 if parts[2].isdigit() else None})    # ps counts in KB
         return found
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return []
+
+
+def children_of(snapshot):
+    """Each process's children, as {pid: [child pids]}."""
+    children = {}
+    for process in snapshot:
+        if process["ppid"] != process["pid"]:
+            children.setdefault(process["ppid"], []).append(process["pid"])
+    return children
+
+
+def below(pids, snapshot, children=None):
+    """The processes given and every process below them, as a set of pids."""
+    children = children_of(snapshot) if children is None else children
+    found, todo = set(), list(pids)
+    while todo:
+        pid = todo.pop()
+        if pid not in found:
+            found.add(pid)
+            todo.extend(children.get(pid, []))
+    return found
+
+
+def memory_of(pids, snapshot):
+    """The memory of the processes named, in bytes, each counted once; None when none of them is listed with it."""
+    by_pid = {p["pid"]: p.get("memory") for p in snapshot}
+    known = [by_pid[pid] for pid in pids if by_pid.get(pid) is not None]
+    return sum(known) if known else None
+
+
+def machine_memory():
+    """The machine's memory as {"total", "available"} in bytes, or None where the system would not say. Available is
+    what a new program can have without anything being written out to disk: on Linux MemAvailable, on macOS the pages
+    free, inactive and speculative."""
+    try:
+        if WINDOWS:
+            import ctypes
+
+            class Status(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong)] + [
+                    (name, ctypes.c_ulonglong) for name in ("ullTotalPhys", "ullAvailPhys", "ullTotalPageFile",
+                                                           "ullAvailPageFile", "ullTotalVirtual", "ullAvailVirtual",
+                                                           "ullAvailExtendedVirtual")]
+
+            status = Status()
+            status.dwLength = ctypes.sizeof(Status)
+            if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                return None
+            return {"total": int(status.ullTotalPhys), "available": int(status.ullAvailPhys)}
+        if os.path.exists("/proc/meminfo"):
+            values = {}
+            with open("/proc/meminfo", encoding="ascii", errors="replace") as handle:
+                for line in handle:
+                    name, _, rest = line.partition(":")
+                    words = rest.split()
+                    if words and words[0].isdigit():
+                        values[name] = int(words[0]) * 1024
+            if "MemTotal" in values and "MemAvailable" in values:
+                return {"total": values["MemTotal"], "available": values["MemAvailable"]}
+            return None
+        if sys.platform == "darwin":
+            def run(*command):
+                return subprocess.run(list(command), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                      stdin=subprocess.DEVNULL, timeout=10).stdout.decode("ascii", "replace")
+            total, stat = run("sysctl", "-n", "hw.memsize").strip(), run("vm_stat")
+            page = re.search(r"page size of (\d+) bytes", stat)
+            pages = re.findall(r"^Pages (?:free|inactive|speculative):\s+(\d+)", stat, re.MULTILINE)
+            if total.isdigit() and page and pages:
+                return {"total": int(total), "available": sum(int(n) for n in pages) * int(page.group(1))}
+        return None
+    except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired):
+        return None
+
+
+def size(amount):
+    """A number of bytes as the person reads it: 1.2 GB, or 350 MB below a gigabyte."""
+    if amount >= 1024 ** 3:
+        return f"{amount / 1024 ** 3:.1f} GB"
+    return f"{max(1, int(round(amount / 1024 ** 2)))} MB"
 
 
 def listening():
@@ -582,18 +683,15 @@ def owners(snapshot, trees, session_pids=None):
     session_pids = session_pids or {}
     direct = {p["pid"]: session_pids.get(p["pid"]) or owner(p["command"], trees) for p in snapshot}
     parent = {p["pid"]: p["ppid"] for p in snapshot}
-    children = {}
-    for process in snapshot:
-        if process["ppid"] != process["pid"]:
-            children.setdefault(process["ppid"], []).append(process["pid"])
-    below = {}
+    children = children_of(snapshot)
+    judged = {}
 
     def from_below(pid, seen):
         # Judged from the bottom up, so that a chain of processes that name no path, such as Git Bash's
         # `bash -> npx -> cmd /c vitest -> node .../vitest.mjs`, takes the worktree its last one names. Git Bash's
         # processes report a parent that has already exited, so from them only the way down is open.
-        if pid in below:
-            return below[pid]
+        if pid in judged:
+            return judged[pid]
         if pid in seen:
             return None
         seen.add(pid)
@@ -602,7 +700,7 @@ def owners(snapshot, trees, session_pids=None):
             kids = [from_below(kid, seen) for kid in children.get(pid, [])]
             if kids and all(kid is not None and kid is kids[0] for kid in kids):
                 tree = kids[0]
-        below[pid] = tree
+        judged[pid] = tree
         return tree
 
     found = {}
@@ -1237,23 +1335,33 @@ def do_after_push(options, word="push"):
 
 # The turn for a heavy check.
 
-def turn_path(root):
-    return os.path.join(state_dir(root), "turn.json")
+# The first slot is the file every version of bowline knows, so that an older one waits for a newer one's check; the
+# other slots are turn-2.json and on, and the small check's is turn-small.json.
+TURN_FILE = re.compile(r"^turn(?:-(\d+|small))?\.json$")
+SMALL = "small"
+SAMPLE_SECONDS = 5
+PEAK_RUNS = 3
+PEAKS_KEPT = 40
+ROOM = 1.1                      # a check beside another one waits for its peak and a tenth more to be free
 
 
-def turn_holder(root, snapshot):
-    """Who holds the turn, or None. A turn whose process is gone was left by a command that was stopped, and is removed."""
-    path = turn_path(root)
+def turn_path(root, slot=1):
+    return os.path.join(state_dir(root), "turn.json" if slot == 1 else f"turn-{slot}.json")
+
+
+def live_turn(path, live):
+    """The turn a file holds, or None. A turn whose process is gone was left by a command that was stopped, and is
+    removed; so is a file nobody finished writing. live is the set of pids running now, or None when not known."""
     turn = read_json(path, None)
     if not isinstance(turn, dict):
         if turn is not None or os.path.exists(path):
             try:
                 if time.time() - os.path.getmtime(path) > LOCK_STALE_SECONDS:
-                    os.remove(path)        # a turn file nobody finished writing
+                    os.remove(path)
             except OSError:
                 pass
         return None
-    if snapshot and turn.get("pid") not in {p["pid"] for p in snapshot}:
+    if live and turn.get("pid") not in live:
         try:
             os.remove(path)
         except OSError:
@@ -1262,9 +1370,28 @@ def turn_holder(root, snapshot):
     return turn
 
 
-def take_turn(root, here, command):
-    """Takes the turn when nobody holds it; only one of two sessions that try at the same moment succeeds."""
-    path = turn_path(root)
+def turn_holders(root, snapshot):
+    """Every turn held now, the oldest first, each with its slot: 1, 2 and on for a full check, "small" for the small
+    one."""
+    folder = state_dir(root)
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return []
+    live = {p["pid"] for p in snapshot} if snapshot else None
+    found = []
+    for name in names:
+        match = TURN_FILE.match(name)
+        turn = live_turn(os.path.join(folder, name), live) if match else None
+        if turn:
+            slot = match.group(1) or "1"
+            found.append(dict(turn, slot=int(slot) if slot.isdigit() else slot))
+    return sorted(found, key=lambda turn: str(turn.get("since") or ""))
+
+
+def take_turn(root, here, command, slot=1):
+    """Takes a slot of the turn when nobody holds it; only one of two sessions that try at the same moment succeeds."""
+    path = turn_path(root, slot)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
         handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -1276,13 +1403,97 @@ def take_turn(root, here, command):
     return True
 
 
-def give_turn(root):
-    turn = read_json(turn_path(root), None)
+def give_turn(root, slot=1):
+    turn = read_json(turn_path(root, slot), None)
     if isinstance(turn, dict) and turn.get("pid") == os.getpid():
         try:
-            os.remove(turn_path(root))
+            os.remove(turn_path(root, slot))
         except OSError:
             pass
+
+
+def turn_words(turn, trees):
+    kind = "the small check's turn" if turn.get("slot") == SMALL else "the turn"
+    return f"{kind}, held since {turn.get('since')} by {holder_name(turn, trees)} for: {turn.get('command')}"
+
+
+def peaks_path(root):
+    return os.path.join(state_dir(root), "peaks.json")
+
+
+def load_peaks(root):
+    """The memory the checks run through the turn took, newest first, as [{"command", "recent": [bytes of each of the
+    last runs, newest first], "runs", "seconds", "at", "time", "small", "worktree"}]."""
+    return [p for p in read_json(peaks_path(root), {}).get("peaks") or [] if isinstance(p, dict) and p.get("command")]
+
+
+def peak(entry):
+    """The most a command took in its last runs, in bytes, or None."""
+    recent = [int(n) for n in (entry or {}).get("recent") or [] if isinstance(n, (int, float)) and n > 0]
+    return max(recent) if recent else None
+
+
+def record_peak(root, here, words, held, seconds, small):
+    def change(peaks):
+        entry = next((p for p in peaks if p["command"] == words), {"command": words})
+        entry = dict(entry, recent=([held] + list(entry.get("recent") or []))[:PEAK_RUNS], runs=int(entry.get("runs") or 0) + 1,
+                     seconds=int(round(seconds)), at=now_stamp(), time=time.time(), small=small, worktree=here["path"])
+        rest = [p for p in peaks if p["command"] != words]
+        return ([entry] + sorted(rest, key=lambda p: -float(p.get("time") or 0)))[:PEAKS_KEPT]
+    with Lock(state_dir(root)):
+        write_json(peaks_path(root), {"peaks": change(load_peaks(root))})
+
+
+class Sampler(threading.Thread):
+    """Measures the memory of a process and of every process below it, every few seconds, and keeps the most."""
+
+    def __init__(self, pid, every):
+        super().__init__(daemon=True)
+        self.pid, self.every, self.peak = pid, every, None
+        self.done = threading.Event()
+
+    def run(self):
+        wait = min(1.0, self.every)
+        while not self.done.wait(wait):
+            snapshot = processes()
+            held = memory_of(below([self.pid], snapshot), snapshot) if any(p["pid"] == self.pid for p in snapshot) else None
+            if held is not None and (self.peak is None or held > self.peak):
+                self.peak = held
+            wait = self.every
+
+
+def room_for(small, slots, holders, outside):
+    """Whether a check may start now, as far as the slots go. A full check needs a slot that neither a turn nor a heavy
+    process outside the turn takes (each worktree that runs one takes a slot); the small check runs beside them, one at
+    a time, while they do not already take more than the slots."""
+    full = sum(1 for turn in holders if turn.get("slot") != SMALL) + outside
+    if small:
+        return not any(turn.get("slot") == SMALL for turn in holders) and full <= slots
+    return full < slots
+
+
+def run_measured(command, every):
+    """Runs the command with its output passed through; returns (exit code, peak memory in bytes or None)."""
+    try:
+        if len(command) == 1:
+            child = subprocess.Popen(command[0], shell=True)
+        else:
+            child = subprocess.Popen([shutil.which(command[0]) or command[0]] + command[1:])
+    except OSError as problem:
+        print(f"bowline crew: {command[0]} could not be started: {problem}", file=sys.stderr)
+        return 2, None
+    sampler = Sampler(child.pid, every)
+    sampler.start()
+    with child:
+        try:
+            code = child.wait()
+        except BaseException:
+            child.kill()            # as subprocess.call does when it is stopped
+            raise
+        finally:
+            sampler.done.set()
+    sampler.join(timeout=2 * every + 1)
+    return code, sampler.peak
 
 
 def do_run(options):
@@ -1298,50 +1509,79 @@ def do_run(options):
         print("\n".join(lines_of(behind, "", "  ")), file=sys.stderr, flush=True)
     minutes = options.timeout if options.timeout is not None else (crew.get("waitMinutes") or 30)
     every = max(1, options.every if options.every is not None else (crew.get("waitEverySeconds") or 15))
+    sample = max(0.1, options.sample if options.sample is not None else SAMPLE_SECONDS)
+    slots = max(1, int(crew.get("slots") or 1)) if str(crew.get("slots") or 1).isdigit() else 1
+    small = bool(options.small)
+    words = shown(" ".join(command))
     if not patterns:
         print(f"bowline crew: {common.CONFIG_FILE} names no heavy processes (crew.heavy), so only the turn is waited for.",
               file=sys.stderr)
+    entry = next((p for p in load_peaks(place.root) if p["command"] == words), None)
+    needs = peak(entry)
     deadline = time.time() + minutes * 60
-    said = None
+    said, slot = None, None
     while True:
         snapshot = processes()
-        busy = heavy_now(snapshot, patterns)
-        turn = turn_holder(place.root, snapshot)
-        if not busy and not turn and take_turn(place.root, place.here, command):
-            break
-        waits = []
-        pids = session_pids(place.trees, sessions_by_tree(place.trees, cached_sessions(place.root) or []))
+        holders = turn_holders(place.root, snapshot)
+        managed = below([turn["pid"] for turn in holders if isinstance(turn.get("pid"), int)], snapshot)
+        busy = [p for p in heavy_now(snapshot, patterns) if p["pid"] not in managed]
+        pids = session_pids(place.trees, sessions_by_tree(place.trees, cached_sessions(place.root) or [])) if busy else {}
         found = owners(snapshot, place.trees, pids) if busy else {}
+        outside = len({same(found[p["pid"]]["path"]) if found.get(p["pid"]) else None for p in busy})
+        room = room_for(small, slots, holders, outside)
+        free = machine_memory() if room and needs and (holders or busy) else None
+        short = free is not None and free["available"] < needs * ROOM
+        if room and not short:
+            choices = [SMALL] if small else [n for n in range(1, slots + 1)
+                                             if n not in {turn.get("slot") for turn in holders}]
+            slot = next((n for n in choices if take_turn(place.root, place.here, command, n)), None)
+            if slot is not None:
+                break
+        waits = []
         for process in busy[:5]:
             whose = found.get(process["pid"])
             waits.append(f"pid {process['pid']} {shown(process['command'], 70)}" + (f" ({whose['name']})" if whose else ""))
         if len(busy) > 5:
             waits.append(f"and {len(busy) - 5} more")
-        if turn:
-            waits.append(f"the turn, held since {turn.get('since')} by {holder_name(turn, place.trees)} for: {turn.get('command')}")
-        words = "; ".join(waits) or "another session that took the turn at the same moment"
-        if words != said:
+        waits += [turn_words(turn, place.trees) for turn in holders]
+        if short:
+            waits.append(f"too little memory beside them: this command took at most about {size(needs)} in its last "
+                         f"runs, and {size(free['available'])} is free")
+        reason = "; ".join(waits) or "another session that took the turn at the same moment"
+        if reason != said:
             print(f"bowline crew: waiting for a quiet machine, up to {minutes:g} minute(s), looking every {every:g} "
-                  f"second(s). Running now: {words}.", file=sys.stderr, flush=True)
-            said = words
+                  f"second(s). Running now: {reason}." + (f" crew.slots lets {slots} full checks run at once." if slots > 1 else ""),
+                  file=sys.stderr, flush=True)
+            said = reason
         if time.time() >= deadline:
             print(f"bowline crew: the machine was not quiet within {minutes:g} minute(s), so the command did not run. "
-                  f"Still running: {words}. Nothing was stopped; ask that session, or try again later.", file=sys.stderr)
+                  f"Still running: {reason}. Nothing was stopped; ask that session, or try again later.", file=sys.stderr)
             return TIMED_OUT
         time.sleep(min(every, max(0.1, deadline - time.time())))
     try:
-        print(f"bowline crew: the machine is quiet and the turn is this worktree's; running: {shown(' '.join(command))}",
-              file=sys.stderr, flush=True)
-        if len(command) == 1:
-            return subprocess.call(command[0], shell=True)
-        program = shutil.which(command[0]) or command[0]
-        try:
-            return subprocess.call([program] + command[1:])
-        except OSError as problem:
-            print(f"bowline crew: {command[0]} could not be started: {problem}", file=sys.stderr)
-            return 2
+        others = [turn for turn in holders if turn.get("slot") != slot]
+        if not others and not busy:
+            print(f"bowline crew: the machine is quiet and the turn is this worktree's; running: {words}",
+                  file=sys.stderr, flush=True)
+        else:
+            beside = common.count(len(others) + outside, "other check", "other checks")
+            print(f"bowline crew: {'the small check' if small else 'a turn'} is this worktree's, beside {beside}"
+                  + (f", with {size(free['available'])} free and at most {size(needs)} taken by this command before"
+                     if free and needs else "") + f"; running: {words}", file=sys.stderr, flush=True)
+        started = time.time()
+        code, held = run_measured(command, sample)
+        if held:
+            seconds = time.time() - started
+            try:
+                record_peak(place.root, place.here, words, held, seconds, small)
+            except (OSError, SystemExit):           # the lock was not had: the command's exit code still counts
+                pass
+            print(f"bowline crew: the command ended after {how_long(seconds)}, with exit code {code}; it and the processes "
+                  f"it started held at most about {size(held)} of memory, measured every {sample:g} second(s).",
+                  file=sys.stderr, flush=True)
+        return code
     finally:
-        give_turn(place.root)
+        give_turn(place.root, slot)
 
 
 # Who is here.
@@ -1837,7 +2077,10 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     patterns = heavy_patterns(place.config)
     heavy = {p["pid"] for p in heavy_now(snapshot, patterns)}
     whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
-    turn = turn_holder(place.root, snapshot)
+    holders = turn_holders(place.root, snapshot)
+    turn = holders[0] if holders else None
+    children = children_of(snapshot)
+    listed_pids = {p["pid"] for p in snapshot}
     names = display_names(place.trees)
     measured = {same(tree["path"]): tree for tree in record["trees"]}
     keep = [int(p) for p in crew.get("keepPorts") or [] if str(p).isdigit()]
@@ -1847,6 +2090,10 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
         key = same(tree["path"])
         m = measured.get(key) or {}
         sessions = [dict(session) for session in by_tree.get(key, [])]
+        for session in sessions:
+            # The session's own process and every process below it: what closing the session gives back.
+            pid = session.get("pid")
+            session["memory"] = memory_of(below([pid], snapshot, children), snapshot) if pid in listed_pids else None
         loose = []
         for question in asks:
             if same(question["worktree"]) != key:
@@ -1879,7 +2126,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                 "claims": [{"key": c["key"], "since": c.get("since"), "why": c.get("why") or ""}
                            for c in claims if same(c.get("worktree") or "") == key],
                 "said": {"words": spoke.get("words"), "at": said_at(spoke)} if spoke else None,
-                "turn": bool(turn) and same(turn.get("worktree") or "") == key}
+                "turn": any(same(held.get("worktree") or "") == key for held in holders)}
         item["group"], item["reason"] = standing(item, minutes, now)
         items.append(item)
     order = {"asks": 0, "blocked": 1}
@@ -1904,6 +2151,13 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     counts["worktrees"] = len(items) - counts["broken"]
     counts["sessions"] = sum(len(item["sessions"]) for item in items)
     trees_folder = {os.path.dirname(tree["name"]) for tree in place.trees if not tree["main"]}
+    session_pids_listed = [s["pid"] for item in items for s in item["sessions"] if s.get("pid") in listed_pids]
+    machine = machine_memory()
+    slots = crew.get("slots")
+    turns = [{"worktree": by_name.get(holder_name(held, place.trees), holder_name(held, place.trees)),
+              "path": held.get("worktree"), "since": held.get("since"), "command": held.get("command"),
+              "small": held.get("slot") == SMALL, "pid": held.get("pid")} for held in holders]
+    peaks = sorted(((peak(entry), entry) for entry in load_peaks(place.root) if peak(entry)), key=lambda pair: -pair[0])
     return {
         "repository": place.trees[0]["path"], "base": place.base, "at": now, "measuredAt": record.get("at"),
         "activeMinutes": minutes, "sessionsListed": rows is not None, "claude": claude_command(place.config),
@@ -1921,6 +2175,12 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                     if p["pid"] in heavy and whose.get(p["pid"]) is None],
         "turn": {"worktree": by_name.get(holder_name(turn, place.trees), holder_name(turn, place.trees)),
                  "since": turn.get("since"), "command": turn.get("command")} if turn else None,
+        "turns": turns,
+        "slots": max(1, int(slots)) if str(slots or "").isdigit() else 1,
+        "memory": dict(machine, sessions=memory_of(below(session_pids_listed, snapshot, children), snapshot)
+                       if session_pids_listed else None) if machine else None,
+        "peaks": [{"command": entry["command"], "peak": most, "seconds": entry.get("seconds"), "runs": entry.get("runs"),
+                   "at": entry.get("at"), "small": bool(entry.get("small"))} for most, entry in peaks[:3]],
         "unreachable": list(place.unreachable),
         "dropped": [{"key": claim["key"], "holder": holder_name(claim, place.trees), "reason": reason} for claim, reason in dropped],
     }
@@ -2008,7 +2268,8 @@ def block(item, model, verbose=False):
     out = lines_of(f"{head_of(item, model)}: {reason_words(item, model)}")
     out += lines_of("holds: " + holds(item, base), "      ", "        ")
     for session in item["sessions"]:
-        out += lines_of(f"session {session_name(session)}: {session_state(session, now)}", "      ", "        ")
+        held = f", {size(session['memory'])} of memory" if session.get("memory") else ""
+        out += lines_of(f"session {session_name(session)}: {session_state(session, now)}{held}", "      ", "        ")
         if session.get("asks"):
             asked = session["asks"]
             out += lines_of(f"asks, {ago(asked['at'], now) if asked.get('at') else 'lately'}: {quoted(asked['words'])}",
@@ -2028,9 +2289,11 @@ def block(item, model, verbose=False):
             f"listens on {port}" + (", the person's own" if port in process["keep"] else "") for port in process["ports"]]
         out += lines_of(f"pid {process['pid']} {shown(process['shown'], 170)}" + (f" ({', '.join(marks)})" if marks else ""),
                         "      process: ", "        ")
-    if item["turn"] and model["turn"]:
-        out += lines_of(f"holds the turn for a heavy check since {clock(model['turn']['since'], now)}, for: "
-                        f"{model['turn']['command']}", "      ", "        ")
+    for turn in model["turns"]:
+        if same(turn["path"] or "") == same(item["path"]):
+            kind = "a small check" if turn["small"] else "a heavy check"
+            out += lines_of(f"holds the turn for {kind} since {clock(turn['since'], now)}, for: {turn['command']}",
+                            "      ", "        ")
     for claim in item["claims"]:
         out += lines_of(f"{claim['key']}, since {clock(claim['since'], now)}" + (f": {claim['why']}" if claim["why"] else ""),
                         "      claim: ", "        ")
@@ -2046,7 +2309,8 @@ def idle_line(item, model):
     extra = [f"listens on {port}" for process in item["processes"] for port in process["ports"]]
     if item["claims"]:
         extra.append("still claims " + ", ".join(claim["key"] for claim in item["claims"]))
-    names = "; ".join(session_name(session) for session in item["sessions"])
+    names = "; ".join(session_name(session) + (f" ({size(session['memory'])})" if session.get("memory") else "")
+                      for session in item["sessions"])
     return lines_of(f"{head_of(item, model)}: {names}" + (", " + ", ".join(extra) if extra else ""), "  ", "      ")
 
 
@@ -2148,12 +2412,26 @@ def render(model, verbose=False):
         out += lines_of(f"A heavy process in no worktree: pid {process['pid']} {shown(process['command'], 170)}")
     for claim in model["dropped"]:
         out += lines_of(f"Dropped the claim {claim['key']} of {claim['holder']}: {claim['reason']}.")
-    if model["turn"]:
-        out += lines_of(f"The turn for a heavy check is held since {model['turn']['since']} by {model['turn']['worktree']}, "
-                        f"for: {model['turn']['command']}")
-    else:
+    for turn in model["turns"]:
+        out += lines_of(f"The turn for {'a small check' if turn['small'] else 'a heavy check'} is held since "
+                        f"{turn['since']} by {turn['worktree']}, for: {turn['command']}")
+    if not model["turns"]:
         out += lines_of("The turn for a heavy check is free." + ("" if model["heavyPatterns"] else
                         f" {common.CONFIG_FILE} names no heavy processes (crew.heavy)."))
+    if model["turns"] or model["slots"] > 1:
+        out += lines_of(f"crew.slots lets {common.count(model['slots'], 'full check', 'full checks')} run at a time, and "
+                        "a small one (crew run --small) beside them.")
+    if model["peaks"]:
+        out += lines_of("The most memory the checks run through the turn took: " + "; ".join(
+            f"{shown(entry['command'], 60)}, {size(entry['peak'])}" + (f" in {how_long(entry['seconds'])}" if entry.get("seconds") else "")
+            + (" (small)" if entry["small"] else "") for entry in model["peaks"]) + ".")
+    memory = model["memory"]
+    if memory:
+        words = f"Memory: {size(memory['total'] - memory['available'])} of {size(memory['total'])} in use"
+        if memory.get("sessions"):
+            words += (f"; the sessions listed and the processes they started hold {size(memory['sessions'])} of it, "
+                      "each one's beside its name")
+        out += lines_of(words + ".")
     out.append("  To tell a session what you take: SendMessage." if model["sessionsListed"] else
                "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
     return out
@@ -2259,6 +2537,9 @@ def main(argv=None):
     p = sub.add_parser("run", help="wait for a quiet machine and the turn, then run the command after two dashes")
     p.add_argument("--timeout", type=float, help="minutes to wait before giving up (default: crew.waitMinutes)")
     p.add_argument("--every", type=float, help="seconds between two looks (default: crew.waitEverySeconds)")
+    p.add_argument("--small", action="store_true",
+                   help="a check of one file or a few: it runs beside the full checks, one small check at a time")
+    p.add_argument("--sample", type=float, help=f"seconds between two measures of the command's memory (default: {SAMPLE_SECONDS})")
     for name in ("after-rebase", "after-push", "after-commit"):
         p = sub.add_parser(name)
         p.add_argument("--hook", action="store_true", help="read a PostToolUse hook's JSON on standard input; always exit 0")

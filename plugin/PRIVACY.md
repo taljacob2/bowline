@@ -30,7 +30,8 @@ Nothing else bowline does reaches the network.
 - Claude Code's memory folder for the repository.
 - A private list of words never to commit, at `~/.claude/private/never-commit.txt`, when that file exists.
 - For the crew, which helps several sessions work in one repository: the list of the processes on your machine with
-  their command lines and the TCP ports they listen on, when you or Claude run `bowline crew` or `bowline crew run`;
+  their command lines, the memory each one holds and the TCP ports they listen on, and how much of the machine's
+  memory is free, when you or Claude run `bowline crew` or `bowline crew run`;
   the files of the repository's other worktrees that the repository names as numbered lists, and the names of the
   files each worktree changed; the list of Claude Code's sessions on your machine that `claude agents --json` gives,
   with each session's name, folder, process id and whether it is busy, when you or Claude run `bowline crew`; and,
@@ -56,9 +57,9 @@ Nothing else bowline does reaches the network.
 - The crew's claims, its turn for a heavy check, the list of the files each worktree changed, as last measured, the
   list of sessions `claude agents --json` last gave, the few sentences a session writes about its own work with
   `crew say`, and the question a session waits for you to answer (said with `crew say --asks`, or the last sentence
-  of a reply that ends with a question, which Claude Code gives the hook after each reply), and the order of the
-  push queue, in the repository's own git folder, on your
-  machine only and never committed; and the list of memory removals you said were meant, in Claude Code's project
+  of a reply that ends with a question, which Claude Code gives the hook after each reply), the order of the
+  push queue, and the most memory each check run through `crew run` took, with its command line and how long it
+  ran, in the repository's own git folder, on your machine only and never committed; and the list of memory removals you said were meant, in Claude Code's project
   folder for the repository.
 - For the check before an edit, in the repository's own git folder: which warnings each session has already heard
   (the session's random identifier, the file's path and the worktrees named), kept for a day, and a marker while

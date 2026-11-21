@@ -131,13 +131,22 @@ class SessionTests(ScratchRepo):
 
     @unittest.skipUnless(os.name == "nt", "wmic is a Windows program")
     def test_the_characters_wmic_escapes_are_read_back(self):
-        table = ("\r\nNode,CommandLine,Name,ParentProcessId,ProcessId\r\n"
-                 "HOST,cmd.exe /c tsc -b &amp;&amp; vite build &gt; out.log,cmd.exe,4,5\r\n").encode("oem")
+        table = ("\r\r\nNode,CommandLine,Name,ParentProcessId,ProcessId,WorkingSetSize\r\r\n"
+                 "HOST,cmd.exe /c tsc -b &amp;&amp; vite build &gt; out.log,cmd.exe,4,5,4096000\r\r\n"
+                 # A command line with line breaks in it, as a `python -c` script of several lines has.
+                 'HOST,python -c "import time\ntime.sleep(60)\n",python.exe,5,6,8192\r\r\n'
+                 "HOST,,System Idle Process,0,0,8192\r\r\n").encode("oem")
         answer = subprocess.CompletedProcess([], 0, stdout=table)
         with mock.patch.object(crew.shutil, "which", return_value="wmic"), \
-                mock.patch.object(crew.subprocess, "run", return_value=answer):
+                mock.patch.object(crew.subprocess, "run", return_value=answer), \
+                mock.patch.dict(os.environ, {"COMPUTERNAME": "HOST"}):
             found = crew.processes()
-        self.assertEqual(found, [{"pid": 5, "ppid": 4, "name": "cmd.exe", "command": "cmd.exe /c tsc -b && vite build > out.log"}])
+        self.assertEqual(found, [{"pid": 5, "ppid": 4, "name": "cmd.exe", "command": "cmd.exe /c tsc -b && vite build > out.log",
+                                  "memory": 4096000},
+                                 {"pid": 6, "ppid": 5, "name": "python.exe", "command": 'python -c "import time\ntime.sleep(60)\n"',
+                                  "memory": 8192},
+                                 {"pid": 0, "ppid": 0, "name": "System Idle Process", "command": "System Idle Process",
+                                  "memory": 8192}])
 
     def test_the_sessions_claude_lists_are_named_beside_their_worktree(self):
         os.makedirs(os.path.join(self.other["path"], "docs"))
