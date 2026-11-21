@@ -4,6 +4,25 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+Sessions that work as a team, not only beside one another. No Claude Code limit moved. The reasoning is in
+`plugin/docs/decisions.md`, "sessions that collaborate".
+
+- A new skill, `collaborate`: say your subject before you design (`crew claim subject:<name>`), exchange file lists
+  before either session edits, keep a status of your own, ask another session to try your uncommitted work from its
+  own worktree, ask what it sees from where it stands when a decision is open, and look once more before a step that
+  cannot be taken back. It says what a message is (a notice that may arrive late or cross the answer) and what the
+  record is (the claims, the changed files and what each session said, true whenever anyone looks), and what another
+  session's word is worth: information, never the person's approval.
+- `crew say "<words>"` keeps a few sentences a session writes about its own work: what is done, with the commits,
+  what it waits on, what it asks. One per worktree, replaced each time, in the repository's git folder, never
+  committed. `bowline crew` shows each worktree's with its age; `crew say` alone prints this worktree's, and
+  `--clear` takes it back. A status longer than `crew.sayChars` (600 characters, a new setting) is refused, not cut.
+  Saying something counts as a sign of work, and a worktree that is removed takes its words with it.
+- The crew skill, the conventions skill, the conventions page, the guide, the README and `plugin/PRIVACY.md` name the
+  new skill and the command.
+
 ## 0.11.0 (2026-11-21)
 
 A warning before an edit of a file that another worktree holds, and one rule template for working beside other

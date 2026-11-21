@@ -147,6 +147,10 @@ what, with the commit's hash. A session on a branch of its own commits long befo
 waits may need only the commit. Send each of them the hash with `SendMessage`, in one sentence that says what the
 commit holds. After a push, release the claims it finished.
 
+Sending a hash is the least two sessions can do for each other. `/bowline:collaborate` is the procedure for the
+rest: saying your subject before you design, asking another session to try your work, and keeping a status of your
+own with `crew say` that the others read whenever they look.
+
 ## 7. Give work a session of its own
 
 Keeping apart is half of working side by side; the other half is moving work into a session of its own wherever the

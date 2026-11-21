@@ -10,6 +10,7 @@
     python -I scripts/bowline.py crew after-commit [--hook]                who waits on this worktree's commit
     python -I scripts/bowline.py crew refresh                              measure the worktrees again, for the record
     python -I scripts/bowline.py crew before-edit --file <path> | --hook   whether another worktree holds this file
+    python -I scripts/bowline.py crew say [<words> | --clear]              what this worktree's session wants the others to know
 
 Several sessions in one repository share more than they see: one machine's processor, one memory folder, one roadmap
 whose numbers each of them extends, and the ports a person's own servers listen on. This command gives each session
@@ -51,6 +52,13 @@ before-edit says whether another worktree holds a file: changed there and not co
 neither the pushed branch nor this one, or claimed there. With --hook it is a PreToolUse hook on Edit, Write and
 NotebookEdit that tells Claude once per session and file and never blocks the edit. It is a module of its own,
 crew_edit.py, which reads what the look measured and measures nothing itself.
+
+say keeps a few sentences a session writes about itself: what it finished, with the commits, what it waits on, what
+it asks of the others or offers them. The look shows each worktree's with its age. One per worktree, replaced each
+time, no longer than crew.sayChars, kept beside the claims and never committed. A message between sessions arrives
+when the other one next looks, and may cross the answer on its way; what a session said is there whenever anyone
+looks, and it is the session itself that chooses the words, so nothing is read out of a transcript. With no words it
+prints what this worktree last said; --clear takes it back. A worktree that is removed takes its words with it.
 """
 
 import argparse
@@ -225,12 +233,13 @@ def claimed_at(tree_path, claims):
     return newest
 
 
-def last_sign(tree_path, claims):
+def last_sign(tree_path, claims, said=()):
     """The last sign of work in a worktree, as (time, what it was), or (None, None): a session's transcript, the
-    worktree's git folder, or a claim. A session started in another folder that works here by path leaves only the
-    last two."""
+    worktree's git folder, a claim, or what its session said of itself. A session started in another folder that
+    works here by path leaves no transcript here."""
+    spoke = said_by(tree_path, said)
     signs = [(last_session(tree_path), "a session's transcript"), (git_written(tree_path), "its git folder"),
-             (claimed_at(tree_path, claims), "a claim")]
+             (claimed_at(tree_path, claims), "a claim"), (said_at(spoke) if spoke else None, "what it said")]
     signs = [sign for sign in signs if sign[0] is not None]
     return max(signs) if signs else (None, None)
 
@@ -248,11 +257,11 @@ def others_active(start, config, transcript=None, now=None):
     now = time.time() if now is None else now
     trees = worktrees(root)
     here = mine(trees, root)
-    claims = load_claims(root)
+    claims, said = load_claims(root), load_said(root)
     names = []
     for tree in trees:
         if tree is not here:
-            stamp, _ = last_sign(tree["path"], claims)
+            stamp, _ = last_sign(tree["path"], claims, said)
             if stamp is not None and now - stamp <= minutes * 60:
                 names.append(tree["name"])
             continue
@@ -655,6 +664,70 @@ def do_release(options):
     return 0
 
 
+# What a session says of itself.
+
+def said_path(root):
+    return os.path.join(state_dir(root), "said.json")
+
+
+def load_said(root):
+    """What each worktree's session last said of itself: a list of {worktree, words, at, seconds}."""
+    return [s for s in read_json(said_path(root), {}).get("said") or [] if isinstance(s, dict) and s.get("worktree")]
+
+
+def said_by(tree_path, said):
+    """What one worktree's session last said, or None."""
+    for entry in said:
+        if same(entry.get("worktree") or "") == same(tree_path):
+            return entry
+    return None
+
+
+def said_at(entry):
+    """When something was said, in seconds since 1970, or None."""
+    if isinstance(entry.get("seconds"), (int, float)):
+        return float(entry["seconds"])
+    try:
+        return datetime.datetime.strptime(str(entry.get("at")), "%Y-%m-%d %H:%M").timestamp()
+    except ValueError:
+        return None
+
+
+def do_say(options):
+    place = Place(options.repo)
+    limit = int(settings(place.config).get("sayChars") or 0)
+    words = " ".join(" ".join(options.words).split())
+    here = place.here["path"]
+    with Lock(state_dir(place.root)):
+        # A worktree git no longer lists has nobody left to speak for it.
+        alive = {same(tree["path"]) for tree in place.trees} | {same(path) for path in place.unreachable}
+        said = [entry for entry in load_said(place.root) if same(entry["worktree"]) in alive]
+        mine_now = said_by(here, said)
+        others = [entry for entry in said if same(entry["worktree"]) != same(here)]
+        if options.clear:
+            write_json(said_path(place.root), {"said": others})
+            print("bowline crew: taken back; this worktree says nothing now." if mine_now
+                  else "bowline crew: this worktree had said nothing.")
+            return 0
+        if not words:
+            if mine_now:
+                print(f"bowline crew: this worktree said, at {mine_now.get('at')}: {mine_now.get('words')}")
+            else:
+                print("bowline crew: this worktree has said nothing. Say what you finished, what you wait on and what "
+                      "you ask: crew say \"<a few sentences>\"")
+            return 0
+        if limit and len(words) > limit:
+            print(f"bowline crew: that is {len(words)} characters, and what a session says of itself may hold {limit} "
+                  f"({common.CONFIG_FILE}, crew.sayChars), so that every session can read every other's in one look. "
+                  "Say what is done, what you wait on and what you ask; the rest belongs in a commit message or a "
+                  "note. Nothing was changed.", file=sys.stderr)
+            return 2
+        write_json(said_path(place.root), {"said": others + [
+            {"worktree": here, "words": words, "at": now_stamp(), "seconds": time.time()}]})
+    print(f"bowline crew: said, for every session that looks with `bowline crew`: {words}")
+    return 0
+
+
 # What a rebase and a push change.
 
 def repeated_numbers(tree_path, lists):
@@ -1003,6 +1076,7 @@ def do_look(options):
     now = time.time()
     with Lock(state_dir(place.root)):
         claims, dropped = place.settled()
+    spoken = load_said(place.root)
     record = survey(place)
     snapshot = processes()
     ports = listening()
@@ -1031,7 +1105,7 @@ def do_look(options):
             head += f": {common.count(measured['ahead'], 'commit', 'commits')} ahead of {place.base}, {measured['behind']} behind"
         head += f", {common.count(measured['uncommitted'], 'file', 'files')} not committed"
         print(head)
-        stamp, what = last_sign(tree["path"], claims)
+        stamp, what = last_sign(tree["path"], claims, spoken)
         if stamp is None or now - stamp > 24 * 3600:
             quiet[tree["name"]] = "no sign of work" if stamp is None else f"quiet for {how_long(now - stamp)}"
         print("      last sign of work: " + (f"{ago(stamp, now)}, {what}" if stamp else "none on this machine"))
@@ -1047,6 +1121,10 @@ def do_look(options):
             if same(claim["worktree"]) == same(tree["path"]):
                 why = f": {claim['why']}" if claim.get("why") else ""
                 print(f"      claim: {claim['key']}, since {claim.get('since')}{why}")
+        spoke = said_by(tree["path"], spoken)
+        if spoke:
+            when = said_at(spoke)
+            print(f"      said, {ago(when, now) if when else spoke.get('at')}: {spoke.get('words')}")
         print()
     outside = [p for p in snapshot if p["pid"] in heavy and whose[p["pid"]] is None]
     if outside:
@@ -1120,6 +1198,9 @@ def main(argv=None):
     p = sub.add_parser("before-edit", help="whether another worktree holds a file: changed, committed or claimed there")
     p.add_argument("--file", help="the file to ask about")
     p.add_argument("--hook", action="store_true", help="read a PreToolUse hook's JSON on standard input; always exit 0")
+    p = sub.add_parser("say", help="a few sentences about this worktree's work, for the other sessions' look")
+    p.add_argument("words", nargs="*", help="what is done, what you wait on, what you ask; none prints what was said")
+    p.add_argument("--clear", action="store_true", help="take back what this worktree said")
     for p in sub.choices.values():
         p.add_argument("--repo", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     options = parser.parse_args(argv)
@@ -1144,6 +1225,8 @@ def main(argv=None):
         return do_run(options)
     if options.action == "refresh":
         return do_refresh(options)
+    if options.action == "say":
+        return do_say(options)
     if command:
         print("bowline crew: a command after two dashes belongs to crew run: crew run -- <command>", file=sys.stderr)
         return 2

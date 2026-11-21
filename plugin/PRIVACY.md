@@ -46,8 +46,9 @@ Nothing else bowline does reaches the network.
 - The commits of the memory backup, in the memory folder, once the backup is set up. From 0.10.0 each commit's message
   also names the session whose reply it follows, by the random identifier Claude Code gives it, so that bowline can
   tell when one session removed lines another had added; the identifier goes to your remote with the commit.
-- The crew's claims, its turn for a heavy check and the list of the files each worktree changed, as last measured,
-  in the repository's own git folder; and the list of memory removals you said were meant, in Claude Code's project
+- The crew's claims, its turn for a heavy check, the list of the files each worktree changed, as last measured, and
+  the few sentences a session writes about its own work with `crew say`, in the repository's own git folder, on your
+  machine only and never committed; and the list of memory removals you said were meant, in Claude Code's project
   folder for the repository.
 - For the check before an edit, in the repository's own git folder: which warnings each session has already heard
   (the session's random identifier, the file's path and the worktrees named), kept for a day, and a marker while

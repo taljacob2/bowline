@@ -1,0 +1,114 @@
+"""What a session says of itself, on a scratch repository with two worktrees: the words are kept one per worktree and
+replaced, every worktree's look shows them with their age, a status over the limit is refused and not cut, a worktree
+that is removed takes its words with it, and saying something is a sign of work. And the collaborate skill, which
+names the command, is a skill Claude Code can list."""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import unittest
+
+from support import SCRIPTS, ScratchRepo, git, read, write
+
+import common  # noqa: E402 - support puts the scripts on the path
+import crew  # noqa: E402
+
+ROOT = "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n"
+
+
+class SayTests(ScratchRepo):
+    def setUp(self):
+        super().setUp()
+        write(os.path.join(self.repo, "CLAUDE.md"), ROOT)
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"crew": {"sayChars": 80}}) + "\n")
+        git(self.repo, "add", "CLAUDE.md", ".claude/bowline.json")
+        git(self.repo, "commit", "-q", "-m", "the crew's settings")
+        git(self.repo, "worktree", "add", "-q", "-b", "other", os.path.join(".claude", "worktrees", "other"))
+        self.other = [tree["path"] for tree in crew.worktrees(self.repo) if not tree["main"]][0]
+        self.kept = os.path.join(self.repo, ".git", "bowline", "crew", "said.json")
+
+    def crew(self, *args, cwd=None):
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "bowline.py"), "crew", *args],
+                                cwd=cwd or self.repo, capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
+        return result.returncode, result.stdout, result.stderr
+
+    def block(self, out, name):
+        """One worktree's lines in a look: from its heading to the next empty line."""
+        return out[out.index(f"  {name}"):].split("\n\n")[0]
+
+    def test_what_a_session_says_is_kept_shown_to_every_worktree_and_replaced(self):
+        code, out, _ = self.crew("say")
+        self.assertEqual(code, 0)
+        self.assertIn("this worktree has said nothing", out)
+        code, out, err = self.crew("say", "Done: the parser, 1a2b3c4.", "Waiting on:   nothing.\n Asking: a trial.")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("said, for every session that looks", out)
+        code, out, _ = self.crew(cwd=self.other)                                  # the other session reads it at once
+        mine = self.block(out, "the main checkout")
+        self.assertIn("said, less than a minute ago: Done: the parser, 1a2b3c4. Waiting on: nothing. Asking: a trial.", mine)
+        self.assertNotIn("said,", self.block(out, ".claude/worktrees/other"))
+        self.crew("say", "Theirs: reading the trial.", cwd=self.other)           # each worktree has its own
+        self.crew("say", "Done: the parser and its tests.")                       # and a new one replaces the old
+        code, out, _ = self.crew()
+        self.assertIn("said, less than a minute ago: Done: the parser and its tests.", self.block(out, "the main checkout"))
+        self.assertNotIn("1a2b3c4", out)
+        self.assertIn("said, less than a minute ago: Theirs: reading the trial.", self.block(out, ".claude/worktrees/other"))
+        code, out, _ = self.crew("say")
+        self.assertIn("this worktree said, at ", out)
+        self.assertIn("Done: the parser and its tests.", out)
+        with open(self.kept, "rb") as handle:                                     # in the git folder every worktree shares
+            self.assertNotIn(b"\r", handle.read())
+        self.assertEqual(len(crew.load_said(self.repo)), 2)
+
+    def test_a_status_over_the_limit_is_refused_and_the_old_one_stays(self):
+        self.crew("say", "Short and whole.")
+        code, out, err = self.crew("say", "word " * 30)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("that is 149 characters", err)
+        self.assertIn("may hold 80", err)
+        self.assertIn("Nothing was changed", err)
+        code, out, _ = self.crew("say")
+        self.assertIn("Short and whole.", out)
+
+    def test_clear_takes_it_back_and_a_removed_worktree_takes_its_words_with_it(self):
+        self.crew("say", "Mine.")
+        self.crew("say", "Theirs.", cwd=self.other)
+        code, out, _ = self.crew("say", "--clear")
+        self.assertIn("taken back", out)
+        code, out, _ = self.crew()
+        self.assertNotIn("said,", self.block(out, "the main checkout"))
+        self.assertIn("Theirs.", out)
+        code, out, _ = self.crew("say", "--clear")
+        self.assertIn("had said nothing", out)
+        git(self.repo, "worktree", "remove", "--force", self.other)
+        self.crew("say", "Mine again.")                                           # whoever writes next drops the gone one's
+        self.assertEqual([entry["words"] for entry in crew.load_said(self.repo)], ["Mine again."])
+
+    def test_saying_something_is_a_sign_of_work(self):
+        folder = os.path.join(self.repo, ".git", "worktrees", os.path.basename(self.other))
+        long_ago = time.time() - 3 * 3600
+        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
+            if os.path.exists(os.path.join(folder, name)):
+                os.utime(os.path.join(folder, name), (long_ago, long_ago))
+        config = common.load_config(self.repo)
+        self.assertEqual(crew.others_active(self.repo, config), [])
+        self.crew("say", "Here, by path, with no transcript in this folder.", cwd=self.other)
+        self.assertEqual(crew.others_active(self.repo, config), [".claude/worktrees/other"])
+        code, out, _ = self.crew()
+        self.assertIn("last sign of work: less than a minute ago, what it said", self.block(out, ".claude/worktrees/other"))
+
+    def test_the_collaborate_skill_names_the_command_and_fits_what_claude_code_lists(self):
+        text = read(os.path.join(os.path.dirname(SCRIPTS), "skills", "collaborate", "SKILL.md"))
+        front = re.match(r"---\nname: collaborate\ndescription: (.+)\n---\n", text)
+        self.assertIsNotNone(front)
+        self.assertLess(len(front.group(1)), 1536)                                # a description is cut past this
+        self.assertIn("crew say", text)
+        self.assertIn("crew claim subject:", text)
+        self.assertLess(text.count("\n"), 500)
+
+
+if __name__ == "__main__":
+    unittest.main()

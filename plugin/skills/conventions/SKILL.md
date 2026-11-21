@@ -29,7 +29,8 @@ reason and let the person choose. The reasons and templates are in `${CLAUDE_PLU
 
 When the person runs several sessions on the repository at once, each in its own worktree, there is one more, with a
 skill of its own: `/bowline:crew`, for who is here, claims before work, shared files that are edited and never saved
-over, and a quiet machine before a heavy check. Offer it by name; do not repeat its steps here.
+over, and a quiet machine before a heavy check. Offer it by name; do not repeat its steps here. Its companion,
+`/bowline:collaborate`, is for the same sessions working as a team.
 
 In a folder of repositories, each repository keeps its own decisions and roadmap, and the folder's own documents hold
 what spans them; ask which the person means before writing. For each one the person wants, write the template into

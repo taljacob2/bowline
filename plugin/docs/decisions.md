@@ -481,3 +481,59 @@ A cache of its own: two records of one thing in one folder disagreed within minu
    read it, which would also name sessions started in another folder.
 3. The warning names each worktree in full. With many holders of one file it grows long; it could name the two with
    the newest sign of work and count the rest.
+
+## 2026-11-21: sessions that collaborate
+
+**The question.** The crew keeps sessions out of each other's way. While it was being built, two sessions with
+related tasks worked on it side by side. The first user's words, as one of the two sessions passed them on: "i would
+potentially want that as a skill within itself - 'to collaborate between the sessions' - so they would enrich the
+experience of each session - since they can check things together and work together as a team to make sure things or
+think better together, and sync together." To the session that built it they said: "yes the 'collaboration' sounds
+good in my opinion, but plan it first", and, after the plan, "Yes, build it". What does such a skill hold, and does it
+need anything a script can give?
+
+**The decision.** A skill of its own, `collaborate`, and one command, `crew say`. The skill is the moves that
+worked in that round, each with what it answered. Say your subject before you design: two sessions had been started
+on the same feature by two different sessions, and neither knew until one saw the other's branch. Exchange file lists
+before either edits: both sessions did, and it is what let them split one feature. Ask for a trial: the second
+session ran the first one's uncommitted command from its own worktree and on a large repository, and sent eight
+findings, each of which changed the command before its release. Ask what the other sees: one session had measured
+the real repository and the other held the approved plan. And sync, with a look before any step that cannot be taken
+back.
+
+**Why a status each session writes.** Three things went wrong with messages alone. They arrive when the other
+session next looks, so several times in one round two messages crossed and each session acted on an order the other
+had already changed. A report that the desktop app passes on to another session is cut at 400 characters. And a
+session that needed a neighbour's last report said it read about 240 messages of that conversation to find it.
+`crew say` keeps a few sentences per worktree beside the claims, and the look shows them: the state is there, whole,
+whenever anyone looks, and a message only says that it changed. The session chooses the words, so bowline still opens
+no transcript, and it works where a client has no tools for messages between sessions.
+
+**Why it is refused over its limit, not cut.** A cut report is the loss this exists to prevent. Six hundred
+characters hold what is done, what is waited on and what is asked, and a look at ten worktrees can still be read at
+once.
+
+**Why its own skill.** The crew skill is read by a session that must not collide, at the moment it is about to take
+a number or run a check. This one is read at another moment and for another reason: when a session could use
+another's help. Claude decides which skill to load from its description, and one description cannot say both. The
+crew skill points to it in one sentence.
+
+**What another session's word is worth.** In that round, sessions wrote to one another "the user confirmed" and "the
+user asks" several times, each time truthfully. The skill still says that such a sentence is a report: it cannot
+approve a push, a release or a deletion, and a session acts on it only for work that is already its own to do. A
+skill that made sessions trust each other's reports of approval would turn any one session's mistake into every
+session's.
+
+**Not chosen.** A hook that puts another session's words into Claude's context on its own, such as a question
+waiting for this worktree: text that arrives unasked from another session reads like an instruction, and the look,
+which Claude runs on purpose, shows the same words as data. A shared notes file that every session writes: that is
+how one session erased another's notes, and the reason each session has a status of its own instead. A history of
+what each session said: the commits are the history, and a status is the present. Sending messages from bowline: a
+plugin has no tool for it, and Claude does.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. A question to one worktree that stays visible until it is answered, beside what a session says of itself, for a
+   client with no messages between sessions; today the status holds the question in its words.
+2. The look could mark a status older than its worktree's last commit, since it then describes work that has moved
+   on.

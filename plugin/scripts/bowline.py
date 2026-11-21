@@ -25,7 +25,7 @@ COMMANDS = {
     "init": ("init", "scaffold the repository side: --plan to see, --write to do"),
     "move": ("move", "move an oversized CLAUDE.md into pages, rules and an index: plan, run --spec, find-pointers, pointers"),
     "autosplit": ("autosplit", "prepare the split of an oversized CLAUDE.md in the background, on a branch: --hook, run, status, show, done, discard"),
-    "crew": ("crew", "work beside other sessions in one repository: who is here, claim, release, run -- <command>, after-rebase, after-push, before-edit"),
+    "crew": ("crew", "work beside other sessions in one repository: who is here, claim, release, say, run -- <command>, after-rebase, after-push, before-edit"),
 }
 LATER = {}
 

@@ -194,4 +194,6 @@ branch of its own, and leaves the merge to you.
 3. `/bowline:init` for the layout, `/bowline:memory-backup` for the backup, and `/bowline:split-instructions` when a
    `CLAUDE.md` is over the line. `/bowline:conventions` when decisions keep getting lost.
 4. `/bowline:crew` when more than one session works in the repository at once, each in its own worktree: who is here,
-   who took which roadmap number, how a shared file is changed, and when a heavy check may run.
+   who took which roadmap number, how a shared file is changed, and when a heavy check may run. `/bowline:collaborate`
+   when those sessions should work as a team: who has which subject, a trial of each other's work, a status each one
+   keeps for the others.

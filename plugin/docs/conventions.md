@@ -72,6 +72,12 @@ round left half done in a conversation that has moved on. And reading and checki
 whose answer comes back in the same turn; the loss is a session nobody needed to open, for work that ends in no
 commit.
 
+There is a third thing beyond the two halves, with a skill of its own, `collaborate`: sessions that work as a team.
+A session says its subject before it designs, two sessions exchange their file lists before either edits, one tries
+the other's uncommitted work from its own worktree, and each keeps a short status of its own that the others read
+whenever they look. The loss it answers is two sessions that build the same thing, each sure it is alone, and a
+report that reaches its reader late, cut short, or after the answer to it was already sent.
+
 Unlike the conventions above, part of this one is checked: `bowline crew`
 keeps the claims and the turn, and the doctor warns about a number that appears twice, a stale stamp, and memory
 lines one session added and another removed. What stays the repository's own is in its `.claude/bowline.json`: which
