@@ -356,8 +356,8 @@ def has_rule(root, config):
 def findings(root, config):
     """The doctor's note for a repository that has several worktrees and no rule about working beside other sessions.
     A note, not a warning: a worktree can also be one that Claude Code made for a subagent, or a person's own second
-    checkout, and a convention is offered, never pressed at every session's start. The line a session's start gets
-    when another session worked here lately is the one place that names the missing rule unasked (doctor.others_line)."""
+    checkout. The line every session's start gets is the place that names the missing rule unasked, with the rule's
+    main points (doctor.others_line); this finding is its long form, for a person who reads the report."""
     count = worktree_count(root)
     if count < 2 or has_rule(root, config):
         return []

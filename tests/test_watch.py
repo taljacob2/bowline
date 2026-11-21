@@ -30,7 +30,8 @@ class WatchTests(ScratchRepo):
 
     def test_one_reminder_per_new_finding_and_once_for_claude(self):
         code, out, err = self.run_script("doctor", "--brief", "--no-memory")        # a session starts; all is clean
-        self.assertEqual((code, out, err), (0, "", ""))
+        self.assertEqual((code, err), (0, ""))
+        self.assertNotIn("bowline found", out)
         code, out, err = self.hook("--watch", "Stop")                                # a reply ends; nothing changed
         self.assertEqual((code, out, err), (0, "", ""))
         write(self.sub, "# Sub\n\n" + "A line.\n" * 205)                            # a file crosses the target mid-session

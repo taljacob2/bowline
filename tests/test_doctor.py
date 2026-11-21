@@ -35,7 +35,14 @@ class DoctorTests(ScratchRepo):
     def test_brief_says_nothing_when_clean_and_one_line_per_problem(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n")
         code, out, err = self.run_script("doctor", "--brief", "--no-memory")
-        self.assertEqual((code, out, err), (0, "", ""))
+        self.assertEqual((code, err), (0, ""))
+        # Clean: no finding, and the one line every session's start gets about working beside other sessions.
+        self.assertNotIn("bowline found", out)
+        self.assertEqual(len(out.splitlines()), 1, out)
+        self.assertIn("bowline: no other Claude Code session shows a sign of work in this repository right now.", out)
+        write(os.path.join(self.repo, ".claude", "bowline.json"), '{"crew": {"assumeOthers": false}}\n')
+        self.assertEqual(self.run_script("doctor", "--brief", "--no-memory"), (0, "", ""))
+        os.remove(os.path.join(self.repo, ".claude", "bowline.json"))
         write(os.path.join(self.repo, "sub", "CLAUDE.md"), "# Sub\n\n## First\n\n" + ("words " * 20 + "\n") * 400 + "## Second\n\nx\n")
         code, out, err = self.run_script("doctor", "--brief", "--no-memory")
         self.assertEqual(code, 0, out + err)

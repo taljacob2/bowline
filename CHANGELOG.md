@@ -6,22 +6,29 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
 
 ## Unreleased
 
-A repository learns of the crew when another session is there, with no setup. No Claude Code limit moved. The
-reasoning is in `plugin/docs/decisions.md`, "a repository learns of the crew when another session is there".
+Several sessions in one repository is the usual case, with no setup. No Claude Code limit moved. The reasoning is in
+`plugin/docs/decisions.md`, "several sessions in one repository is the usual case".
 
-- The line a session's start gets when other sessions are at work now also names `/bowline:collaborate`, for a
-  session that has the same subject or the same files as another. In a repository that has no rule about working
-  beside other sessions, the line carries the rule's main points (split the work by files, claim before you work,
-  run a heavy check through the turn) and says that the last section of `/bowline:crew` sets the repository up.
-  Before, nothing told a session that the setup exists: it is in a skill the session opens only by choice. A
-  session alone gets no line, as before, and a repository with such a rule gets the line without the points.
+- Every session's start in a repository gets the line about working beside other sessions, whether or not another
+  one is seen: the second session may start a minute after the first one looked. The line names the places where
+  another session worked in the last `crew.activeMinutes` minutes, or says that none shows now, and names
+  `/bowline:crew` and, new, `/bowline:collaborate`. A new setting, `crew.assumeOthers`, is true by default; false
+  gives the line only when another session is seen, as before, and `crew.activeMinutes` 0 still gives none.
+- A session that is already running is told when another one appears: before a prompt, the hook names each place
+  where a sign of work has shown since the session was last told, once, and again when it comes back after going
+  quiet. The 30 minutes of `crew.activeMinutes` were never a wait: the look happens at once, and the number only says
+  how long a sign of work counts.
+- In a repository that has no rule about working beside other sessions, the line at a session's start carries the
+  rule's main points (split the work by files, claim before you work, run a heavy check through the turn) and says
+  that the last section of `/bowline:crew` sets the repository up. Before, nothing told a session that the setup
+  exists: it is in a skill the session opens only by choice.
 - The rule template, `templates/crew/beside-other-sessions.md`, says that `bowline crew` is the plugin's script and
   not a program on the PATH, and has a new point: on one subject, work as a team, following `/bowline:collaborate`,
   with a status written by `bowline crew say`. Its other points are worded shorter to pay for both, so the template
   is the size it was, 4,036 characters; every session reads it at its start. A repository that already copied the
   template keeps its copy: compare the two and take what it lacks.
-- The init skill asks, at its end, whether several sessions work in the repository at once, and points to
-  `/bowline:crew` when they do.
+- The init skill offers the crew's setup at its end, and the crew skill offers the settings and the rule in every
+  repository, without asking first whether several sessions work there.
 
 ## 0.12.0 (2026-11-21)
 

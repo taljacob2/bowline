@@ -32,9 +32,10 @@ Nothing else bowline does reaches the network.
 - For the crew, which helps several sessions work in one repository: the list of the processes on your machine with
   their command lines and the TCP ports they listen on, when you or Claude run `bowline crew` or `bowline crew run`;
   the files of the repository's other worktrees that the repository names as numbered lists, and the names of the
-  files each worktree changed; and, at a session's start, when the transcript files in Claude Code's project folders
-  for the repository's worktrees, and each worktree's own git folder, were last written.
-  bowline never opens a transcript, and nothing of this is stored or sent.
+  files each worktree changed; and, at a session's start and before each prompt, when the transcript files in Claude
+  Code's project folders for the repository's worktrees, and each worktree's own git folder, were last written.
+  bowline never opens a transcript. It keeps the names of the worktrees it has named to a session, in the
+  repository's git folder, so that it names each one once; nothing of this is sent.
 - Before an edit that Claude makes with the Edit, Write or NotebookEdit tool: the path of the file, from the hook's
   input, to say whether another worktree of the repository holds that file. Never the file's content or the edit.
 

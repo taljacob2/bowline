@@ -295,8 +295,8 @@ class CrewTests(ScratchRepo):
         os.utime(path, (stamp, stamp))
         return path
 
-    def brief(self, stdin):
-        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "doctor.py"), "--brief", "--no-memory"], input=stdin,
+    def brief(self, stdin, mode="--brief"):
+        result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "doctor.py"), mode, "--no-memory"], input=stdin,
                                 cwd=self.repo, capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         return result.returncode, result.stdout, result.stderr
 
@@ -316,13 +316,17 @@ class CrewTests(ScratchRepo):
         code, out, _ = self.brief(payload)
         self.assertIn("1 other Claude Code session has worked in this repository", out)
         self.quiet_git_folder(self.other, 120)
-        self.assertEqual(self.brief(payload), (0, "", ""))                       # alone: nothing
+        code, out, err = self.brief(payload)                                     # alone: the line says so, and why it came
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("bowline: no other Claude Code session shows a sign of work in this repository right now.", out)
+        self.assertIn("Work as if one may start at any moment", out)
+        self.assertIn("follow /bowline:crew", out)
         self.crew("claim", "note:3", cwd=self.other)                             # a claim is a sign of work too
         code, out, _ = self.brief(payload)
         self.assertIn("in .claude/worktrees/other.", out)
         self.crew("release", "--all", cwd=self.other)
         self.transcript(self.other, "theirs", minutes_ago=90)
-        self.assertEqual(self.brief(payload), (0, "", ""))                       # a session that ended long ago: nothing
+        self.assertIn("bowline: no other Claude Code session shows a sign of work in this repository right now.", self.brief(payload)[1])                 # a session that ended long ago: nobody
         self.transcript(self.other, "theirs", minutes_ago=5)
         code, out, err = self.brief(payload)
         self.assertEqual((code, err), (0, ""))
@@ -345,6 +349,40 @@ class CrewTests(ScratchRepo):
         self.assertIn("2 other Claude Code sessions have worked", out)
         self.assertIn("this same folder", out)
         self.assertEqual(crew.others_active(self.repo, {"crew": {"activeMinutes": 0}}), [])   # 0 turns the line off
+        self.configure({"activeMinutes": 0})
+        self.assertEqual(self.brief(payload), (0, "", ""))
+
+    def test_a_running_session_is_told_before_a_prompt_when_another_one_appears(self):
+        mine = self.transcript(self.repo, "mine")
+        start = json.dumps({"hook_event_name": "SessionStart", "transcript_path": mine, "cwd": self.repo})
+        prompt = json.dumps({"hook_event_name": "UserPromptSubmit", "transcript_path": mine, "cwd": self.repo})
+        self.quiet_git_folder(self.other, 120)
+        self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))           # no record of a start: nothing to compare
+        self.assertIn("bowline: no other Claude Code session shows a sign of work in this repository right now.", self.brief(start)[1])
+        self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))           # still alone
+        self.transcript(self.other, "theirs")                                    # a session starts in the other worktree
+        code, out, err = self.brief(prompt, "--pending")
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("bowline: 1 other Claude Code session has started to work in this repository since you were last "
+                      "told, in .claude/worktrees/other.", out)
+        self.assertIn("/bowline:crew before your next edit", out)
+        self.assertIn("/bowline:collaborate", out)
+        self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))           # named once
+        self.transcript(self.repo, "a-second-session-in-this-folder")
+        code, out, _ = self.brief(prompt, "--pending")
+        self.assertIn("1 other Claude Code session has started", out)
+        self.assertIn("in this same folder.", out)
+        self.assertNotIn("worktrees/other", out)                                 # the one already named is not named again
+        self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))
+        # A session's start names who is there, so the prompt after it names nobody again.
+        code, out, _ = self.brief(start)
+        self.assertIn("2 other Claude Code sessions have worked", out)
+        self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))
+        # Seen only when it is there: with the line turned off for a session alone, a start alone says nothing.
+        self.configure({"assumeOthers": False})
+        os.remove(os.path.join(common.project_folder(self.repo), "a-second-session-in-this-folder.jsonl"))
+        os.remove(os.path.join(common.project_folder(self.other), "theirs.jsonl"))
+        self.assertEqual(self.brief(start), (0, "", ""))
 
 
 class MemoryLossTests(ScratchRepo):

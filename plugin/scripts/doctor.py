@@ -25,11 +25,14 @@ For each finding it prints three lines: what it found, why it matters, what to d
 From a folder that is not a repository but holds several, as with services cloned side by side, it measures the
 folder's own CLAUDE.md and every repository directly under it, names the repository in each finding, and reads the
 one memory folder Claude Code keeps for a session started there.
-At a session's start, --brief adds one line when another Claude Code session worked in the repository in the last
-crew.activeMinutes minutes, in another worktree or in this same folder, and points to /bowline:crew and
-/bowline:collaborate; it reads only when the transcript files in Claude Code's project folders were written, never what
-they hold. In a repository that has no rule about working beside other sessions, the line also carries the rule's main
-points and says that /bowline:crew sets the repository up.
+At a session's start, --brief adds one line about working beside other sessions, in every repository, because several
+sessions in one repository is taken as the usual case (crew.assumeOthers; false gives the line only when another
+session is seen, and crew.activeMinutes 0 gives none). It names the places where another Claude Code session worked in
+the last crew.activeMinutes minutes, in another worktree or in this same folder, or says that none shows now, and points
+to /bowline:crew and /bowline:collaborate; it reads only when the transcript files in Claude Code's project folders were
+written, never what they hold. In a repository that has no rule about working beside other sessions, the line also
+carries the rule's main points and says that /bowline:crew sets the repository up. --pending, before a prompt, names
+each place where another session started to work since this one was last told, once.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run. The three hook modes always exit 0.
 
@@ -417,7 +420,8 @@ def load_watch(path):
     data = autosplit.read_json(path)
     if data is None:
         return None
-    return {"told": list(data.get("told") or []), "pending": list(data.get("pending") or [])}
+    return {"told": list(data.get("told") or []), "pending": list(data.get("pending") or []),
+            "others": list(data.get("others") or [])}
 
 
 def save_watch(path, watch):
@@ -429,14 +433,15 @@ def save_watch(path, watch):
     os.replace(temp, path)
 
 
-def hook_cwd(default):
-    """The working folder a hook's JSON names on standard input, or the default when there is none to read."""
+def hook_input():
+    """What a hook's JSON on standard input says, or {} when there is none to read."""
     try:
         if sys.stdin is not None and not sys.stdin.isatty():
-            return json.load(sys.stdin).get("cwd") or default
+            facts = json.load(sys.stdin)
+            return facts if isinstance(facts, dict) else {}
     except Exception:
         pass
-    return default
+    return {}
 
 
 def hook_facts(wait=0.5):
@@ -474,26 +479,56 @@ WITHOUT_A_RULE = (
     "section of /bowline:crew sets the repository up, its settings and the rule; offer that to the person.")
 
 
-def others_line(root):
-    """The line a session's start gets when other sessions are at work in the repository, or None. Their names come from
-    the worktrees whose transcripts were written lately; this session's own transcript is the one the hook names. A
-    repository without a rule about working beside other sessions gets the rule's main points with the line, and where
-    it is set up: nothing else tells a session there that the setup exists, and a session alone gets no line at all."""
+BESIDE_OTHERS = (
+    "Before you take a roadmap number or a note, edit a file the sessions share such as the memory, run a heavy check, "
+    "rebase or push, follow /bowline:crew. When another session has your subject or your files, work with it as a team: "
+    "/bowline:collaborate.")
+
+
+def others_line(root, names=None):
+    """The line every session's start gets in a repository, with the names of the places where another session worked
+    lately, or None. The names come from the worktrees with a sign of work in the last crew.activeMinutes minutes; this
+    session's own transcript is the one the hook names. Several sessions in one repository is taken as the usual case
+    (crew.assumeOthers), so a session that sees nobody still gets the line: another may start a minute later, and a
+    session's start is the one moment every session reads. A repository without a rule about working beside other
+    sessions gets the rule's main points with it, and where the repository is set up. Returns the line and the names."""
     config = common.load_config(root)
-    names = crew.others_active(root, config, transcript=lambda: hook_facts().get("transcript_path"))
-    if not names:
-        return None
-    minutes = (config.get("crew") or {}).get("activeMinutes")
-    return (f"bowline: {common.count(len(names), 'other Claude Code session has', 'other Claude Code sessions have')} worked in this "
-            f"repository in the last {minutes} minutes, in {common.names(names)}. Before you take a roadmap number or a "
-            "note, edit a file the sessions share such as the memory, run a heavy check, rebase or push, follow "
-            "/bowline:crew. When another session has your subject or your files, work with it as a team: "
-            "/bowline:collaborate." + ("" if crew_edit.has_rule(root, config) else WITHOUT_A_RULE))
+    settings = config.get("crew") or {}
+    minutes = settings.get("activeMinutes")
+    if names is None:
+        names = crew.others_active(root, config, transcript=lambda: hook_facts().get("transcript_path"))
+    if not minutes or not (names or settings.get("assumeOthers")):
+        return None, names
+    if names:
+        seen = (f"{common.count(len(names), 'other Claude Code session has', 'other Claude Code sessions have')} worked in this "
+                f"repository in the last {minutes} minutes, in {common.names(names)}.")
+    else:
+        seen = ("no other Claude Code session shows a sign of work in this repository right now. Work as if one may start "
+                "at any moment, because several sessions in one repository is the usual case; bowline tells you before a "
+                "prompt when one appears.")
+    return f"bowline: {seen} {BESIDE_OTHERS}" + ("" if crew_edit.has_rule(root, config) else WITHOUT_A_RULE), names
+
+
+def arrived_line(root, watch, transcript):
+    """Before a prompt: the line for a session that is already running when another one appears, or None. A session's
+    start names who is there at that moment; this names each place once when a sign of work shows there afterwards, and
+    again when it comes back after going quiet. Changes the record's list of the places named."""
+    names = crew.others_active(root, common.load_config(root), transcript=transcript)
+    new = [name for name in names if name not in watch["others"]]
+    changed = sorted(names) != sorted(watch["others"])
+    watch["others"] = names
+    if not new:
+        return None, changed
+    return (f"bowline: {common.count(len(new), 'other Claude Code session has', 'other Claude Code sessions have')} started "
+            f"to work in this repository since you were last told, in {common.names(new)}. Look who holds what with "
+            "/bowline:crew before your next edit, and before you take a number, run a heavy check, rebase or push; when it "
+            "has your subject or your files, work with it as a team: /bowline:collaborate."), True
 
 
 def do_watch(options):
     """The Stop hook (--watch) and the UserPromptSubmit hook (--pending). Prints nothing when there is nothing new."""
-    start = hook_cwd(options.repo or os.getcwd())
+    facts = hook_input()
+    start = facts.get("cwd") or options.repo or os.getcwd()
     workspace, roots = common.roots_for(start)
     if not roots:
         return 0
@@ -506,12 +541,18 @@ def do_watch(options):
                 print(f"- {line}")
             watch["pending"] = []
             save_watch(path, watch)
+        if watch is not None and not workspace:
+            line, changed = arrived_line(roots[0], watch, facts.get("transcript_path"))
+            if line:
+                print(line)
+            if changed:
+                save_watch(path, watch)
         return 0
     urgent = Survey(start, options.no_memory).urgent()
     keys = [finding_key(f) for f in urgent]
     if watch is None:
         # No record yet: the session's start said whatever was there, so nothing counts as new this time.
-        save_watch(path, {"told": keys, "pending": []})
+        save_watch(path, {"told": keys, "pending": [], "others": []})
         return 0
     told = set(watch["told"])
     new = [f for f, key in zip(urgent, keys) if key not in told]
@@ -548,7 +589,15 @@ def main(argv=None):
             if survey.findings is None:
                 return 0
             urgent = survey.urgent()
-            save_watch(watch_file(survey.workspace, survey.roots), {"told": [finding_key(f) for f in urgent], "pending": []})
+        except Exception:
+            return 0
+        try:
+            line, names = others_line(survey.roots[0]) if not survey.workspace else (None, [])
+        except Exception:  # noqa: BLE001 - a hook must never fail a session's start
+            line, names = None, []
+        try:
+            save_watch(watch_file(survey.workspace, survey.roots),
+                       {"told": [finding_key(f) for f in urgent], "pending": [], "others": names})
         except Exception:
             return 0
         if urgent:
@@ -556,10 +605,6 @@ def main(argv=None):
             print(f"bowline found {len(urgent)} thing(s) worth a look about {whose}; run /bowline:doctor for the report. The first:")
             for finding in urgent[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
-        try:
-            line = others_line(survey.roots[0]) if not survey.workspace else None
-        except Exception:  # noqa: BLE001 - a hook must never fail a session's start
-            line = None
         if line:
             print(line)
         return 0

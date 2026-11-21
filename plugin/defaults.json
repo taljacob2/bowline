@@ -76,6 +76,7 @@
   },
   "crew": {
     "activeMinutes": 30,
+    "assumeOthers": true,
     "base": null,
     "heavy": [],
     "keepPorts": [],
@@ -91,7 +92,8 @@
     "sayChars": 600
   },
   "crewWhy": {
-    "activeMinutes": "A session's start says that other sessions are at work when a transcript of another worktree, or another transcript of this folder, was written within this many minutes; 0 says nothing. Half an hour covers a session that is thinking or waiting for a check, and forgets one that was closed.",
+    "activeMinutes": "How far back a sign of work counts: a session's start names another session when a transcript of another worktree, or another transcript of this folder, was written within this many minutes, and a running session is told before a prompt when one appears; 0 says nothing at all. It is not a wait: the look happens at once, and half an hour only decides who still counts as at work, which covers a session that is thinking or waiting for a check and forgets one that was closed.",
+    "assumeOthers": "true, the default: every session's start gets the line about working beside other sessions, whether or not another one is seen, because several sessions in one repository is the usual case and the second may start a minute after the first looked. false gives the line only when another session shows a sign of work.",
     "base": "The branch every session pushes to, such as origin/main, which the worktrees and the numbered lists are measured against; null asks git for origin's default branch.",
     "heavy": "Regular expressions over a process's command line, for the checks that must not run beside one another on one machine: a test suite, a browser test run, a full build. Each repository names its own, because only it knows them; with none, crew run waits for the turn alone. Name the program as it runs, such as \"dotnet(\\.exe)?\\s+test\" or \"vitest\", and never a server a person keeps running, which would never go quiet.",
     "keepPorts": "The ports a person's own servers listen on. crew lists what listens on each and says that it must never be stopped; a session that needs a server takes another port.",

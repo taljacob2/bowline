@@ -29,7 +29,8 @@ worktree of the repository holds, Claude is told which one, without the edit bei
 memory index or one of its notes crosses a limit, you get one reminder in the doctor's words, and Claude gets the same line at your next
 message. A repository that turns `autosplit` on in `.claude/bowline.json` gets one more: when a `CLAUDE.md` outgrows
 the limits, the hook after a reply starts a worker that prepares its split in the background, on a branch of its own,
-for you to review and merge. When several sessions work in one repository, a session's start also says so in one line,
+for you to review and merge. Every session's start in a repository also gets one line about working beside other
+sessions, which names the ones at work; a running session is told before a prompt when another one appears;
 and after a `git rebase`, `git pull`, `git push` or `git commit` that Claude issues, Claude is told when a roadmap
 number now appears twice, a build's stamp went stale, or another session waits on this worktree. Everything else is a
 skill you or Claude invoke, with you approving before anything moves on your branch.
@@ -99,10 +100,11 @@ staying out.
 
 When you run more than one Claude Code session on a repository at once, each in its own worktree, the sessions share
 one machine, one memory folder and the lists each of them adds to. `/bowline:crew` is the procedure that keeps them
-apart, and `bowline crew` is what it runs. A session's start tells Claude, in one line, that other sessions worked in
-the repository in the last half hour; alone, it says nothing. In a repository that has no rule about this yet, the
-same line carries the rule's main points and says that `/bowline:crew` sets the repository up. `crew` shows who is
-here. A session claims a roadmap number, a note or a file before it works on it, and the next free number is taken
+apart, and `bowline crew` is what it runs. bowline takes several sessions as the usual case, so every
+session's start tells Claude, in one line, how to work beside the others, and names the places where another session
+worked in the last half hour, or says that none shows now. A session that is already running is told before its
+next prompt when another one appears. In a repository that has no rule about this yet, the line at the start carries
+the rule's main points and says that `/bowline:crew` sets the repository up. `crew` shows who is here. A session claims a roadmap number, a note or a file before it works on it, and the next free number is taken
 across every worktree's copy of the list, so two sessions cannot take the same one. A shared file, the memory above all, is changed with an edit and never
 saved over whole; the doctor warns when the memory's backup shows that one session removed lines another had added
 within a day, and `memory losses` lists them. A test suite or a build runs through `crew run`, which waits for a quiet
