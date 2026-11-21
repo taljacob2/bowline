@@ -534,10 +534,11 @@ plugin has no tool for it, and Claude does.
 **What a trial of it found.** The session that had tried the crew tried this too, from its own worktree, before any
 release. It asked that the look set a session's words apart from its own lines, since a status may hold a sentence
 that starts like one of them: they are in quotation marks now. It reported that a refused status exited with 0;
-that did not happen again here, where it exited with 2, and the code is now 1, as for a claim another worktree holds.
-And it proposed that the warning before an edit repeat what the holding worktree said. The warning says only that it
-said something, when, and that the look shows it: a hook's text arrives unasked, and the reason above for keeping
-another session's words out of it holds there too.
+that did not happen again here, where it exited with 2, and the session then found its own cause: it had piped the
+command into another, and read that one's exit code. The code is 1 now all the same, as for a claim another worktree
+holds. And it proposed that the warning before an edit repeat what the holding worktree said. The warning says only
+that it said something, when, and that the look shows it: a hook's text arrives unasked, and the reason above for
+keeping another session's words out of it holds there too. The session that proposed it agreed.
 
 **Left for later**, each a concrete piece of work this round did not do:
 
