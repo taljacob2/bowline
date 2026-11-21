@@ -5,10 +5,11 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, assert_starts_hidden, git, read, write
+from support import SCRIPTS, ScratchRepo, assert_starts_hidden, git, read, wait_for_split, write
 
 FAKE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")
 LONG = "# Sub\n\n## First\n\n" + ("A rule, stated at length.\n" * 150) + "\n## Second\n\n" + ("More.\n" * 100)
@@ -52,18 +53,6 @@ class AutosplitTests(ScratchRepo):
         with open(self.state_file(), encoding="utf-8") as handle:
             return json.load(handle)
 
-    def wait_for_state(self, *kinds, seconds=120):
-        deadline = time.time() + seconds
-        while time.time() < deadline:
-            try:
-                state = self.state()
-                if state.get("state") in kinds:
-                    return state
-            except (OSError, ValueError):
-                pass
-            time.sleep(0.2)
-        self.fail(f"no state in {kinds} within {seconds} seconds")
-
     def calls_made(self):
         if not os.path.isfile(self.calls):
             return []
@@ -100,6 +89,61 @@ class AutosplitTests(ScratchRepo):
         self.assertEqual(args[3:5], ["autosplit", "worker"], "what is started is the worker")
         assert_starts_hidden(self, kwargs)
 
+    @unittest.skipUnless(os.name == "nt", "only Windows refuses to replace a file that another process has open")
+    def test_a_record_is_saved_while_a_reader_has_it_open(self):
+        import autosplit
+        import common
+        autosplit.save_state(self.repo, "sub/CLAUDE.md", {"file": "sub/CLAUDE.md", "state": "starting"})
+        # A reader in the middle of its read, as a session's hook, the doctor or this file's own wait is: Windows
+        # refuses the replacement until the reader closes the file, here half a second later.
+        reader = open(self.state_file(), encoding="utf-8")
+        closing = threading.Timer(0.5, reader.close)
+        closing.start()
+        try:
+            autosplit.save_state(self.repo, "sub/CLAUDE.md", {"file": "sub/CLAUDE.md", "state": "running"})
+        finally:
+            closing.cancel()
+            reader.close()
+        self.assertEqual(self.state()["state"], "running", "the save waited for the reader, it did not fail")
+        # A file that stays open is still an error, raised once the time is up, and the record is left as it was.
+        temp = self.state_file() + ".tmp"
+        write(temp, "{}")
+        reader = open(self.state_file(), encoding="utf-8")
+        try:
+            started = time.time()
+            with self.assertRaises(PermissionError):
+                common.replace_file(temp, self.state_file(), seconds=0.3)
+            self.assertLess(time.time() - started, 3)
+        finally:
+            reader.close()
+        self.assertEqual(self.state()["state"], "running")
+
+    def test_a_worker_that_fails_after_it_made_its_worktree_removes_it_and_records_why(self):
+        import autosplit
+        import common
+        self.enable()
+        real = autosplit.save_state
+        refused = []
+
+        def save_state(root, path, state):
+            if "worktree" in state and not refused:           # the save that says where the worktree is, once
+                refused.append(state["worktree"])
+                raise PermissionError(5, "Access is denied")
+            real(root, path, state)
+        autosplit.save_state = save_state
+        try:
+            final = autosplit.run_split(self.repo, "sub/CLAUDE.md", common.load_config(self.repo), lambda words: None)
+        finally:
+            autosplit.save_state = real
+        self.assertEqual(len(refused), 1)
+        self.assertEqual(final["state"], "failed", json.dumps(final, indent=1))
+        self.assertIn("the worker stopped on an error", final["reason"])
+        self.assertIn("Access is denied", final["reason"])
+        self.assertEqual(self.state()["state"], "failed", "the record says so too, it does not stay at running")
+        self.assertFalse(os.path.exists(refused[0]), "the worktree's folder is gone")
+        self.assertEqual(len(self.git_out("worktree", "list").strip().splitlines()), 1)
+        self.assertEqual(self.calls_made(), [], "no session was started")
+
     def test_hook_does_nothing_when_off_when_the_file_is_dirty_or_inside_the_worker(self):
         code, out, err = self.hook()
         self.assertEqual((code, out, err), (0, "", ""))
@@ -129,7 +173,7 @@ class AutosplitTests(ScratchRepo):
         self.enable()
         code, out, err = self.hook()
         self.assertEqual((code, out, err), (0, "", ""))
-        state = self.wait_for_state("ready", "failed")
+        state = wait_for_split(self, self.state_file())
         self.assertEqual(state["state"], "ready", json.dumps(state, indent=1))
         # The person's checkout is untouched, and the worktree is gone.
         self.assertEqual(read(os.path.join(self.repo, "sub", "CLAUDE.md")), LONG)

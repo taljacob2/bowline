@@ -8,10 +8,9 @@ import os
 import re
 import subprocess
 import sys
-import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, git, read, write
+from support import SCRIPTS, ScratchRepo, git, read, wait_for_split, write
 
 FAKE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")
 LONG = "# Sub\n\n## First\n\n" + ("A rule, stated at length.\n" * 150) + "\n## Second\n\n" + ("More.\n" * 100)
@@ -124,18 +123,7 @@ class WorkspaceTests(ScratchRepo):
         code, out, err = self.bowline("autosplit", "--hook", stdin=self.hook_json())
         self.assertEqual((code, out, err), (0, "", ""))
         state_file = os.path.join(self.repo1, ".git", "bowline", "autosplit", "sub-CLAUDE-md.json")
-        deadline = time.time() + 120
-        state = None
-        while time.time() < deadline:
-            try:
-                with open(state_file, encoding="utf-8") as handle:
-                    state = json.load(handle)
-                if state.get("state") in ("ready", "failed"):
-                    break
-            except (OSError, ValueError):
-                pass
-            time.sleep(0.2)
-        self.assertIsNotNone(state)
+        state = wait_for_split(self, state_file)
         self.assertEqual(state["state"], "ready", json.dumps(state, indent=1))
         self.assertFalse(os.path.exists(os.path.join(self.repo2, ".git", "bowline")))
         code, out, _ = self.bowline("doctor", "--no-memory")

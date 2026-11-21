@@ -4,6 +4,30 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+A fix for Windows: an autosplit worker could stop for good at the moment something else read its record. No Claude
+Code limit moved. The reasoning is in `plugin/docs/decisions.md`, "a record that Windows refuses to replace is tried
+again".
+
+- On Windows a file cannot be replaced while another process has it open. bowline saves a record (a split's state,
+  the crew's claims, statuses and survey, the doctor's watch file) by writing a file beside it and putting that file
+  in the record's place, and Windows refused that step with "Access is denied" whenever a session's hook, the
+  doctor, a test or a virus scanner had the record open at that moment. The step is now tried again for up to five
+  seconds (`common.replace_file()`); a reader is done within milliseconds. Linux and macOS never refused it, and
+  nothing changes there.
+- An autosplit worker that met the refusal stopped with a traceback in its log. It left its record at "running", and
+  its branch and its worktree behind, and autosplit never started on that file again. If `bowline autosplit status`
+  says that a split is "being prepared in the background" since a time long past, that worker is gone. `bowline
+  autosplit discard` refuses such a record, so clear it by hand: `git worktree list` shows the worktree the worker
+  left, then `git worktree remove --force <that folder>`, `git branch -D bowline/split/<the name>`, and delete
+  `.git/bowline/autosplit/<the name>.json`. The next reply starts a new worker.
+- A worker that fails after it made its worktree now removes the worktree and records "failed" with the reason,
+  whatever the failure was. Before, only a failure inside the headless session was recorded.
+- The two tests that wait for the worker failed in about half of the full runs on one Windows machine, for this
+  reason and not because the machine was busy. They now share one wait, `wait_for_split()` in `tests/support.py`;
+  when it runs out, the test fails with the record as it stands and the end of the worker's log.
+
 ## 0.13.2 (2026-11-21)
 
 What the collaborate skill left out, found the day it was used between two repositories. No Claude Code limit

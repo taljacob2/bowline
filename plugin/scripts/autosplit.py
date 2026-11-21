@@ -102,7 +102,7 @@ def save_state(root, path, state):
     with open(temp, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(state, handle, indent=2)
         handle.write("\n")
-    os.replace(temp, target)
+    common.replace_file(temp, target)
 
 
 def all_states(root):
@@ -433,9 +433,11 @@ def run_split(root, path, config, say):
         shutil.rmtree(temp, ignore_errors=True)
         return finish(root, path, state, Outcome(False, "git worktree add failed: " + out.strip()), config, say)
     state["worktree"] = worktree
-    save_state(root, path, state)
-    say(f"autosplit: the branch {branch} from {base[:12]}, in the worktree {worktree}")
     try:
+        # From here the worktree and the branch exist, so whatever goes wrong, the worktree is removed and the record
+        # says how the worker ended. The record is saved inside for that reason: the save was once refused here.
+        save_state(root, path, state)
+        say(f"autosplit: the branch {branch} from {base[:12]}, in the worktree {worktree}")
         outcome = run_session(worktree, path, branch, base, config, say)
     except Exception as problem:  # noqa: BLE001 - the worker must always record how it ended
         outcome = Outcome(False, f"the worker stopped on an error: {problem}", keep_branch=True)

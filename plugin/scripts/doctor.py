@@ -430,7 +430,7 @@ def save_watch(path, watch):
     with open(temp, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(watch, handle, indent=2)
         handle.write("\n")
-    os.replace(temp, path)
+    common.replace_file(temp, path)
 
 
 def hook_input():

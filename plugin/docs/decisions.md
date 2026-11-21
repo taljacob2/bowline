@@ -667,3 +667,61 @@ session said to whom, and a line after every push that is usually about nothing 
    command names.
 2. A wait across repositories: a session could record that it waits on a branch of another repository on the same
    machine, and that repository's check after a push could name it.
+
+## 2026-11-21: a record that Windows refuses to replace is tried again
+
+**What happened.** Two tests that wait for the autosplit worker failed in about half of the full test runs on one
+Windows machine, and never on GitHub's machines: the split's record stayed at "running" for the whole 120 seconds.
+A busy machine was the first guess. It was wrong. With the stand-in for claude the worker needs about one second,
+and repeated outside the suite, 2 of 40 workers and then 3 of 60 stayed at "running" while the others were ready
+within two seconds. Each one that stayed had ended with the same traceback in its log: `PermissionError: [WinError
+5] Access is denied`, from `os.replace()` in `save_state()`, at the save that follows `git worktree add`. One run
+of the two test modules failed the same way, with the same traceback.
+
+**The cause.** bowline saves a record by writing a file beside it and putting that file in the record's place, so
+that a reader never sees half a record. On Linux and macOS that step always works. On Windows it is refused for as
+long as any other process has the record open, unless that process opened it in a way Python's `open()` does not.
+The test reads the record every 0.2 seconds, and the worker's second save falls about 0.2 seconds after the hook
+returns, which is when the test reads for the second time; that is why it happened far more often than two short
+moments would meet by chance. A reader is not even needed: of 300 saves made one after another with no reader at
+all, 10 were refused at first, by something else on the machine. Every refusal was over within 17 milliseconds.
+The worker did not wait: the error ended it, the record stayed at "running", the branch and the worktree stayed,
+and the hook starts nothing for a file that has a record.
+
+**Did the hidden console cause it.** No, and it is likely what made it frequent. The save, the reader and the
+refusal are the same before and after the start flags changed, so the fault was there from the first version of
+autosplit. With `DETACHED_PROCESS` every git and Python the worker started opened a console window, and a process
+watcher counted seven of them in 5.5 seconds; since the change the same worker is done in one second, and its saves
+fall in the first moments after the hook returns, when the test reads most closely behind it. This part is reasoned
+from the timing and was not measured: running the old flags many times would have opened hundreds of windows on
+the first user's screen, which is what the change was made to stop.
+
+**The decision.** `common.replace_file()` puts a file in its target's place, and on Windows tries again when the
+step is refused, with a short pause that doubles, until five seconds have passed; then it raises the error. The
+three places that save a record this way use it: `autosplit.save_state()`, `crew.write_json()` and
+`doctor.save_watch()`. Five seconds is about 300 times the longest refusal measured and still short for a hook
+that a reply waits on. On Linux and macOS an error from that step is a real one and is raised at once. In the
+worker, the save that names the worktree moved inside the block that always removes the worktree and records how
+the worker ended, so that a failure there, of any kind, is recorded as "failed" with its reason. With the change,
+none of 60 workers stayed at "running", and none of 200 in a second sample.
+
+**The tests.** The wait of 120 seconds stays: it was never too short, and a longer one would only have hidden a
+worker that died. Both tests now use one wait, `wait_for_split()`, which fails with the record as it stands and the
+end of the worker's log, so the next stall says what the worker last did. Two new tests fail without the fix: one
+holds the record open as a reader does while it is saved, and one refuses the save after the worktree was made and
+checks that the worktree is gone and the record says "failed".
+
+**Not chosen.** Opening the record for reading in the way that lets Windows replace it: Python's standard library
+has no public call for it, and it would do nothing about a virus scanner or any reader that is not bowline. A lock
+file around every read and write: it makes every reader wait on every other one to solve a refusal that lasts
+milliseconds. A longer wait in the two tests: the worker was dead, not slow.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. A record at "starting" or "running" whose process is gone. A worker can still die without a word: the machine
+   restarts, the process is stopped, or a save is refused for longer than five seconds. `bowline autosplit status`
+   and the doctor then say "being prepared in the background" for good, `discard` refuses the record because it
+   takes the worker to be running, and the person clears it by hand. The doctor could say that the process named in
+   the record is gone, and `discard` could accept such a record and remove the worktree it left.
+2. The old start flags were not run again, for the reason above, so how often the refusal happened before the
+   change is not known.

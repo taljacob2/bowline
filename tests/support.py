@@ -1,11 +1,13 @@
 """What the tests share: a scratch git repository, a scratch Claude Code configuration folder, and the path to the
 scripts. Every test writes only under the system's temp folder and removes it afterwards."""
 
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugin", "scripts")
@@ -29,9 +31,33 @@ def read(path):
 
 
 def load_json(path):
-    import json
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def wait_for_split(test, state_file, seconds=120):
+    """Waits until autosplit's background worker has recorded how the split ended, and returns that record. The worker
+    needs about a second with the stand-in for claude, so a wait of two minutes that runs out is a worker that stalled
+    or died, never a slow machine. The test then fails with the record as it stands and the end of the worker's log,
+    which is the only place where a worker that died says why."""
+    deadline = time.time() + seconds
+    state = None
+    while time.time() < deadline:
+        try:
+            state = load_json(state_file)
+            if state.get("state") in ("ready", "failed"):
+                return state
+        except (OSError, ValueError):
+            pass
+        time.sleep(0.2)
+    log = os.path.splitext(state_file)[0] + ".log"
+    try:
+        with open(log, encoding="utf-8", errors="replace") as handle:
+            said = handle.read()[-3000:]
+    except OSError as problem:
+        said = f"(the log could not be read: {problem})"
+    test.fail(f"the worker recorded no end of the split within {seconds} seconds.\nIts record as it stands: "
+              f"{json.dumps(state, indent=1)}\nThe end of its log, {log}:\n{said}")
 
 
 def assert_starts_hidden(test, kwargs):

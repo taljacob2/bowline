@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = ".claude/bowline.json"
@@ -49,6 +50,32 @@ def background_start():
     if os.name == "nt":
         return {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
     return {"start_new_session": True}
+
+
+# How long a file's replacement is tried again on Windows. A reader holds the file for milliseconds: the longest wait
+# measured was 17 ms. Five seconds is far past that, and short enough for a hook that a reply waits on.
+REPLACE_SECONDS = 5
+
+
+def replace_file(temp, target, seconds=REPLACE_SECONDS):
+    """Puts a file that was written beside its target in the target's place, in one step, so that a reader never sees
+    half of it. On Windows that step is refused with "Access is denied" for as long as any other process has the
+    target open: another session's hook that reads it, a test that polls it, a virus scanner that looks at a file
+    just written. The reader is done within milliseconds, so the step is tried again until `seconds` have passed, and
+    only then is the error raised. One refusal used to end the process that was writing: an autosplit worker stopped
+    there and left its record saying "running" for good. Elsewhere an open file never stands in the way, so an error
+    there is a real one and is raised at once."""
+    deadline = time.monotonic() + seconds
+    pause = 0.005
+    while True:
+        try:
+            os.replace(temp, target)
+            return
+        except PermissionError:
+            if os.name != "nt" or time.monotonic() >= deadline:
+                raise
+        time.sleep(pause)
+        pause = min(pause * 2, 0.2)
 
 
 # What a run learns about the folders' layout, kept for the rest of the run: which folder is a repository's top, and which
