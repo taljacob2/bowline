@@ -189,7 +189,8 @@ Then offer the rule in `${CLAUDE_PLUGIN_ROOT}/templates/crew/beside-other-sessio
 the repository, and with the person's yes write it to `.claude/rules/beside-other-sessions.md`. It holds both halves,
 keeping apart and giving work a session of its own, because a repository should have one rule about this and not
 two. It has no `paths:`, so every session reads it at its start, and it takes about 4,000 of the 10,000 characters the
-unscoped rules may use; drop the rules the repository does not need. A repository that already has such a rule keeps
+unscoped rules may use; drop the rules the repository does not need. Keep its sentence that says `bowline crew` is
+the plugin's script: a session that types the name as a command finds no such program. A repository that already has such a rule keeps
 its own: fill its names into the template's words, or leave it. A repository where one session works at a time needs
 neither the settings nor the rule.
 

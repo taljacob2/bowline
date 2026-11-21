@@ -241,6 +241,13 @@ class CrewEditTests(ScratchRepo):
         self.assertEqual(code, 0, out + err)
         self.assertIn("NOTE  The repository has 2 worktrees and no rule about working beside other sessions.", out)
         self.assertIn("/bowline:crew offers the rule", out)
+        # A worktree nobody has worked in lately presses nothing at a session's start: the note stays a note. The
+        # line for a session that does work beside another one, which names the missing rule, is in test_crew.
+        folder = os.path.join(self.repo, ".git", "worktrees", os.path.basename(self.other))
+        stamp = time.time() - 120 * 60
+        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
+            if os.path.exists(os.path.join(folder, name)):
+                os.utime(os.path.join(folder, name), (stamp, stamp))
         code, brief, _ = self.run_script("doctor", "--brief", "--no-memory")
         self.assertNotIn("no rule about working", brief, "a note is not pressed at a session's start")
         write(os.path.join(self.repo, ".claude", "rules", "beside-other-sessions.md"), "# Working beside other sessions\n\nSplit the work by files.\n")

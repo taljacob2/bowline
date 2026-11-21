@@ -49,6 +49,9 @@ or without `--only` for all. Then show `git status` so they see exactly what app
   `gate.acceptedCharacters` in `.claude/bowline.json`.
 - Run `/bowline:doctor` again and show that the findings it fixed are gone.
 - Suggest `/bowline:conventions` when the repository has no decisions section, no roadmap with slots and no notes queue.
+- Ask whether several Claude Code sessions work in the repository at the same time. If they do, suggest
+  `/bowline:crew`: its last section writes the repository's settings and offers the rule about working beside other
+  sessions. `init` writes neither, because only the person knows the repository's heavy checks, ports and lists.
 
 Never edit an existing `CLAUDE.md` beyond appending the missing sections; what a repository already says is the
 person's.

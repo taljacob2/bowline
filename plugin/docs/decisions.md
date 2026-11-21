@@ -568,3 +568,53 @@ Linux and macOS the process gets a session of its own, as before.
 **Not chosen.** Starting the worker with `pythonw.exe`: it has no console either, so the programs it starts would still
 open windows. Passing `CREATE_NO_WINDOW` to each git call inside the worker: it works, but every later call would have to
 remember it, and one that forgot would bring the windows back.
+
+## 2026-11-21: a repository learns of the crew when another session is there
+
+**The question.** A session set the crew up in a second repository, the day the crew was released, and sent three
+gaps. Nothing points a repository to the setup: `init` does not mention it, and it is the last section of a skill
+that a session opens only by choice. The rule template writes `bowline crew` as if it were a command, and a session
+that types it finds no such program. And the template never names `/bowline:collaborate`, which came after it. All
+three were checked against the code and hold. The same session then passed on the first user's words about the
+defaults: "I feel like autosplit should be default to true 'branch' and crew and collaboration should be default true
+too". Those words reached this session through another session, not from the person directly. To the three gaps the
+person said, here: "Yes, build them".
+
+**The decision, for the crew and for collaborating.** The line a session's start gets when another session worked in
+the repository in the last `crew.activeMinutes` minutes is where a repository learns of both. It always names
+`/bowline:collaborate` beside `/bowline:crew`. When the repository has no rule about working beside other sessions
+(the test the doctor's note already uses: a heading that names other, parallel or several sessions), the line also
+carries the rule's main points and says that the last section of `/bowline:crew` sets the repository up. So the crew
+is on without setup in the sense that matters: a session beside another one is told how the work is split, in every
+repository, and a session alone pays nothing, because it gets no line. The doctor's note stays a note. It fires on a
+second worktree, which may be a subagent's or the person's own checkout; the line fires on a sign of work in the last
+half hour, which is the case the rule is for.
+
+**The decision, for the template.** It says in one sentence that `bowline crew` is the plugin's script and that the
+skill gives the full command, and it has a point about working as a team. Every session reads the template at its
+start, and the second repository's unscoped rules already took 9,504 of their 10,000 characters, as that session
+reported, so the other points were worded shorter until the template was the size it had been, 4,036 characters.
+
+**Not chosen.** A question in `init` about several sessions, as the only pointer: it reaches a repository once, on
+the day it is set up, and not the many that were set up before the crew existed; the init skill now asks it at its
+end all the same, because it costs one line. Writing the crew's settings from `init`: only the person knows which
+checks are heavy, which ports are theirs and which lists the sessions extend. Making `bowline` a real command: Claude
+Code's plugin reference, read on 2026-11-21, says that files in a plugin's `bin/` folder "are on the Bash tool's
+`PATH` while the plugin is enabled", says nothing of the PowerShell tool, and says that claude.ai and Cowork do not
+install a plugin that has this folder. The first user's sessions type their commands in PowerShell, so the name
+would work in one tool and fail in the other, and the plugin would install in fewer places. This was read, not tried.
+
+**Not decided here: autosplit on by default.** `autosplit.enabled` is false in `defaults.json` because its worker
+spends money, up to `autosplit.maxBudgetUsd` for a split, and makes a branch; a plugin installed for a person's whole
+account would then start paid runs in every repository they open, their own or not. The session that passed the
+words on proposed that `init` write `"autosplit": {"enabled": true}` into the repository's own
+`.claude/bowline.json` and name the cost in its plan. That is a decision about the person's money, so it waits for
+their word in the session that would build it, not for a word passed on.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. `init` offers autosplit for the repository it sets up, naming the cost, once the person has decided the default.
+2. The setup could propose settings it can see: a roadmap file with numbered items, a test runner the repository's
+   own files name. A runner in watch mode never goes quiet and must not be proposed as a heavy process.
+3. After a commit, when other sessions are at work and this worktree's status is older than the commit, the hook
+   could remind the session to write a new one with `crew say`.

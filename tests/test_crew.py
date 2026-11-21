@@ -329,6 +329,17 @@ class CrewTests(ScratchRepo):
         self.assertIn("1 other Claude Code session has worked in this repository in the last 30 minutes, in "
                       ".claude/worktrees/other.", out)
         self.assertIn("follow /bowline:crew", out)
+        self.assertIn("work with it as a team: /bowline:collaborate.", out)
+        # A repository without a rule gets the rule's main points and where the setup is; one with a rule does not.
+        self.assertIn("This repository has no rule about working beside other sessions", out)
+        self.assertIn("The last section of /bowline:crew sets the repository up", out)
+        rule = os.path.join(self.repo, ".claude", "rules", "beside-other-sessions.md")
+        write(rule, read(os.path.join(os.path.dirname(SCRIPTS), "templates", "crew", "beside-other-sessions.md")))
+        code, out, _ = self.brief(payload)
+        self.assertIn("work with it as a team: /bowline:collaborate.", out)
+        self.assertNotIn("no rule about working beside other sessions", out)
+        self.assertNotIn("sets the repository up", out)
+        os.remove(rule)
         self.transcript(self.repo, "a-second-session-in-this-folder", minutes_ago=2)
         code, out, _ = self.brief(payload)
         self.assertIn("2 other Claude Code sessions have worked", out)

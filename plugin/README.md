@@ -100,9 +100,10 @@ staying out.
 When you run more than one Claude Code session on a repository at once, each in its own worktree, the sessions share
 one machine, one memory folder and the lists each of them adds to. `/bowline:crew` is the procedure that keeps them
 apart, and `bowline crew` is what it runs. A session's start tells Claude, in one line, that other sessions worked in
-the repository in the last half hour; alone, it says nothing. `crew` shows who is here. A session claims a roadmap
-number, a note or a file before it works on it, and the next free number is taken across every worktree's copy of the
-list, so two sessions cannot take the same one. A shared file, the memory above all, is changed with an edit and never
+the repository in the last half hour; alone, it says nothing. In a repository that has no rule about this yet, the
+same line carries the rule's main points and says that `/bowline:crew` sets the repository up. `crew` shows who is
+here. A session claims a roadmap number, a note or a file before it works on it, and the next free number is taken
+across every worktree's copy of the list, so two sessions cannot take the same one. A shared file, the memory above all, is changed with an edit and never
 saved over whole; the doctor warns when the memory's backup shows that one session removed lines another had added
 within a day, and `memory losses` lists them. A test suite or a build runs through `crew run`, which waits for a quiet
 machine and never stops anything. After a rebase, Claude is told when a number appears twice or a build's stamp names

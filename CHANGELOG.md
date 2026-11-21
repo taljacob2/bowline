@@ -4,6 +4,25 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+A repository learns of the crew when another session is there, with no setup. No Claude Code limit moved. The
+reasoning is in `plugin/docs/decisions.md`, "a repository learns of the crew when another session is there".
+
+- The line a session's start gets when other sessions are at work now also names `/bowline:collaborate`, for a
+  session that has the same subject or the same files as another. In a repository that has no rule about working
+  beside other sessions, the line carries the rule's main points (split the work by files, claim before you work,
+  run a heavy check through the turn) and says that the last section of `/bowline:crew` sets the repository up.
+  Before, nothing told a session that the setup exists: it is in a skill the session opens only by choice. A
+  session alone gets no line, as before, and a repository with such a rule gets the line without the points.
+- The rule template, `templates/crew/beside-other-sessions.md`, says that `bowline crew` is the plugin's script and
+  not a program on the PATH, and has a new point: on one subject, work as a team, following `/bowline:collaborate`,
+  with a status written by `bowline crew say`. Its other points are worded shorter to pay for both, so the template
+  is the size it was, 4,036 characters; every session reads it at its start. A repository that already copied the
+  template keeps its copy: compare the two and take what it lacks.
+- The init skill asks, at its end, whether several sessions work in the repository at once, and points to
+  `/bowline:crew` when they do.
+
 ## 0.12.0 (2026-11-21)
 
 Sessions that work as a team, not only beside one another. No Claude Code limit moved. The reasoning is in

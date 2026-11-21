@@ -26,8 +26,10 @@ From a folder that is not a repository but holds several, as with services clone
 folder's own CLAUDE.md and every repository directly under it, names the repository in each finding, and reads the
 one memory folder Claude Code keeps for a session started there.
 At a session's start, --brief adds one line when another Claude Code session worked in the repository in the last
-crew.activeMinutes minutes, in another worktree or in this same folder, and points to /bowline:crew; it reads only when
-the transcript files in Claude Code's project folders were written, never what they hold.
+crew.activeMinutes minutes, in another worktree or in this same folder, and points to /bowline:crew and
+/bowline:collaborate; it reads only when the transcript files in Claude Code's project folders were written, never what
+they hold. In a repository that has no rule about working beside other sessions, the line also carries the rule's main
+points and says that /bowline:crew sets the repository up.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run. The three hook modes always exit 0.
 
@@ -465,9 +467,18 @@ def hook_facts(wait=0.5):
     return box[0] if box and isinstance(box[0], dict) else {}
 
 
+WITHOUT_A_RULE = (
+    " This repository has no rule about working beside other sessions, so these hold until it has one: two sessions "
+    "never edit one file at once, so message a session before you edit a file it has changed; claim a number, a note or "
+    "a file before you work on it; and run a heavy check through the turn, never beside another session's. The last "
+    "section of /bowline:crew sets the repository up, its settings and the rule; offer that to the person.")
+
+
 def others_line(root):
     """The line a session's start gets when other sessions are at work in the repository, or None. Their names come from
-    the worktrees whose transcripts were written lately; this session's own transcript is the one the hook names."""
+    the worktrees whose transcripts were written lately; this session's own transcript is the one the hook names. A
+    repository without a rule about working beside other sessions gets the rule's main points with the line, and where
+    it is set up: nothing else tells a session there that the setup exists, and a session alone gets no line at all."""
     config = common.load_config(root)
     names = crew.others_active(root, config, transcript=lambda: hook_facts().get("transcript_path"))
     if not names:
@@ -475,7 +486,9 @@ def others_line(root):
     minutes = (config.get("crew") or {}).get("activeMinutes")
     return (f"bowline: {common.count(len(names), 'other Claude Code session has', 'other Claude Code sessions have')} worked in this "
             f"repository in the last {minutes} minutes, in {common.names(names)}. Before you take a roadmap number or a "
-            "note, edit a file the sessions share such as the memory, run a heavy check, rebase or push, follow /bowline:crew.")
+            "note, edit a file the sessions share such as the memory, run a heavy check, rebase or push, follow "
+            "/bowline:crew. When another session has your subject or your files, work with it as a team: "
+            "/bowline:collaborate." + ("" if crew_edit.has_rule(root, config) else WITHOUT_A_RULE))
 
 
 def do_watch(options):
