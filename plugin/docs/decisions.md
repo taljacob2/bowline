@@ -907,7 +907,19 @@ place would turn a twenty-minute check into an hour behind a session that went t
 A worktree whose folder this system cannot enter, such as one made from another system's view of the disk, is named
 apart and never offered: it may be in use there.
 
+**Corrected the same day, after the first real use.** 0.14.0 ran `git worktree remove` with the two-minute limit
+every other git command of the crew has. On the first user's repository, on Windows, git took longer than that to
+delete a worktree with its own `node_modules`, file by file, and was stopped: six of the nine worktrees the user had
+agreed to remove were left with no `.git` file and part of their files, and the message said only that git "said
+nothing", because the crew's git commands keep no error output. Nothing was lost, since each had been checked to hold
+nothing that was not on main, but each folder had to be finished by hand. `git worktree remove` now runs with no time
+limit and with its errors shown, the look before each removal after the first is measured again (sessions,
+processes and claims; the files are not, because git refuses a change itself), and a removal git stops partway says
+that the folder is left without its `.git` file and that nothing in it is lost.
+
 **Left for later**, a concrete piece of work this round did not do:
 
 1. The place in the queue could be taken by the turn itself: a `crew run` of the repository's full checks (a pattern
    in `crew.heavy` the repository marks as full) could join the queue when the session has no place.
+2. `crew prune` could offer to finish a removal that git stopped partway: a worktree git lists as prunable whose
+   folder holds only files of the commit it was on and ignored files. Until then the person deletes such a folder.

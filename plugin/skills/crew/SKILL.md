@@ -208,8 +208,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew prune
 It names the worktrees that are safe to remove (every file committed, every commit on the pushed branch by content,
 no session, process, claim, lock or place in the queue, and no sign of work for `crew.pruneHours`) and why each
 other one is not. Show the list to the person. Only on their yes, run `crew prune --remove <name>...`: each is checked
-again and removed with `git worktree remove`, never with `--force`, and its branch stays. Never remove a worktree the
-list calls not safe, and never one by hand.
+again and removed with `git worktree remove`, never with `--force`, and its branch stays. Start it in the background,
+because a worktree with its own `node_modules` takes minutes to delete on Windows, and a command stopped at a time
+limit leaves git's deletion half done. Never remove a worktree the list calls not safe, and never one by hand.
 
 ## Setting a repository up for it
 

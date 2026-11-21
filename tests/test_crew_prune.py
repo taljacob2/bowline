@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import unittest
+from unittest import mock
 
 from support import SCRIPTS, ScratchRepo, git, write
 
@@ -121,6 +122,20 @@ class PruneTests(CrewCase):
         self.assertNotIn("done", listed)
         self.assertEqual(subprocess.run(["git", "-C", self.repo, "rev-parse", "--verify", "-q", "done"],
                                         capture_output=True).returncode, 0, "its branch stays")
+
+    def test_git_removes_with_no_time_limit_and_its_refusal_is_shown(self):
+        # On Windows git took more than two minutes to delete a worktree with its own node_modules; stopped at a time
+        # limit, it left a folder with no .git file and part of its files, and said nothing that was shown.
+        answer = subprocess.CompletedProcess([], 0, stdout=b"")
+        with mock.patch.object(crew.subprocess, "run", return_value=answer) as run:
+            crew.remove_worktree(self.repo, self.trees["done"])
+        self.assertNotIn("timeout", run.call_args.kwargs)
+        self.assertEqual(run.call_args.kwargs.get("stderr"), subprocess.STDOUT)
+        git(self.repo, "worktree", "lock", "--reason", "a test", self.trees["done"])
+        code, said = crew.remove_worktree(self.repo, self.trees["done"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("locked", said)                                            # git's own words, from its errors
+        self.assertTrue(os.path.isdir(self.trees["done"]))
 
 
 class QueueTests(CrewCase):

@@ -4,6 +4,20 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+`crew prune --remove` lets git finish. No Claude Code limit moved. The reasoning is in `plugin/docs/decisions.md`,
+"which worktrees may go, and an order for pushes", corrected the same day.
+
+- `git worktree remove` runs with no time limit. On Windows, git took more than the two minutes allowed to delete a
+  worktree with its own `node_modules`, and was stopped partway, which left the folder with no `.git` file and part
+  of its files. Nothing in such a folder is lost, since only a worktree whose work is all on the pushed branch is
+  removed, but the folder had to be deleted by hand.
+- What git says when it does not remove a worktree is shown; until now the message said only that git "said
+  nothing". A removal git stops partway says that the folder is left without its `.git` file.
+- Before each removal after the first, the sessions, the processes and the claims are measured again, since each
+  removal can take minutes. Each removal is announced as it starts.
+
 ## 0.14.0 (2026-11-21)
 
 The crew for a day of many sessions in one repository: it names who works where, puts what waits for the person

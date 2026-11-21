@@ -1674,10 +1674,24 @@ def prune_safe_words(item, model):
     return words
 
 
+def remove_worktree(main, path):
+    """Runs `git worktree remove` from the main checkout and returns (exit code, what git said, its errors included).
+    It has no time limit: git deletes the folder file by file, which on Windows took more than two minutes for a
+    worktree with its own node_modules, and a git stopped halfway leaves a folder with no .git file and part of its
+    files."""
+    try:
+        result = subprocess.run(["git", "-C", main, "worktree", "remove", path], stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+    except OSError as problem:
+        return 1, str(problem)
+    return result.returncode, result.stdout.decode("utf-8", "replace")
+
+
 def do_prune(options):
     place = Place(options.repo)
     hours = settings(place.config).get("pruneHours") or 6
-    model = look(place, verbose=True)
+    record = survey(place)
+    model = look(place, verbose=True, record=record)
     queued = {same(p["worktree"]) for p in load_queue(place.root, place.trees)}
     items = [item for item in model["worktrees"] if not item["main"]]
     if options.remove:
@@ -1692,19 +1706,32 @@ def do_prune(options):
                 return 2
             wanted.append(match[0])
         code = 0
-        for item in wanted:
+        for index, item in enumerate(wanted):
+            if index:
+                # A removal can take minutes, so whether a session, a process or a claim came to this worktree since
+                # is measured again; the files it changed are not, because git refuses a change on its own.
+                model = look(place, verbose=True, record=record)
+                item = next((i for i in model["worktrees"] if same(i["path"]) == same(item["path"])), item)
+                queued = {same(p["worktree"]) for p in load_queue(place.root, place.trees)}
             reasons = prune_reasons(item, model, hours, queued)
             if reasons:
-                print("\n".join(lines_of(f"bowline crew: {item['display']} is not removed: {'; '.join(reasons)}.", "", "  ")))
+                print("\n".join(lines_of(f"bowline crew: {item['display']} is not removed: {'; '.join(reasons)}.", "", "  ")),
+                      flush=True)
                 code = 1
                 continue
-            status, out = git(place.trees[0]["path"], "worktree", "remove", item["path"])
+            print(f"bowline crew: removing {item['display']}; a worktree with its own node_modules takes minutes.", flush=True)
+            status, out = remove_worktree(place.trees[0]["path"], item["path"])
             if status == 0:
-                print(f"bowline crew: removed {item['display']} ({item['path']}); its branch {item['branch']} stays.")
-            else:
-                print(f"bowline crew: git did not remove {item['display']}: {out.strip() or 'it said nothing'}. Nothing "
-                      "was forced.")
-                code = 1
+                print(f"bowline crew: removed {item['display']} ({item['path']}); its branch {item['branch']} stays.",
+                      flush=True)
+                continue
+            words = f"bowline crew: git did not remove {item['display']}: {' '.join(out.split()) or 'it gave no reason'}."
+            if os.path.isdir(item["path"]) and not os.path.exists(os.path.join(item["path"], ".git")):
+                words += (" git stopped partway, so the folder is left with no .git file and part of its files. Everything "
+                          f"in it was committed and is on {model['base']}, so nothing is lost: close what holds the "
+                          "files git names, then delete the folder.")
+            print("\n".join(lines_of(words + " Nothing was forced.", "", "  ")), flush=True)
+            code = 1
         return code
     print("\n".join(lines_of(f"bowline crew prune: {model['repository']}, " + (f"measured against {model['base']}"
                                                                              if model["base"] else "with no pushed branch"), "", "  ")))
