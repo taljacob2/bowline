@@ -636,3 +636,34 @@ their word in the session that would build it, not for a word passed on.
 4. A session in the middle of a long turn is told of a new session only at its next prompt; until then the warning
    before an edit covers the file both would change. A hook after a tool call could tell it sooner, at the price of
    a look after every tool call.
+
+## 2026-11-21: a message that stops being true is corrected
+
+**What happened.** The day the collaborate skill was released, a session that works on bowline changed one file in
+a second repository, for a session that works there. It wrote to that session that the commit was not pushed and
+that the push was for the first user or for a session of that repository. Minutes later the first user told the
+first session to push, and it pushed and removed its worktree. It sent nothing more. The second session then asked
+the first user to approve a push that had already happened, and the first user asked why it had not been told.
+
+**Why the skill did not prevent it.** Three reasons, as the second session named them. The skill said to keep the
+state where anyone can read it and to use messages to say that it changed, but never that a message of your own
+which stops being true needs a correction. The session that waited had not written its wait down, so the check
+after the push told the pusher that nobody waited. And the crew's records are one repository's: the two sessions
+work in different repositories, so in each one the other is no neighbour at all.
+
+**The decision.** The skill gets three additions, and no code. A message that stops being true needs a correction,
+one line in the same turn that names the message it corrects; the examples are the ones that happened. A session
+that needs another's branch or commit first records it with `crew claim waits:`, in the step about exchanging file
+lists, where a session that splits work reads it. And the skill says that the record is one repository's, so that
+between repositories the messages carry everything.
+
+**Not chosen.** A reminder from the hook after every push to correct what was said: the hook cannot know what a
+session said to whom, and a line after every push that is usually about nothing teaches a session to skip it.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. The check after a push looks at the repository of the session's own folder. A push made in another repository,
+   by changing folder inside one command, is checked against the wrong one; the check could read the folder the
+   command names.
+2. A wait across repositories: a session could record that it waits on a branch of another repository on the same
+   machine, and that repository's check after a push could name it.

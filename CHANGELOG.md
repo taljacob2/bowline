@@ -4,6 +4,21 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+What the collaborate skill left out, found the day it was used between two repositories. No Claude Code limit
+moved. The reasoning is in `plugin/docs/decisions.md`, "a message that stops being true is corrected".
+
+- The collaborate skill says that a message which stops being true needs a correction: when a session told
+  another one that it would not push, or that something waits for the person, and that changed, it sends one line
+  in the same turn that names the message it corrects. After a commit or a push, the hash also goes to every
+  session that was told the work was not committed or not pushed.
+- A session that needs another session's branch or commit first writes that down with `crew claim waits:<its
+  folder or its branch>`, in the step about exchanging file lists and not only in the crew skill, so that
+  bowline's check after that session's commit or push names it.
+- The skill says that the record is one repository's: a session that works in another repository is no
+  neighbour there, so the messages carry everything the record would.
+
 ## 0.13.1 (2026-11-21)
 
 A wording fix in the rule template. No Claude Code limit moved.

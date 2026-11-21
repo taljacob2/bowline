@@ -119,6 +119,9 @@ class SayTests(ScratchRepo):
         self.assertLess(len(front.group(1)), 1536)                                # a description is cut past this
         self.assertIn("crew say", text)
         self.assertIn("crew claim subject:", text)
+        self.assertIn("crew claim waits:", text)                                  # a wait is written down, where the pusher's check finds it
+        self.assertIn("A message that stops being true needs a correction.", text)
+        self.assertIn("The record is one repository's.", text)
         self.assertLess(text.count("\n"), 500)
 
 

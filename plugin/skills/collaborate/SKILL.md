@@ -23,6 +23,15 @@ moment, and use messages to say that it changed:
   itself. It is true whenever you look.
 - **A message** is a notice. Begin it with one sentence that says what it is about, say what you have done and not
   only what you propose, and say which of the other session's messages it answers.
+- **A message that stops being true needs a correction.** What you told another session stays in its conversation
+  as you wrote it, and that session acts on your last word. When you said you would not push and then pushed, when
+  you said a thing waits for the person and the person then answered you, or when a plan you described changed,
+  send that session one line in the same turn: which message it corrects, and what is true now. Without it, the
+  other session asks its person to approve what has already happened.
+- **The record is one repository's.** `crew` shows the worktrees of the repository you stand in. A session that
+  works in another repository is no neighbour there: nothing names it, and no check after a push says that it
+  waits. When you change something in its repository, or something in yours for its sake, the messages carry all of
+  it: one when you start, one for every change of plan, and one when the work is pushed.
 
 ## 1. Say your subject before you design
 
@@ -46,6 +55,16 @@ a section, a key. Ask for its list. Where the lists meet, agree who changes what
 (`crew claim file:<path>`), because bowline's warning before an edit names a claim to whoever is about to edit that
 file. A split that both sessions wrote down survives a message that arrives late; one that only one of them
 proposed does not.
+
+When your part needs the other session's branch or commit first, write that down too:
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew claim waits:<its folder or its branch> --why "<what you need>"
+```
+
+bowline's check after that session's commit or push then names you, with what you wait for, so it sends you the
+hash without having to remember you. A wait that only you know of is found out late: the other session pushes, is
+told that nobody waits, and says nothing. Release the claim when the wait is over.
 
 ## 3. Keep a status of your own
 
@@ -88,7 +107,8 @@ lost with them.
 ## 6. Sync
 
 - After a commit or a push, send its hash to whoever waits on it (`/bowline:crew` step 6), and say in one sentence
-  what it holds and which of the other session's lines it touches.
+  what it holds and which of the other session's lines it touches. Send it also to every session you told that the
+  work was not committed or not pushed: for that session, your earlier message is now wrong.
 - Before a step that cannot be taken back, such as a push or a release, look once more: `crew`, and any message that
   arrived. When two proposals crossed, the session that has already acted keeps its order, and the other one says
   so and follows.
