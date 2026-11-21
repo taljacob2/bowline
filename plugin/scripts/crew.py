@@ -17,8 +17,15 @@ whose numbers each of them extends, and the ports a person's own servers listen 
 what the others would otherwise have to say by hand.
 
 With no word after it, crew lists every worktree of the repository: its branch, how far it is from the branch every
-session pushes to, its changed files, the last sign of work there, its processes that count as heavy or that listen
-on a port, the claims it holds, the files changed in more than one worktree, and who holds the turn for a heavy check.
+session pushes to, its changed files, the last sign of work there, the sessions at work in it, its processes that
+count as heavy or that listen on a port, the claims it holds, the files changed in more than one worktree, and who
+holds the turn for a heavy check. The sessions are the ones `claude agents --json` lists, Claude Desktop's included,
+each joined to the worktree its folder is in, with whether it is busy, idle or blocked; what claude listed is kept in
+the repository's git folder (sessions.json) for the hooks, which never start claude. Where claude cannot be asked, a
+transcript written lately stands for a session, named by the title line at its end. A process belongs to the worktree
+of its session, else to the one its command line names, else to that of its children when all of them agree, else to
+that of its nearest parent with one. A worktree whose folder has no .git file of its own, as while it is being
+removed, is named as broken and left out, because git asked there answers for the main checkout.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -65,6 +72,7 @@ import argparse
 import concurrent.futures
 import datetime
 import fnmatch
+import html
 import json
 import os
 import re
@@ -143,6 +151,10 @@ def worktrees(root, unreachable=None):
     main = found[0]["path"]
     for index, tree in enumerate(found):
         tree["main"] = index == 0
+        # A worktree's folder holds a .git file that leads to its own git folder. Without it, as while the worktree is
+        # being removed, git run in the folder walks up and answers for the main checkout: once, 5,781 files "not
+        # committed" and twenty false overlaps, which were the main checkout's own diff.
+        tree["broken"] = index > 0 and not os.path.exists(os.path.join(tree["path"], ".git"))
         inside = same(tree["path"]).startswith(same(main) + "/")
         tree["name"] = "the main checkout" if index == 0 else (
             os.path.relpath(tree["path"], main).replace("\\", "/") if inside else tree["path"].replace("\\", "/"))
@@ -244,12 +256,141 @@ def last_sign(tree_path, claims, said=()):
     return max(signs) if signs else (None, None)
 
 
+# The sessions.
+
+DAY = 24 * 3600
+# How much of a transcript's end is read for its title. Claude Code writes the title again as the session goes on, so
+# the end of the file holds it; the rest of the file, the session's own work, is never read.
+TITLE_TAIL = 256 * 1024
+
+
+def claude_command(config):
+    """The program that lists Claude Code's sessions (crew.claude), as a list: a name on the path or a full path, or a
+    list for a program with its arguments."""
+    command = settings(config).get("claude") or "claude"
+    return [str(word) for word in command] if isinstance(command, list) else [str(command)]
+
+
+def sessions_path(root):
+    return os.path.join(state_dir(root), "sessions.json")
+
+
+def fetch_sessions(root, config, timeout=15):
+    """Every session Claude Code knows on this machine, Claude Desktop's included, as `claude agents --json` lists them:
+    each with its name, its folder (cwd), its kind, its process id and whether it is busy, idle or blocked. Kept in the
+    repository's git folder for the hooks, which must answer at once and so never start claude themselves. None when
+    the command is missing or fails."""
+    command = claude_command(config)
+    program = shutil.which(command[0])
+    if not program:
+        return None
+    try:
+        result = subprocess.run([program, *command[1:], "agents", "--json"], stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=timeout)
+        rows = json.loads(result.stdout.decode("utf-8", "replace") or "null")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0 or not isinstance(rows, list):
+        return None
+    rows = [row for row in rows if isinstance(row, dict)]
+    try:
+        write_json(sessions_path(root), {"at": time.time(), "sessions": rows})
+    except OSError:
+        pass                # the record is a convenience; a look that cannot keep it still answers
+    return rows
+
+
+def cached_sessions(root, max_age=DAY):
+    """The sessions the last look listed, when that was within max_age seconds; else None."""
+    record = read_json(sessions_path(root), None)
+    if not isinstance(record, dict) or not isinstance(record.get("sessions"), list):
+        return None
+    return record["sessions"] if time.time() - (record.get("at") or 0) <= max_age else None
+
+
+def session_title(path):
+    """A session's title as its transcript records it (the `custom-title` line), read from the file's end only, or
+    None. The fallback where `claude agents` cannot be asked; nothing else in the transcript is read."""
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - TITLE_TAIL))
+            data = handle.read()
+    except OSError:
+        return None
+    title = None
+    for line in data.decode("utf-8", "replace").splitlines():
+        if '"custom-title"' not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(entry, dict) and entry.get("type") == "custom-title" and entry.get("customTitle"):
+            title = " ".join(str(entry["customTitle"]).split())
+    return title
+
+
+def tree_of(folder, trees):
+    """The worktree a folder is in: the one that is the folder or holds it, the deepest when one holds another."""
+    here = same(folder)
+    best = None
+    for tree in trees:
+        top = same(tree["path"])
+        if (here == top or here.startswith(top + "/")) and (best is None or len(top) > len(same(best["path"]))):
+            best = tree
+    return best
+
+
+def sessions_by_tree(trees, rows, minutes=30, now=None):
+    """The sessions in each worktree, as {same(worktree's path): [session]}, newest first. A session is {"name", "id",
+    "kind", "status", "pid", "started", "wrote", "cwd"}: status is busy, idle or blocked as Claude Code says, and wrote
+    is when its transcript was last written. rows are what `claude agents --json` listed; None means it could not be
+    asked, and then each transcript written in the last `minutes` stands for a session, named by its title, with the
+    status unknown."""
+    now = time.time() if now is None else now
+    found = {}
+    if rows is None:
+        for tree in trees:
+            for path, stamp in transcripts(tree["path"]):
+                if now - stamp <= minutes * 60:
+                    found.setdefault(same(tree["path"]), []).append({
+                        "name": session_title(path), "id": os.path.basename(path)[:-len(".jsonl")], "kind": None,
+                        "status": "unknown", "pid": None, "started": None, "wrote": stamp, "cwd": tree["path"]})
+    for row in rows or []:
+        tree = tree_of(str(row.get("cwd") or ""), trees) if row.get("cwd") else None
+        if tree is None or tree.get("broken"):
+            continue
+        sid = str(row.get("sessionId") or row.get("id") or "")
+        try:
+            wrote = os.path.getmtime(os.path.join(common.project_folder(row["cwd"]), sid + ".jsonl")) if sid else None
+        except OSError:
+            wrote = None
+        started = row.get("startedAt")
+        found.setdefault(same(tree["path"]), []).append({
+            "name": " ".join(str(row.get("name") or "").split()) or None, "id": sid, "kind": row.get("kind"),
+            "status": "blocked" if row.get("state") == "blocked" else str(row.get("status") or row.get("state") or "unknown"),
+            "pid": row.get("pid") if isinstance(row.get("pid"), int) else None,
+            "started": started / 1000.0 if isinstance(started, (int, float)) else None, "wrote": wrote, "cwd": row["cwd"]})
+    for sessions in found.values():
+        sessions.sort(key=lambda s: -(s["wrote"] or s["started"] or 0))
+    return found
+
+
+def quoted(name):
+    """A session's name in double quotes, which its own words never close."""
+    return '"' + str(name).replace('"', "'") + '"'
+
+
 def others_active(start, config, transcript=None, now=None):
-    """The names of the places where another session worked in the last crew.activeMinutes: every other worktree of
-    the repository with a sign of work that recent (a transcript, its git folder, a claim), and this worktree itself
-    when a transcript other than this session's was written there. For the line at a session's start. transcript is
-    this session's own transcript, or a function that gives it, asked only when this folder has a transcript written
-    lately; without it, two such transcripts mean one is another session's."""
+    """The places where another session worked in the last crew.activeMinutes, as [{"name": the worktree's name,
+    "own": whether it is this session's own folder, "sessions": the names of the sessions seen there}]: every other
+    worktree of the repository with a sign of work that recent (a transcript, its git folder, a claim, what it said),
+    and this worktree itself when a transcript other than this session's was written there. For the line at a
+    session's start and the one before a prompt. transcript is this session's own transcript, or a function that gives
+    it, asked only when this folder has a transcript written lately; without it, two such transcripts mean one is
+    another session's. A session is named from what the last look listed, else from its transcript's title; claude
+    itself is never started here, because a hook must answer at once."""
     minutes = settings(config).get("activeMinutes") or 0
     root = common.repo_root(start)
     if not minutes or not root:
@@ -258,20 +399,43 @@ def others_active(start, config, transcript=None, now=None):
     trees = worktrees(root)
     here = mine(trees, root)
     claims, said = load_claims(root), load_said(root)
-    names = []
-    for tree in trees:
+    known = {str(row.get("sessionId")): row.get("name") for row in cached_sessions(root) or [] if row.get("sessionId")}
+
+    def names(paths):
+        found = []
+        for path, _ in sorted(paths, key=lambda pair: -pair[1]):
+            name = known.get(os.path.basename(path)[:-len(".jsonl")]) or session_title(path)
+            if name and name not in found:
+                found.append(" ".join(str(name).split()))
+        return found
+
+    places = []
+    for tree in [tree for tree in trees if tree is not here] + [here]:          # this session's own folder last
+        if tree.get("broken"):
+            continue
+        recent = [(path, stamp) for path, stamp in transcripts(tree["path"]) if now - stamp <= minutes * 60]
         if tree is not here:
             stamp, _ = last_sign(tree["path"], claims, said)
             if stamp is not None and now - stamp <= minutes * 60:
-                names.append(tree["name"])
+                places.append({"name": tree["name"], "own": False, "sessions": names(recent)})
             continue
-        recent = [path for path, stamp in transcripts(tree["path"]) if now - stamp <= minutes * 60]
         if not recent:
             continue
         own = transcript() if callable(transcript) else transcript
-        if any(same(path) != same(own) for path in recent) if own else len(recent) > 1:
-            names.append("this same folder")
-    return names
+        others = [(path, stamp) for path, stamp in recent if not own or same(path) != same(own)]
+        if others if own else len(recent) > 1:
+            places.append({"name": tree["name"], "own": True, "sessions": names(others) if own else []})
+    return places
+
+
+def places_words(places):
+    """The places of others_active in words, each on its own: which one is this session's own folder, and the sessions
+    seen in each. With the number of sessions, counted as one for a place where none is named."""
+    parts = []
+    for place in places:
+        where = f"in your own folder, {place['name']}" if place["own"] else f"in {place['name']}"
+        parts.append(where + (", " + ", ".join(quoted(name) for name in place["sessions"]) if place["sessions"] else ""))
+    return sum(max(1, len(place["sessions"])) for place in places), "; ".join(parts)
 
 
 # The processes and the ports.
@@ -289,7 +453,10 @@ def processes():
             for line in result.stdout.decode("oem", "replace").splitlines():
                 parts = line.strip().split(",", 1)[-1].rsplit(",", 3)
                 if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit():
-                    found.append({"pid": int(parts[3]), "ppid": int(parts[2]), "name": parts[1], "command": parts[0] or parts[1]})
+                    # wmic's table is made by a style sheet that writes &, < and > as &amp;, &lt; and &gt;: a build
+                    # showed as "tsc -b &amp;&amp; vite build", and a heavy pattern was matched against that text.
+                    command, name = html.unescape(parts[0]), html.unescape(parts[1])
+                    found.append({"pid": int(parts[3]), "ppid": int(parts[2]), "name": name, "command": command or name})
             if found:
                 return found
         if WINDOWS:
@@ -361,9 +528,15 @@ def listening():
     return ports
 
 
+# Claude Desktop starts every session's claude.exe with the main checkout as --project-config-root, a session in a
+# worktree too, so that path says where the project's settings are, not where the session works.
+CONFIG_ROOT = re.compile(r"--project-config-root(?:=|\s+)(?:\"[^\"]*\"|'[^']*'|\S+)")
+
+
 def owner(command, trees):
-    """The worktree a process belongs to: the one whose path its command line names, the longest when one path lies
-    inside another, as a worktree under the main checkout does. None when it names none."""
+    """The worktree whose path a command line names, the longest when one path lies inside another, as a worktree
+    under the main checkout does. None when it names none."""
+    command = CONFIG_ROOT.sub(" ", command)
     text = same(command) if WINDOWS else command.replace("\\", "/")
     best = None
     for tree in trees:
@@ -371,6 +544,36 @@ def owner(command, trees):
         if re.search(re.escape(path) + r"(?![A-Za-z0-9._-])", text) and (best is None or len(path) > len(same(best["path"]))):
             best = tree
     return best
+
+
+def owners(snapshot, trees, session_pids=None):
+    """The worktree each process belongs to, as {pid: worktree or None}. A session's own process (session_pids, from
+    the sessions Claude Code lists) belongs to the session's worktree; any other process to the worktree its command
+    line names. A process that names none, such as `cmd.exe /d /s /c tsc -b && vite build`, takes the worktree of its
+    children when every one of them names the same, and otherwise that of its nearest parent that belongs to one: a
+    session's shell, the session itself. The children count only when all of them agree, because a system process
+    such as services.exe has a hundred children and belongs to none of them."""
+    session_pids = session_pids or {}
+    direct = {p["pid"]: session_pids.get(p["pid"]) or owner(p["command"], trees) for p in snapshot}
+    parent = {p["pid"]: p["ppid"] for p in snapshot}
+    children = {}
+    for process in snapshot:
+        if process["ppid"] != process["pid"]:
+            children.setdefault(process["ppid"], []).append(process["pid"])
+    found = {}
+    for process in snapshot:
+        pid = process["pid"]
+        tree = direct.get(pid)
+        kids = [direct.get(kid) for kid in children.get(pid, [])]
+        if tree is None and kids and all(kid is not None and kid is kids[0] for kid in kids):
+            tree = kids[0]
+        seen, up = {pid}, parent.get(pid)
+        while tree is None and up and up not in seen:
+            seen.add(up)
+            tree = direct.get(up)
+            up = parent.get(up)
+        found[pid] = tree
+    return found
 
 
 def heavy_patterns(config):
@@ -940,8 +1143,10 @@ def do_run(options):
         if not busy and not turn and take_turn(place.root, place.here, command):
             break
         waits = []
+        pids = session_pids(place.trees, sessions_by_tree(place.trees, cached_sessions(place.root) or []))
+        found = owners(snapshot, place.trees, pids) if busy else {}
         for process in busy[:5]:
-            whose = owner(process["command"], place.trees)
+            whose = found.get(process["pid"])
             waits.append(f"pid {process['pid']} {shown(process['command'], 70)}" + (f" ({whose['name']})" if whose else ""))
         if len(busy) > 5:
             waits.append(f"and {len(busy) - 5} more")
@@ -994,6 +1199,10 @@ def survey_tree(tree, base):
     path = tree["path"]
     ahead = behind = None
     blobs = {}
+    if tree.get("broken"):
+        # git asked there would answer for the main checkout; nothing it said would be this worktree's.
+        return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": False, "head": tree.get("head"),
+                "ahead": None, "behind": None, "uncommitted": 0, "files": [], "blobs": {}, "dirty": [], "broken": True}
     if base:
         code, out = git(path, "rev-list", "--left-right", "--count", f"{base}...HEAD")
         if code == 0 and len(out.split()) == 2:
@@ -1013,7 +1222,8 @@ def survey_tree(tree, base):
             blobs.setdefault(dirty[-1], None)                           # changed here, in no commit yet
     return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": tree["main"],
             "head": tree.get("head"), "ahead": ahead,
-            "behind": behind, "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty)}
+            "behind": behind, "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty),
+            "broken": False}
 
 
 def collisions(trees):
@@ -1024,6 +1234,8 @@ def collisions(trees):
     each hold a change that is not committed."""
     holders = {}
     for tree in trees:
+        if tree.get("broken"):
+            continue
         dirty = set(tree.get("dirty") or [])
         for path, blob in (tree.get("blobs") or {}).items():
             holders.setdefault(path, []).append((tree["name"], blob, path in dirty))
@@ -1070,6 +1282,27 @@ def do_refresh(options):
     return 0
 
 
+def session_pids(trees, by_tree):
+    """{pid: worktree} for every session whose process id is known."""
+    return {session["pid"]: tree for tree in trees for session in by_tree.get(same(tree["path"]), []) if session["pid"]}
+
+
+def session_state(session, now):
+    """How a session stands, in a few words: busy, idle for how long, blocked, or when it last wrote."""
+    status = session["status"]
+    if status == "busy":
+        return "busy"
+    if status == "blocked":
+        return "blocked in the background" if session.get("kind") == "background" else "blocked"
+    if status == "idle":
+        return "idle" + (f" for {how_long(now - session['wrote'])}" if session.get("wrote") else "")
+    return f"last wrote {ago(session['wrote'], now)}" if session.get("wrote") else f"{status}"
+
+
+def session_name(session):
+    return quoted(session["name"]) if session.get("name") else f"{session.get('id', '')[:8] or 'with no id'} (no title)"
+
+
 def do_look(options):
     place = Place(options.repo)
     crew = settings(place.config)
@@ -1078,6 +1311,8 @@ def do_look(options):
         claims, dropped = place.settled()
     spoken = load_said(place.root)
     record = survey(place)
+    rows = fetch_sessions(place.root, place.config)
+    by_tree = sessions_by_tree(place.trees, rows, crew.get("activeMinutes") or 30, now)
     snapshot = processes()
     ports = listening()
     patterns = heavy_patterns(place.config)
@@ -1085,10 +1320,15 @@ def do_look(options):
     keep = [int(p) for p in crew.get("keepPorts") or [] if str(p).isdigit()]
     by_pid = {p["pid"]: p for p in snapshot}
     port_owner = {port: pid for pid, found in (ports or {}).items() for port in found}
-    whose = {p["pid"]: owner(p["command"], place.trees) for p in snapshot}
+    whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
+    broken = [tree for tree in place.trees if tree.get("broken")]
 
-    print(f"bowline crew: {place.trees[0]['path']}, {common.count(len(place.trees), 'worktree', 'worktrees')}"
+    print(f"bowline crew: {place.trees[0]['path']}, {common.count(len(place.trees) - len(broken), 'worktree', 'worktrees')}"
+          + (f" and {common.count(len(broken), 'broken one', 'broken ones')}" if broken else "")
           + (f", measured against {place.base}" if place.base else ", with no pushed branch to measure against"))
+    if rows is None:
+        print(f"  Claude Code's list of sessions could not be asked ({' '.join(claude_command(place.config))} agents --json), "
+              "so a session is named from its transcript's title, and whether it is busy is not known.")
     if place.unreachable:
         print(f"  {common.count(len(place.unreachable), 'worktree that git lists is', 'worktrees that git lists are')} left out, "
               "because this system cannot enter the folder (made from another system's view of the disk, or removed "
@@ -1100,6 +1340,12 @@ def do_look(options):
     print()
     quiet = {}
     for tree, measured in zip(place.trees, record["trees"]):
+        if tree.get("broken"):
+            print(f"  {tree['name']}, branch {tree['branch']}: broken or being removed. Its folder has no .git file of its "
+                  "own, so git asked there answers for the main checkout; it is left out of the counts and of the files "
+                  "changed in more than one worktree.")
+            print()
+            continue
         head = f"  {tree['name']}" + (" (this one)" if tree is place.here else "") + f", branch {tree['branch']}"
         if measured["ahead"] is not None:
             head += f": {common.count(measured['ahead'], 'commit', 'commits')} ahead of {place.base}, {measured['behind']} behind"
@@ -1109,6 +1355,11 @@ def do_look(options):
         if stamp is None or now - stamp > 24 * 3600:
             quiet[tree["name"]] = "no sign of work" if stamp is None else f"quiet for {how_long(now - stamp)}"
         print("      last sign of work: " + (f"{ago(stamp, now)}, {what}" if stamp else "none on this machine"))
+        here_now = by_tree.get(same(tree["path"]), [])
+        for session in here_now:
+            print(f"      session {session_name(session)}: {session_state(session, now)}")
+        if sum(1 for session in here_now if session["status"] == "busy") > 1:
+            print("      warning: more than one session is busy in this one worktree, and they may change the same files")
         own = [p for p in snapshot if whose[p["pid"]] is tree and p["pid"] != os.getpid()]
         named = [p for p in own if p["pid"] in heavy or (ports or {}).get(p["pid"])]
         for process in named if not options.verbose else own:
@@ -1167,7 +1418,8 @@ def do_look(options):
         print(f"  The turn for a heavy check is held since {turn.get('since')} by {holder_name(turn, place.trees)}, for: {turn.get('command')}")
     else:
         print("  The turn for a heavy check is free." + ("" if patterns else f" {common.CONFIG_FILE} names no heavy processes (crew.heavy)."))
-    print("  The sessions themselves, and what each says it is doing: ListAgents. To tell one what you take: SendMessage.")
+    print("  To tell a session what you take: SendMessage." if rows is not None else
+          "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
     return 0
 
 

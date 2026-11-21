@@ -28,9 +28,10 @@ one memory folder Claude Code keeps for a session started there.
 At a session's start, --brief adds one line about working beside other sessions, in every repository, because several
 sessions in one repository is taken as the usual case (crew.assumeOthers; false gives the line only when another
 session is seen, and crew.activeMinutes 0 gives none). It names the places where another Claude Code session worked in
-the last crew.activeMinutes minutes, in another worktree or in this same folder, or says that none shows now, and points
-to /bowline:crew and /bowline:collaborate; it reads only when the transcript files in Claude Code's project folders were
-written, never what they hold. In a repository that has no rule about working beside other sessions, the line also
+the last crew.activeMinutes minutes, each on its own with the sessions seen there, saying which one is the session's
+own folder, or says that none shows now, and points to /bowline:crew and /bowline:collaborate. It reads when the
+transcript files in Claude Code's project folders were written, and of what they hold only the session's title from the
+file's end; the names come first from what the last `bowline crew` heard from `claude agents`. In a repository that has no rule about working beside other sessions, the line also
 carries the rule's main points and says that /bowline:crew sets the repository up. --pending, before a prompt, names
 each place where another session started to work since this one was last told, once.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
@@ -485,23 +486,26 @@ BESIDE_OTHERS = (
     "/bowline:collaborate.")
 
 
-def others_line(root, names=None):
-    """The line every session's start gets in a repository, with the names of the places where another session worked
-    lately, or None. The names come from the worktrees with a sign of work in the last crew.activeMinutes minutes; this
-    session's own transcript is the one the hook names. Several sessions in one repository is taken as the usual case
-    (crew.assumeOthers), so a session that sees nobody still gets the line: another may start a minute later, and a
-    session's start is the one moment every session reads. A repository without a rule about working beside other
-    sessions gets the rule's main points with it, and where the repository is set up. Returns the line and the names."""
+def others_line(root, places=None):
+    """The line every session's start gets in a repository, with the places where another session worked lately, or
+    None. The places are the worktrees with a sign of work in the last crew.activeMinutes minutes, each named on its
+    own with the sessions seen there, and this session's own folder said as such; this session's own transcript is the
+    one the hook names. Several sessions in one repository is taken as the usual case (crew.assumeOthers), so a session
+    that sees nobody still gets the line: another may start a minute later, and a session's start is the one moment
+    every session reads. A repository without a rule about working beside other sessions gets the rule's main points
+    with it, and where the repository is set up. Returns the line and the names of the places."""
     config = common.load_config(root)
     settings = config.get("crew") or {}
     minutes = settings.get("activeMinutes")
-    if names is None:
-        names = crew.others_active(root, config, transcript=lambda: hook_facts().get("transcript_path"))
-    if not minutes or not (names or settings.get("assumeOthers")):
+    if places is None:
+        places = crew.others_active(root, config, transcript=lambda: hook_facts().get("transcript_path"))
+    names = [place["name"] for place in places]
+    if not minutes or not (places or settings.get("assumeOthers")):
         return None, names
-    if names:
-        seen = (f"{common.count(len(names), 'other Claude Code session has', 'other Claude Code sessions have')} worked in this "
-                f"repository in the last {minutes} minutes, in {common.names(names)}.")
+    if places:
+        count, where = crew.places_words(places)
+        seen = (f"{common.count(count, 'other Claude Code session has', 'other Claude Code sessions have')} worked in this "
+                f"repository in the last {minutes} minutes: {where}.")
     else:
         seen = ("no other Claude Code session shows a sign of work in this repository right now. Work as if one may start "
                 "at any moment, because several sessions in one repository is the usual case; bowline tells you before a "
@@ -513,14 +517,16 @@ def arrived_line(root, watch, transcript):
     """Before a prompt: the line for a session that is already running when another one appears, or None. A session's
     start names who is there at that moment; this names each place once when a sign of work shows there afterwards, and
     again when it comes back after going quiet. Changes the record's list of the places named."""
-    names = crew.others_active(root, common.load_config(root), transcript=transcript)
-    new = [name for name in names if name not in watch["others"]]
+    places = crew.others_active(root, common.load_config(root), transcript=transcript)
+    names = [place["name"] for place in places]
+    new = [place for place in places if place["name"] not in watch["others"]]
     changed = sorted(names) != sorted(watch["others"])
     watch["others"] = names
     if not new:
         return None, changed
-    return (f"bowline: {common.count(len(new), 'other Claude Code session has', 'other Claude Code sessions have')} started "
-            f"to work in this repository since you were last told, in {common.names(new)}. Look who holds what with "
+    count, where = crew.places_words(new)
+    return (f"bowline: {common.count(count, 'other Claude Code session has', 'other Claude Code sessions have')} started "
+            f"to work in this repository since you were last told: {where}. Look who holds what with "
             "/bowline:crew before your next edit, and before you take a number, run a heavy check, rebase or push; when it "
             "has your subject or your files, work with it as a team: /bowline:collaborate."), True
 

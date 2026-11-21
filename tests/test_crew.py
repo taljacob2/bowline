@@ -17,11 +17,15 @@ import crew  # noqa: E402
 ROOT = "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n"
 ROADMAP = "# Roadmap\n\n## Next\n\n1. **One.** First.\n2. **Two.** Second.\n3. **Three.** Third.\n"
 HEAVY = "bowline-test-heavy-" + str(os.getpid())
+# The stand-in for claude: `agents --json` lists the sessions of the file FAKE_CLAUDE_AGENTS names.
+FAKE_CLAUDE = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")]
 
 
 class CrewTests(ScratchRepo):
     def setUp(self):
         super().setUp()
+        self.agents_file = os.path.join(self.root, "agents.json")
+        os.environ["FAKE_CLAUDE_AGENTS"] = self.agents_file
         write(os.path.join(self.repo, "CLAUDE.md"), ROOT)
         write(os.path.join(self.repo, "docs", "ROADMAP.md"), ROADMAP)
         self.configure({"heavy": [HEAVY], "keepPorts": [59999],
@@ -33,7 +37,13 @@ class CrewTests(ScratchRepo):
         self.other = [tree["path"] for tree in crew.worktrees(self.repo) if not tree["main"]][0]
 
     def configure(self, settings):
-        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"crew": settings}) + "\n")
+        """Writes the crew's settings, with the stand-in for claude unless they name another program."""
+        write(os.path.join(self.repo, ".claude", "bowline.json"),
+              json.dumps({"crew": dict({"claude": FAKE_CLAUDE}, **settings)}) + "\n")
+
+    def agents(self, *rows):
+        """What `claude agents --json` lists from now on."""
+        write(self.agents_file, json.dumps(list(rows)) + "\n")
 
     def crew(self, *args, cwd=None, stdin=None):
         result = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "bowline.py"), "crew", *args], input=stdin,
@@ -61,7 +71,7 @@ class CrewTests(ScratchRepo):
         self.assertIn("Never stop what listens on them", out)
         self.assertIn("59999: nothing listens now", out)
         self.assertIn("The turn for a heavy check is free.", out)
-        self.assertIn("ListAgents", out)
+        self.assertIn("To tell a session what you take: SendMessage.", out)
         code, out, _ = self.crew(cwd=self.other)
         self.assertIn(".claude/worktrees/other (this one)", out)
 
@@ -330,7 +340,7 @@ class CrewTests(ScratchRepo):
         self.transcript(self.other, "theirs", minutes_ago=5)
         code, out, err = self.brief(payload)
         self.assertEqual((code, err), (0, ""))
-        self.assertIn("1 other Claude Code session has worked in this repository in the last 30 minutes, in "
+        self.assertIn("1 other Claude Code session has worked in this repository in the last 30 minutes: in "
                       ".claude/worktrees/other.", out)
         self.assertIn("follow /bowline:crew", out)
         self.assertIn("work with it as a team: /bowline:collaborate.", out)
@@ -347,7 +357,7 @@ class CrewTests(ScratchRepo):
         self.transcript(self.repo, "a-second-session-in-this-folder", minutes_ago=2)
         code, out, _ = self.brief(payload)
         self.assertIn("2 other Claude Code sessions have worked", out)
-        self.assertIn("this same folder", out)
+        self.assertIn("in .claude/worktrees/other; in your own folder, the main checkout.", out)    # each place on its own
         self.assertEqual(crew.others_active(self.repo, {"crew": {"activeMinutes": 0}}), [])   # 0 turns the line off
         self.configure({"activeMinutes": 0})
         self.assertEqual(self.brief(payload), (0, "", ""))
@@ -364,14 +374,14 @@ class CrewTests(ScratchRepo):
         code, out, err = self.brief(prompt, "--pending")
         self.assertEqual((code, err), (0, ""))
         self.assertIn("bowline: 1 other Claude Code session has started to work in this repository since you were last "
-                      "told, in .claude/worktrees/other.", out)
+                      "told: in .claude/worktrees/other.", out)
         self.assertIn("/bowline:crew before your next edit", out)
         self.assertIn("/bowline:collaborate", out)
         self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))           # named once
         self.transcript(self.repo, "a-second-session-in-this-folder")
         code, out, _ = self.brief(prompt, "--pending")
         self.assertIn("1 other Claude Code session has started", out)
-        self.assertIn("in this same folder.", out)
+        self.assertIn("told: in your own folder, the main checkout.", out)
         self.assertNotIn("worktrees/other", out)                                 # the one already named is not named again
         self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))
         # A session's start names who is there, so the prompt after it names nobody again.

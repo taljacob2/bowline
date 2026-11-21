@@ -32,10 +32,13 @@ Nothing else bowline does reaches the network.
 - For the crew, which helps several sessions work in one repository: the list of the processes on your machine with
   their command lines and the TCP ports they listen on, when you or Claude run `bowline crew` or `bowline crew run`;
   the files of the repository's other worktrees that the repository names as numbered lists, and the names of the
-  files each worktree changed; and, at a session's start and before each prompt, when the transcript files in Claude
-  Code's project folders for the repository's worktrees, and each worktree's own git folder, were last written.
-  bowline never opens a transcript. It keeps the names of the worktrees it has named to a session, in the
-  repository's git folder, so that it names each one once; nothing of this is sent.
+  files each worktree changed; the list of Claude Code's sessions on your machine that `claude agents --json` gives,
+  with each session's name, folder, process id and whether it is busy, when you or Claude run `bowline crew`; and,
+  at a session's start and before each prompt, when the transcript files in Claude Code's project folders for the
+  repository's worktrees, and each worktree's own git folder, were last written. Of a transcript bowline reads only
+  the session's title, from the last 256 KB of the file, to name a session when that list cannot be had; never the
+  conversation. It keeps the names of the worktrees it has named to a session, in the repository's git folder, so
+  that it names each one once; nothing of this is sent.
 - Before an edit that Claude makes with the Edit, Write or NotebookEdit tool: the path of the file, from the hook's
   input, to say whether another worktree of the repository holds that file. Never the file's content or the edit.
 
@@ -47,8 +50,9 @@ Nothing else bowline does reaches the network.
 - The commits of the memory backup, in the memory folder, once the backup is set up. From 0.10.0 each commit's message
   also names the session whose reply it follows, by the random identifier Claude Code gives it, so that bowline can
   tell when one session removed lines another had added; the identifier goes to your remote with the commit.
-- The crew's claims, its turn for a heavy check, the list of the files each worktree changed, as last measured, and
-  the few sentences a session writes about its own work with `crew say`, in the repository's own git folder, on your
+- The crew's claims, its turn for a heavy check, the list of the files each worktree changed, as last measured, the
+  list of sessions `claude agents --json` last gave, and the few sentences a session writes about its own work with
+  `crew say`, in the repository's own git folder, on your
   machine only and never committed; and the list of memory removals you said were meant, in Claude Code's project
   folder for the repository.
 - For the check before an edit, in the repository's own git folder: which warnings each session has already heard

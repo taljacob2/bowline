@@ -19,10 +19,17 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew
 ```
 
 It lists every worktree of the repository: its branch, how far it is from the branch every session pushes to, its
-files not yet committed, the last sign of work there, its processes that count as heavy or listen on a port, the
-claims it holds, the files changed differently in more than one worktree, and who holds the turn for a heavy check.
-Then call `ListAgents`: it names the sessions and says which are busy, which the script cannot know. Do both before
-the first change of a session that was told at its start that others are at work, and again before a push.
+files not yet committed, the last sign of work there, the sessions in it by name with whether each is busy, idle or
+blocked, its processes that count as heavy or listen on a port, the claims it holds, the files changed differently in
+more than one worktree, and who holds the turn for a heavy check. The sessions come from `claude agents --json`; when
+the look says that list could not be asked, call `ListAgents` for who is busy. Look before the first change of a
+session that was told at its start that others are at work, and again before a push. `SendMessage` reaches a session
+by the name `ListAgents` gives it.
+
+- **Two sessions in one worktree** are both listed, with a warning when both are busy: they may change the same
+  files. Ask the person which of them keeps the worktree.
+- **A worktree that is broken or being removed** has lost the `.git` file in its folder, so git there answers for the
+  main checkout. It is named and left out of the counts and of the files changed twice; never work in it.
 
 - **A sign of work** is the newest of a session's transcript, the worktree's own git folder being written, and a
   claim. A session that was started in another folder and works here by path leaves no transcript here, so the last

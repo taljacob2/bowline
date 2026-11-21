@@ -23,7 +23,8 @@ class SayTests(ScratchRepo):
     def setUp(self):
         super().setUp()
         write(os.path.join(self.repo, "CLAUDE.md"), ROOT)
-        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"crew": {"sayChars": 80}}) + "\n")
+        stand_in = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")]
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"crew": {"sayChars": 80, "claude": stand_in}}) + "\n")
         git(self.repo, "add", "CLAUDE.md", ".claude/bowline.json")
         git(self.repo, "commit", "-q", "-m", "the crew's settings")
         git(self.repo, "worktree", "add", "-q", "-b", "other", os.path.join(".claude", "worktrees", "other"))
@@ -97,7 +98,7 @@ class SayTests(ScratchRepo):
         config = common.load_config(self.repo)
         self.assertEqual(crew.others_active(self.repo, config), [])
         self.crew("say", "Here, by path, with no transcript in this folder.", cwd=self.other)
-        self.assertEqual(crew.others_active(self.repo, config), [".claude/worktrees/other"])
+        self.assertEqual(crew.others_active(self.repo, config), [{"name": ".claude/worktrees/other", "own": False, "sessions": []}])
         code, out, _ = self.crew()
         self.assertIn("last sign of work: less than a minute ago, what it said", self.block(out, ".claude/worktrees/other"))
 

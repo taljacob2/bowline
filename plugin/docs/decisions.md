@@ -766,3 +766,55 @@ session's start, for a question the system answers in one call.
    worker, and writes it a moment later. A hook that is stopped between the two leaves an empty file: nothing reads
    it as a record, so the doctor says the split will start after the next reply, and it never does, because the
    file exists. It was not seen to happen. `claim()` could take over an empty file that is older than two minutes.
+
+## 2026-11-21: the crew names the sessions, and a process goes by its session
+
+**The question.** The first user ran six to eight sessions at once in one repository with 26 worktrees and asked
+what was happening right now. Answering took eight commands and some guessing, and the look itself was wrong in
+three ways. A worktree that was being removed had lost the `.git` file in its folder, so git asked there walked up
+and answered for the main checkout: 5,781 files "not committed" and twenty overlaps that were the main checkout's own
+diff. A build, `cmd.exe /d /s /c tsc -b && vite build`, was listed as belonging to no worktree, because its command
+line names no path, while its child ran in a worktree's `webui` folder. And the line before a prompt said "2 other
+Claude Code sessions have started to work ... in this same folder, .claude/worktrees/X": it counted places and said
+sessions, and read as one place. The user agreed to the fixes on 2026-11-21 ("about all the other things you
+suggested i agree") and to their mock on the first user's repository ("yes do it all").
+
+**The decision.** The look asks Claude Code for its sessions with `claude agents --json`, which lists every session
+on the machine, Claude Desktop's included, with its name, its folder, its process and whether it is busy, idle or
+blocked. Each session goes under the worktree its folder is in, the deepest when one holds another, and two sessions
+in one worktree are both shown, with a warning when both are busy. The look keeps the list in the repository's git
+folder, and the hooks read that and never start claude: a hook runs before every prompt. Where claude cannot be
+asked, each transcript written lately stands for a session, named by its title line. A worktree whose folder has no
+`.git` file is named as broken or being removed and left out of the counts and of the files changed twice. The line at
+a session's start and the one before a prompt name each place on its own, say which one is the session's own folder,
+name the sessions seen there, and count sessions, one for a place where none is named.
+
+**Why a process goes first by its session.** A process belongs to the worktree of the session it descends from, then
+to the one its command line names, then to that of its children when every one of them names the same, then to that
+of its nearest parent with one. Two things on the first user's machine set that order. Claude Desktop starts every
+session's `claude.exe` with `--project-config-root` naming the main checkout, a session in a worktree too, so every
+Desktop session's own process was counted under the main checkout, and a rule that took a parent's worktree carried
+that error down to everything the session ran; the option's path is now ignored, and the session's `pid` from the
+list decides first. And a rule that looked at any descendant put `wininit.exe` and `services.exe` in the main
+checkout, because one of their hundred children was a program in it: children count only when all of them agree.
+
+**Two things found on the way.** wmic, which lists the processes on Windows, writes `&`, `<` and `>` as `&amp;`,
+`&lt;` and `&gt;`: the build above showed as `tsc -b &amp;&amp; vite build`, and the heavy patterns were matched
+against that text. The table is now read back. And the first entry about the crew said that only a transcript
+folder's listing is read, never a transcript: a transcript's title line is now read too, from the last 256 KB of the
+file and nothing else, because it is the session's name where claude cannot be asked, and Claude Code writes it again
+as the session goes on, so the end holds the newest.
+
+**Not chosen.** Asking claude from the hooks, with a short timeout: it answered in a third of a second on the first
+machine and in a second under an empty configuration, which is too long for a step before every prompt, and a hook
+that waits on another program is the kind that gets turned off. Reading every transcript whole for its title: the
+first user's transcripts reach eight megabytes. Joining a session to its worktree by its processes rather than its
+folder: a session that has run nothing yet has none.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. A session started in the main checkout that works in a worktree by path is listed under the main checkout, where
+   it started. The processes it starts name the worktree, and could place it there too.
+2. A process whose parent ended can be given a parent id that Windows has since given to an unrelated process, and
+   then takes that process's worktree. It was not seen; comparing start times would rule it out, which the standard
+   library cannot do on every system.

@@ -89,7 +89,8 @@
     "memoryLossHours": 24,
     "warnBeforeEdit": true,
     "changedCacheSeconds": 60,
-    "sayChars": 600
+    "sayChars": 600,
+    "claude": "claude"
   },
   "crewWhy": {
     "activeMinutes": "How far back a sign of work counts: a session's start names another session when a transcript of another worktree, or another transcript of this folder, was written within this many minutes, and a running session is told before a prompt when one appears; 0 says nothing at all. It is not a wait: the look happens at once, and half an hour only decides who still counts as at work, which covers a session that is thinking or waiting for a check and forgets one that was closed.",
@@ -106,7 +107,8 @@
     "memoryLossHours": "A removed line counts as a loss when another session had added it within this many hours. A note saved whole from an older copy loses what was added since that copy was read, which is hours at most; a curation removes lines that are days or weeks old, and stays silent.",
     "warnBeforeEdit": "Before Claude edits a file that another worktree of the repository holds (changed there and not committed, committed there and in neither the pushed branch nor this one, or claimed there as file:<path>), a hook tells Claude which worktree and branch hold it, once per session and file, so that the two sessions agree who changes what before both have built on their own copy. It never blocks the edit, and skips the files of shared, numbers and stamps. false turns it off, for a repository whose worktrees are not sessions.",
     "changedCacheSeconds": "How old the record of what every worktree changed (changed.json in the repository's git folder) may be before the hook before an edit has it measured again, in the background. Measuring nineteen worktrees on a slow disk took over two minutes on the first repository that was tried, and an edit must not wait for that; a minute is short enough that a file another session just changed is known by the next edit or the one after.",
-    "sayChars": "How long what a session says of itself with crew say may be; 0 sets no limit. Six hundred characters hold what is done with its commits, what the session waits on and what it asks, and still let a look at ten worktrees be read at once; a longer one is refused, not cut, because a cut report is the loss this exists to prevent."
+    "sayChars": "How long what a session says of itself with crew say may be; 0 sets no limit. Six hundred characters hold what is done with its commits, what the session waits on and what it asks, and still let a look at ten worktrees be read at once; a longer one is refused, not cut, because a cut report is the loss this exists to prevent.",
+    "claude": "The program crew asks for the list of sessions, as `<program> agents --json`: a name on the path or a full path, or a list for a program with its arguments. That list holds every session on the machine, Claude Desktop's included, with its name, its folder, its process and whether it is busy, idle or blocked. It answered in under a second on the first machine tried; only the look asks it, and the hooks read what the last look kept. Where it cannot be asked, a transcript written lately stands for a session and its title line names it."
   },
   "outsidePaths": [
     "scratchpad['`\\\\/]",

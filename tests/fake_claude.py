@@ -1,7 +1,9 @@
-"""A stand-in for the claude command in bowline's tests. It records how it was called, then behaves as the mode in
-FAKE_CLAUDE_MODE says: "split" makes the two commits of a finished split in the working folder, "half" makes the
-first commit and leaves a file uncommitted, "nothing" changes nothing. It prints the JSON result a headless session
-prints, so the worker's reading of the cost and the session id is tested too."""
+"""A stand-in for the claude command in bowline's tests. Called as `agents --json`, it prints the sessions listed in the
+file FAKE_CLAUDE_AGENTS names, or an empty list, as Claude Code lists its sessions; FAKE_CLAUDE_AGENTS_FAIL makes it
+fail instead. Otherwise it records how it was called, then behaves as the mode in FAKE_CLAUDE_MODE says: "split" makes
+the two commits of a finished split in the working folder, "half" makes the first commit and leaves a file
+uncommitted, "nothing" changes nothing. It prints the JSON result a headless session prints, so the worker's reading
+of the cost and the session id is tested too."""
 
 import json
 import os
@@ -23,6 +25,16 @@ def write(path, text):
 
 
 def main():
+    if sys.argv[1:3] == ["agents", "--json"]:
+        if os.environ.get("FAKE_CLAUDE_AGENTS_FAIL"):
+            return 1
+        listed = os.environ.get("FAKE_CLAUDE_AGENTS")
+        if listed and os.path.isfile(listed):
+            with open(listed, encoding="utf-8") as handle:
+                print(handle.read())
+        else:
+            print("[]")
+        return 0
     mode = os.environ.get("FAKE_CLAUDE_MODE", "split")
     with open(os.environ["FAKE_CLAUDE_LOG"], "a", encoding="utf-8") as handle:
         handle.write(json.dumps({"argv": sys.argv[1:], "cwd": os.getcwd(), "mode": mode,

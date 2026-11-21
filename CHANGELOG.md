@@ -4,6 +4,32 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+The crew names the sessions, and gives each process to the right worktree. No Claude Code limit moved; one observed
+fact was added to `plugin/docs/facts.md`: what `claude agents --json` lists, as Claude Code 2.1.330 prints it. The
+reasoning is in `plugin/docs/decisions.md`, "the crew names the sessions, and a process goes by its session".
+
+- `bowline crew` lists the sessions of each worktree by name, with whether each is busy, idle or blocked, from
+  `claude agents --json`, Claude Desktop's sessions included. Two sessions in one worktree are both listed, with a
+  warning when both are busy. The list is kept in the repository's git folder (`sessions.json`) for the hooks, which
+  never start claude. Where claude cannot be asked, a transcript written lately stands for a session, named by the
+  title line at its end, and the look says so. The new setting `crew.claude` names the program.
+- A worktree whose folder has lost its `.git` file, as while it is being removed, is named "broken or being removed"
+  and left out of the counts and of the files changed in more than one worktree. Until now git asked there answered
+  for the main checkout, and the look showed the main checkout's changes as that worktree's.
+- A process goes to the worktree of the session it descends from, then to the one its command line names, then to
+  that of its children when all of them agree, then to that of its nearest parent with one. A build such as
+  `cmd.exe /d /s /c tsc -b && vite build` is no longer listed as belonging to no worktree. The main checkout path that
+  Claude Desktop passes to every session as `--project-config-root` no longer puts every Desktop session's process
+  in the main checkout.
+- On Windows, the `&`, `<` and `>` that wmic writes as `&amp;`, `&lt;` and `&gt;` are read back, so a command shows
+  as it is and the heavy patterns match what really runs.
+- The line at a session's start and the line before a prompt name each place where another session works on its
+  own, say which one is the session's own folder, and name the sessions there:
+  `in .claude/worktrees/other, "the parser"; in your own folder, the main checkout, "the docs"`. They count
+  sessions, not places.
+
 ## 0.13.4 (2026-11-21)
 
 A split whose worker is gone no longer has to be cleared by hand. No Claude Code limit moved. The reasoning is in
