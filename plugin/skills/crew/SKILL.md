@@ -54,6 +54,10 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew claim file:src/parser.py --why
   branch, in every worktree's copy of the file, committed or not, and in every claim, so it is free even when another
   session wrote its item an hour ago and has not pushed.
 - **A claim another worktree holds is refused**, with that worktree's name. Take another thing, or ask that session.
+- **Split the work by files.** Two sessions never edit the same file at the same time. When your round needs a file
+  another session has changed, message that session before you edit it, agree who changes what, and name the
+  agreement in your commit message; when you cannot reach it, wait for its push and rebase onto it. The files the
+  repository names as shared records are the one exception: every session adds its own entry to them.
 - **Say it as well as write it.** After each claim, tell the sessions it concerns with `SendMessage`: what you took,
   the files and the lines you will change, and what you will not touch. The claims file is where they look; the
   message is how they hear.
@@ -127,6 +131,23 @@ what, with the commit's hash. A session on a branch of its own commits long befo
 waits may need only the commit. Send each of them the hash with `SendMessage`, in one sentence that says what the
 commit holds. After a push, release the claims it finished.
 
+## 7. Give work a session of its own
+
+Keeping apart is half of working side by side; the other half is moving work into a session of its own wherever the
+work allows it, so that a round stays one subject and ends in one commit.
+
+- **A task of its own gets a session of its own.** A deliberate scope cut, or a problem found in passing, gets its
+  numbered slot in the roadmap and does not widen the round you are in. Where the client can start sessions, propose
+  one whose brief names its files and what done looks like; where it cannot, as in the terminal, the slot and one
+  line in your reply stand in for it.
+- **Prefer parallel sessions where the pieces allow it.** When a plan has two or more pieces that touch different
+  files and need nothing from each other, propose each as its own session instead of doing them one after another.
+- **A new subject moves the current round first.** When the person asks about something else in the middle of a
+  round, hand the round to a session of its own with the plan that is left, and then answer. In a worktree, commit
+  first: the new session starts from your branch, and your uncommitted edits stay behind.
+- **Reading and checking stay with you.** A search, a review or a test run goes to a subagent, whose answer comes
+  back in the same turn. A session is for work that ends in a commit of its own.
+
 ## Setting a repository up for it
 
 The first time in a repository, ask the person and write the answers into `.claude/bowline.json` under `crew`; the
@@ -141,9 +162,12 @@ keys and their reasons are in `${CLAUDE_PLUGIN_ROOT}/defaults.json`:
 - `stamps`: each file a build writes with a commit, and the command that remakes it.
 
 Then offer the rule in `${CLAUDE_PLUGIN_ROOT}/templates/crew/beside-other-sessions.md`: show it, adapt its words to
-the repository, and with the person's yes write it to `.claude/rules/beside-other-sessions.md`. It has no `paths:`,
-so every session reads it at its start; it is short for that reason. A repository where one session works at a time
-needs neither the settings nor the rule.
+the repository, and with the person's yes write it to `.claude/rules/beside-other-sessions.md`. It holds both halves,
+keeping apart and giving work a session of its own, because a repository should have one rule about this and not
+two. It has no `paths:`, so every session reads it at its start, and it takes about 4,000 of the 10,000 characters the
+unscoped rules may use; drop the rules the repository does not need. A repository that already has such a rule keeps
+its own: fill its names into the template's words, or leave it. A repository where one session works at a time needs
+neither the settings nor the rule.
 
 ## What not to do
 

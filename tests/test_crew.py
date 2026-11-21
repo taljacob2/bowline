@@ -99,6 +99,8 @@ class CrewTests(ScratchRepo):
         git(self.other, "merge", "-q", "--ff-only", "main")
         trees = crew.survey(crew.Place(self.repo))["trees"]
         self.assertEqual(trees[0]["blobs"]["src/parser.py"], trees[1]["blobs"]["src/parser.py"])
+        head = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        self.assertEqual([tree["head"] for tree in trees], [head, head])       # each worktree's commit is in the record
         self.assertEqual(crew.collisions(trees), {})
         write(os.path.join(self.other, "src", "parser.py"), "shared = 2\n")   # one goes on from there: still none
         self.assertEqual(crew.collisions(crew.survey(crew.Place(self.repo))["trees"]), {})

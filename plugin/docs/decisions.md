@@ -389,6 +389,17 @@ watcher would match it and never go quiet. Measuring the processor's load instea
 does not say whose work it is, or when it will end. Dropping a waiting claim after the push it waited for: the push
 may hold something else, so the claim stays until the session that waits gives it back.
 
+**One rule, with both halves (added the same day, after the release).** While 0.10.0 was being built, the first
+user's repository wrote its own rule about working beside other sessions. Half of it was what the crew's template
+already said. The other half was new: a task of its own gets a session of its own, parallel sessions where the pieces
+allow it, a new subject moves the round first, and reading and checking stay in subagents; and one rule of the first
+half, split the work by files and agree before editing a file another session changed. The user asked, through the
+session that works there, that bowline ship one rule holding both, because two rule files with one title would make
+a reader wonder how they differ. So the template has two sections, the skill has a seventh step, and the conventions
+page names each habit with its loss. The cost is size: about 4,000 characters of the 10,000 the unscoped rules may
+use, where the first template took 1,700, which is why the skill tells a repository to drop the rules it does not
+need.
+
 **Left for later**, each a concrete piece of work this round did not do:
 
 1. A git `post-rewrite` hook in the repository, installed by `init` beside the pre-commit hook, so that a rebase a

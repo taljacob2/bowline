@@ -122,10 +122,10 @@ def worktrees(root, unreachable=None):
                 unreachable.append(entry["worktree"])
             continue
         branch = entry.get("branch", "")
-        found.append({"path": os.path.normpath(entry["worktree"]),
+        found.append({"path": os.path.normpath(entry["worktree"]), "head": entry.get("HEAD") or None,
                       "branch": branch[len("refs/heads/"):] if branch.startswith("refs/heads/") else (branch or "no branch")})
     if not found:
-        found = [{"path": os.path.normpath(root), "branch": "no branch"}]
+        found = [{"path": os.path.normpath(root), "branch": "no branch", "head": None}]
     main = found[0]["path"]
     for index, tree in enumerate(found):
         tree["main"] = index == 0
@@ -932,7 +932,8 @@ def survey_tree(tree, base):
         if len(line) > 3:
             dirty.append(line[3:].split(" -> ")[-1].strip('"'))
             blobs.setdefault(dirty[-1], None)                           # changed here, in no commit yet
-    return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": tree["main"], "ahead": ahead,
+    return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": tree["main"],
+            "head": tree.get("head"), "ahead": ahead,
             "behind": behind, "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty)}
 
 
@@ -970,8 +971,8 @@ def survey(place):
 
 def cached_survey(root):
     """What the last look or `crew refresh` measured, without starting git, or None when nothing was measured yet:
-    {"at": seconds since 1970, "base": the pushed branch or None, "trees": [{"path", "name", "branch", "main", "ahead",
-    "behind", "uncommitted", "files": every file the worktree changed, committed or not, by its path from the
+    {"at": seconds since 1970, "base": the pushed branch or None, "trees": [{"path", "name", "branch", "main", "head":
+    the commit the worktree is at, "ahead", "behind", "uncommitted", "files": every file the worktree changed, committed or not, by its path from the
     repository's top, "blobs": {each of those files: the id of the content its commits end in, or None when no commit
     of the worktree changed it}, "dirty": the files with a change that is not committed}]}. collisions(record["trees"]) gives the files two worktrees changed differently. Measuring a large repository's worktrees cold took over two minutes on the first one that
     was tried, so a hook that runs before every edit reads this and lets `crew refresh` measure in the background."""

@@ -4,6 +4,17 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- The crew's rule template, `templates/crew/beside-other-sessions.md`, holds both halves of working side by side:
+  keeping apart (look, split the work by files, claim, edit the shared records, the turn, read again after a rebase,
+  send the hash) and giving work a session of its own (a task of its own gets one, parallel sessions where the pieces
+  allow it, a new subject moves the round first, reading and checking stay in subagents). The second half comes from
+  the rule the first user's repository wrote for itself, so that a repository gets one rule about this and not two.
+  The crew skill gains the rule about splitting by files and a seventh step for the second half, and the conventions
+  page names each habit with its loss.
+- The record a look keeps (`crew.cached_survey`) holds each worktree's commit as `head`.
+
 ## 0.10.0 (2026-11-21)
 
 The crew: several Claude Code sessions in one repository, each in its own worktree, without colliding. No Claude Code
