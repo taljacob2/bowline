@@ -77,11 +77,8 @@ def start_measuring(root):
     os.makedirs(os.path.dirname(marker), exist_ok=True)
     with open(marker, "w", encoding="utf-8") as handle:
         handle.write(str(os.getpid()) + "\n")
-    kwargs = {"cwd": root, "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-    if os.name == "nt":
-        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        kwargs["start_new_session"] = True
+    kwargs = {"cwd": root, "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL,
+              **common.background_start()}
     subprocess.Popen([sys.executable, "-I", BOWLINE_PY, "crew", "refresh", "--repo", root], **kwargs)
     return True
 

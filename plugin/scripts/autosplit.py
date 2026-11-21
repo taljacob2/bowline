@@ -246,11 +246,7 @@ def start_worker(root, path, lines, chars, why):
     save_state(root, path, {"file": path, "state": "starting", "branch": branch_of(path), "started": now(),
                             "before": {"lines": lines, "chars": chars}, "why": why, "log": log})
     args = [sys.executable, "-I", BOWLINE_PY, "autosplit", "worker", "--repo", root, "--file", path]
-    kwargs = {"cwd": root, "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT}
-    if os.name == "nt":
-        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        kwargs["start_new_session"] = True
+    kwargs = {"cwd": root, "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT, **common.background_start()}
     with open(log, "a", encoding="utf-8") as handle:
         handle.write(f"\n== {now()}: autosplit starts on {path} ({why}) ==\n")
         handle.flush()

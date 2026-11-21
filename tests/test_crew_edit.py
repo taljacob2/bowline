@@ -10,7 +10,7 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, git, write
+from support import SCRIPTS, ScratchRepo, assert_starts_hidden, git, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -212,7 +212,7 @@ class CrewEditTests(ScratchRepo):
         write(marker, "1\n")
         started = []
         real = crew_edit.subprocess.Popen
-        crew_edit.subprocess.Popen = lambda args, **kwargs: started.append(args)
+        crew_edit.subprocess.Popen = lambda args, **kwargs: started.append((args, kwargs))
         try:
             self.assertFalse(crew_edit.start_measuring(self.repo), "one started a moment ago")
             self.assertEqual(started, [])
@@ -222,7 +222,9 @@ class CrewEditTests(ScratchRepo):
         finally:
             crew_edit.subprocess.Popen = real
         self.assertEqual(len(started), 1)
-        self.assertEqual(started[0][-4:], ["crew", "refresh", "--repo", self.repo], "what is started is crew's own measuring")
+        args, kwargs = started[0]
+        self.assertEqual(args[-4:], ["crew", "refresh", "--repo", self.repo], "what is started is crew's own measuring")
+        assert_starts_hidden(self, kwargs)
 
     def test_a_file_outside_any_repository_and_a_path_that_is_not_absolute_are_silent(self):
         self.add_other()

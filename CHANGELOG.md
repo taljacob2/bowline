@@ -26,6 +26,17 @@ Sessions that work as a team, not only beside one another. No Claude Code limit 
 - The crew skill, the conventions skill, the conventions page, the guide, the README and `plugin/PRIVACY.md` name the
   new skill and the command.
 
+A fix: on Windows, bowline's background work opened console windows that took the focus. No Claude Code limit moved.
+The reasoning is in `plugin/docs/decisions.md`, "a background process on Windows gets a console that is never shown".
+
+- The autosplit worker and `crew refresh` were started with no console at all (`DETACHED_PROCESS`). Windows therefore
+  opened a new, visible console window for every git and Python they started, and a burst of windows took the focus
+  for a few seconds from whatever the person was doing. Both now start with a console of their own that is never shown
+  (`CREATE_NO_WINDOW`), and every program they start shares it. They still keep running after the hook returns, in a
+  process group of their own. Linux and macOS are unchanged.
+- `common.background_start()` now holds how bowline starts a process in the background, so both starts use the same
+  arguments, and a test checks each of them.
+
 ## 0.11.0 (2026-11-21)
 
 A warning before an edit of a file that another worktree holds, and one rule template for working beside other

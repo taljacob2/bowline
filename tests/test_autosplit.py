@@ -8,7 +8,7 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, git, read, write
+from support import SCRIPTS, ScratchRepo, assert_starts_hidden, git, read, write
 
 FAKE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")
 LONG = "# Sub\n\n## First\n\n" + ("A rule, stated at length.\n" * 150) + "\n## Second\n\n" + ("More.\n" * 100)
@@ -85,6 +85,20 @@ class AutosplitTests(ScratchRepo):
         # A root file in .claude/ loads whole, like CLAUDE.md: wide is not cut there, only long is too long.
         write(os.path.join(self.repo, ".claude", "CLAUDE.md"), "# Root\n\n## Wide\n\n" + ("words " * 400 + "\n") * 20)
         self.assertEqual(autosplit.oversized(self.repo, config), [])
+
+    def test_the_worker_starts_with_a_console_that_is_never_shown(self):
+        import autosplit
+        started = []
+        real = autosplit.subprocess.Popen
+        autosplit.subprocess.Popen = lambda args, **kwargs: started.append((args, kwargs))
+        try:
+            autosplit.start_worker(self.repo, "sub/CLAUDE.md", 257, 4000, "a test")
+        finally:
+            autosplit.subprocess.Popen = real
+        self.assertEqual(len(started), 1)
+        args, kwargs = started[0]
+        self.assertEqual(args[3:5], ["autosplit", "worker"], "what is started is the worker")
+        assert_starts_hidden(self, kwargs)
 
     def test_hook_does_nothing_when_off_when_the_file_is_dirty_or_inside_the_worker(self):
         code, out, err = self.hook()

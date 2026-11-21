@@ -34,6 +34,20 @@ def load_json(path):
         return json.load(handle)
 
 
+def assert_starts_hidden(test, kwargs):
+    """Checks the arguments a process was started with in the background: it must open no window. On Windows that means
+    a console of its own that is never shown, which every program it starts shares. It never means DETACHED_PROCESS,
+    which leaves the process no console at all, so that every git it starts opens a window of its own. Elsewhere it
+    means a session of its own."""
+    if os.name == "nt":
+        flags = kwargs.get("creationflags", 0)
+        test.assertTrue(flags & subprocess.CREATE_NO_WINDOW, "a console of its own that is never shown")
+        test.assertFalse(flags & subprocess.DETACHED_PROCESS, "never no console at all")
+        test.assertTrue(flags & subprocess.CREATE_NEW_PROCESS_GROUP, "a process group of its own")
+    else:
+        test.assertTrue(kwargs.get("start_new_session"), "a session of its own")
+
+
 class ScratchRepo(unittest.TestCase):
     """A test case with a fresh git repository (one committed file) and a fresh CLAUDE_CONFIG_DIR."""
 

@@ -39,6 +39,18 @@ def run_git(args, cwd=None, check=True):
     return result.stdout.decode("utf-8", "replace")
 
 
+def background_start():
+    """The arguments to subprocess.Popen for a process that keeps running after the hook that starts it returns, and
+    opens no window. On Windows it gets a console of its own that is never shown, and every git or Python it starts
+    shares that console. DETACHED_PROCESS, used before, left it with no console at all, so Windows opened a new, visible
+    console window for every console program it started, and each window took the focus from whatever the person was
+    doing. Its own process group keeps a Ctrl+C meant for the session from reaching it. Elsewhere a new session does the
+    same."""
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
 # What a run learns about the folders' layout, kept for the rest of the run: which folder is a repository's top, and which
 # repositories a folder holds. A doctor over a folder of N repositories asked both for each repository, and each answer
 # rescanned the folder and started git, about N squared calls, minutes on a slow mount. A run of bowline is short and

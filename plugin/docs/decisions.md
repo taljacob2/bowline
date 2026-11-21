@@ -546,3 +546,25 @@ keeping another session's words out of it holds there too. The session that prop
    client with no messages between sessions; today the status holds the question in its words.
 2. The look could mark a status older than its worktree's last commit, since it then describes work that has moved
    on.
+
+## 2026-11-21: a background process on Windows gets a console that is never shown
+
+**The question.** How does bowline start a process that keeps running after the hook that starts it returns? Two do:
+the autosplit worker and `crew refresh`. On Windows both were started with `DETACHED_PROCESS`.
+
+**What went wrong.** A process started with `DETACHED_PROCESS` has no console. When it starts a console program, such
+as git or Python, Windows gives that program a new console, and the new console is visible; on Windows 11 it opens as
+a Windows Terminal window. The first user saw several windows open and close within about five seconds, roughly once a
+minute, and each one took the focus from the game they were playing. A process watcher found seven windows in 5.5
+seconds, one for each git and Python that a single autosplit worker started while bowline's tests ran. The starts the
+hooks make behave the same way.
+
+**The decision.** `common.background_start()` gives the arguments for every such start. On Windows they are
+`CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP`: the process gets a console of its own that is never shown, every console
+program it starts shares that console, and its own process group keeps a Ctrl+C meant for the session away from it.
+Windows ignores `CREATE_NO_WINDOW` when `DETACHED_PROCESS` is also given, so the old flag is removed, not added to. On
+Linux and macOS the process gets a session of its own, as before.
+
+**Not chosen.** Starting the worker with `pythonw.exe`: it has no console either, so the programs it starts would still
+open windows. Passing `CREATE_NO_WINDOW` to each git call inside the worker: it works, but every later call would have to
+remember it, and one that forgot would bring the windows back.
