@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.12.0 (2026-11-21)
 
 Sessions that work as a team, not only beside one another. No Claude Code limit moved. The reasoning is in
 `plugin/docs/decisions.md`, "sessions that collaborate".
