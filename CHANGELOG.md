@@ -4,6 +4,15 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.13.1 (2026-11-21)
+
+A wording fix in the rule template. No Claude Code limit moved.
+
+- `templates/crew/beside-other-sessions.md` says where a status is seen: `bowline crew say` writes it, and every
+  session sees it in `bowline crew`. 0.13.0 said only that every session sees it, which names no command to run.
+  Four other sentences lost a few words to pay for it, with their meaning unchanged, so the template is 4,034
+  characters, two fewer than it was. A repository that copied the template adds the three words to its own copy.
+
 ## 0.13.0 (2026-11-21)
 
 Several sessions in one repository is the usual case, with no setup. No Claude Code limit moved. The reasoning is in
