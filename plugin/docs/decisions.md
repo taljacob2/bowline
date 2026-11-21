@@ -722,6 +722,47 @@ milliseconds. A longer wait in the two tests: the worker was dead, not slow.
    restarts, the process is stopped, or a save is refused for longer than five seconds. `bowline autosplit status`
    and the doctor then say "being prepared in the background" for good, `discard` refuses the record because it
    takes the worker to be running, and the person clears it by hand. The doctor could say that the process named in
-   the record is gone, and `discard` could accept such a record and remove the worktree it left.
+   the record is gone, and `discard` could accept such a record and remove the worktree it left. *Done the same
+   day, after 0.13.3: the entry "a worker that is gone is told from one at work" below.*
 2. The old start flags were not run again, for the reason above, so how often the refusal happened before the
    change is not known.
+
+## 2026-11-21: a worker that is gone is told from one at work
+
+**The question.** A split's record says "starting" or "running" while its worker is at work, and the worker writes
+"ready", "merged" or "failed" before it ends. A worker that is stopped, or whose machine restarts, writes nothing.
+Its record stays at "running", and three things followed from that: the doctor and `autosplit status` said "being
+prepared in the background" for good, the hook started nothing because the file had a record, and `autosplit
+discard` refused because it took the worker to be running. The person had to remove a worktree, a branch and a file
+under `.git` by hand. How does bowline tell such a record from a worker at work?
+
+**The decision.** At "running" the record names the worker's process, and bowline asks the system whether a
+process with that id exists (`common.process_alive()`); one that does not exist is certain. At "starting" there is
+no process id yet, because the hook writes the record before the worker begins, so the record's age decides: the
+worker writes "running" as its first act, within a second, and after two minutes at "starting" none ever began.
+`autosplit.worker_gone()` gives the reason in words. The doctor reports such a split as a warning that it "stopped
+without recording how it ended", `autosplit status` and `show` say the same, and `discard` accepts the record: it
+removes the worktree that has the split's branch checked out, found through `git worktree list`, and the temporary
+folder made for it, then deletes the branch and the record. When git cannot remove the worktree, because a program
+still uses the folder, `discard` says so and keeps the record, so that it can be run again.
+
+**What it does not do.** The hook does not clear the record and start again on its own. After a failure autosplit
+never tries again by itself, because a headless session costs money, and a worker that vanished is a failure of the
+same kind; the person reads the log and decides. And a process id can be given to a new process after the old one
+ended: then some process has the id, bowline takes the worker to be at work, and the record stays as it was before
+this change, to be cleared by hand. That is the safe side of the mistake: bowline never removes the worktree of a
+worker that may be at work.
+
+**Not chosen.** A file the worker touches every half minute, read as a heartbeat: it needs a thread in the worker
+beside the session it waits on, and a machine that slept reads as a dead worker in the first moments after it
+wakes, when `discard` would remove the worktree of a worker that is about to go on. Comparing the process's start
+time with the record's, to rule out a reused id: the standard library reads a start time on Windows and Linux in
+two different ways and not at all on macOS. Starting `tasklist` or `ps`: a program started by the doctor at every
+session's start, for a question the system answers in one call.
+
+**Left for later**, a concrete piece of work this round did not do:
+
+1. A record that is empty. The hook creates the record's file first, empty, so that two hooks cannot both start a
+   worker, and writes it a moment later. A hook that is stopped between the two leaves an empty file: nothing reads
+   it as a record, so the doctor says the split will start after the next reply, and it never does, because the
+   file exists. It was not seen to happen. `claim()` could take over an empty file that is older than two minutes.

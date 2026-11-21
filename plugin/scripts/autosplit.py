@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import budget  # noqa: E402
@@ -120,6 +121,30 @@ def all_states(root):
 
 def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
+# How long a record may stay at "starting". The hook writes it and starts the worker, and the worker writes "running"
+# with its process id as its first act, within a second; after two minutes at "starting" no worker ever began.
+STARTING_SECONDS = 120
+
+
+def worker_gone(root, state):
+    """Why the worker of a record at "starting" or "running" can no longer be at work, in a few words, or None when it
+    may still be. A worker that ends always records "ready", "merged" or "failed" first; one that was stopped, or
+    whose machine restarted, leaves the record as it was, and nothing would ever finish that split. At "running" the
+    record names the worker's process, and a process that no longer exists is certain. At "starting" there is no
+    process id yet, so the record's age decides."""
+    kind = state.get("state")
+    if kind == "running":
+        pid = state.get("pid")
+        return None if common.process_alive(pid) else f"its process {pid} no longer exists"
+    if kind == "starting":
+        try:
+            age = time.time() - os.path.getmtime(state_path(root, state["file"]))
+        except (OSError, KeyError):
+            return None
+        return f"its worker did not begin within {STARTING_SECONDS} seconds" if age > STARTING_SECONDS else None
+    return None
 
 
 def settings(config):
@@ -501,12 +526,17 @@ def deliver(root, state):
     git(root, "branch", "-D", branch)
 
 
-def describe(state):
-    """One sentence on where a split stands, for the doctor, the status and the log."""
+def describe(state, root=None):
+    """One sentence on where a split stands, for the doctor, the status and the log. With the repository's root, a
+    split whose worker is gone is told from one that is being prepared."""
     kind = state.get("state")
     before = (state.get("before") or {}).get("lines")
     after = (state.get("after") or {}).get("lines")
     if kind in ("starting", "running"):
+        gone = worker_gone(root, state) if root else None
+        if gone:
+            return (f"stopped without recording how it ended: {gone}; it began at {state.get('started')}; "
+                    f"the log is {state.get('log')}")
         return f"being prepared in the background since {state.get('started')}; the log is {state.get('log')}"
     if kind == "merged":
         hashes = ", ".join(c["hash"][:8] for c in state.get("merged") or [])
@@ -541,7 +571,7 @@ def findings(root, config, facts):
     for path, lines, chars, why in oversized(root, config, facts):
         state = states.pop(path, None)
         if state is not None:
-            out.append(state_finding(state))
+            out.append(state_finding(state, root))
             continue
         if not enabled:
             continue
@@ -563,11 +593,11 @@ def findings(root, config, facts):
                 "Either the split was merged by hand, or the file was shortened another way.",
                 f"If it was merged: bowline autosplit done --file {state['file']}. Otherwise: bowline autosplit discard --file {state['file']}."))
         elif state.get("state") in ("starting", "running", "failed", "merged"):
-            out.append(state_finding(state))
+            out.append(state_finding(state, root))
     return out
 
 
-def state_finding(state):
+def state_finding(state, root=None):
     path, kind = state["file"], state.get("state")
     if kind == "merged":
         return common.Finding(
@@ -579,6 +609,11 @@ def state_finding(state):
             "warning", f"A split of {path} is {describe(state)}.",
             "bowline prepared it in the background from the committed HEAD; nothing on your branch changed, and the branch waits for your review.",
             f"Review and merge it: /bowline:split-instructions review {path}.")
+    if kind in ("starting", "running") and root and worker_gone(root, state):
+        return common.Finding(
+            "warning", f"The background split of {path} {describe(state, root)}.",
+            "The worker that was preparing it is no longer at work, so nothing will finish it, and autosplit starts nothing for a file that has a record.",
+            f"Read the log, then run 'bowline autosplit discard --file {path}': it removes the worktree and the branch the worker left and clears the record, and autosplit tries again after the next reply. Or split by hand with /bowline:split-instructions.")
     if kind in ("starting", "running"):
         return common.Finding(
             "note", f"A split of {path} is {describe(state)}.",
@@ -619,7 +654,11 @@ def locate(file, repo):
 def do_run(root, config, path, foreground):
     state = load_state(root, path)
     if foreground and state and state.get("state") in ("starting", "running"):
-        print(f"bowline autosplit: a split of {path} is already {describe(state)}.", file=sys.stderr)
+        if worker_gone(root, state):
+            print(f"bowline autosplit: an earlier split of {path} {describe(state, root)}. Clear it first: "
+                  f"bowline autosplit discard --file {path}.", file=sys.stderr)
+        else:
+            print(f"bowline autosplit: a split of {path} is already {describe(state)}.", file=sys.stderr)
         return 1
     if foreground and state and state.get("state") == "ready":
         print(f"bowline autosplit: a split of {path} is already {describe(state)}. Review it, or discard it first.", file=sys.stderr)
@@ -650,7 +689,7 @@ def do_status(root, config):
     for path, lines, chars, why in over:
         state = states.pop(path, None)
         if state:
-            print(f"  {path}: {describe(state)}")
+            print(f"  {path}: {describe(state, root)}")
             continue
         if not common.writes_allowed(root):
             reason = common.left_alone(root)
@@ -658,7 +697,7 @@ def do_status(root, config):
             reason = waiting_reason(root, config, path) if enabled else "autosplit is off"
         print(f"  {path}: over the limits ({why}); " + (f"waiting: {reason}" if reason else "starts after the next reply"))
     for path, state in states.items():
-        print(f"  {path}: {describe(state)} (the file is within the limits now)")
+        print(f"  {path}: {describe(state, root)} (the file is within the limits now)")
     return 0
 
 
@@ -668,7 +707,7 @@ def do_show(root, path):
         print(f"bowline autosplit: no split of {path} is known; 'bowline autosplit status' lists them.", file=sys.stderr)
         return 1
     print(f"file: {path}")
-    print(f"state: {describe(state)}")
+    print(f"state: {describe(state, root)}")
     branch, base = state.get("branch"), state.get("base")
     if base and (state.get("state") == "ready" or state.get("branch_kept")):
         print(f"branch: {branch}, from {base}")
@@ -708,18 +747,58 @@ def do_show(root, path):
     return 0
 
 
+def left_worktrees(root, branch):
+    """The folders of the worktrees that have the branch checked out, as git lists them."""
+    _, out = git(root, "worktree", "list", "--porcelain")
+    found, folder = [], None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            folder = line[len("worktree "):]
+        elif line == "branch refs/heads/" + branch and folder:
+            found.append(os.path.normpath(folder))
+    return found
+
+
+def remove_left_worktrees(root, branch):
+    """Removes what a worker that is gone left checked out: the worktree on the split's branch, and the temporary
+    folder made for it. Returns (the folders removed, the first problem in words or None)."""
+    removed = []
+    for folder in left_worktrees(root, branch):
+        code, out = git(root, "worktree", "remove", "--force", folder)
+        if code != 0 and os.path.exists(folder):
+            return removed, f"git could not remove the worktree {folder}: {' '.join(out.split())[:200]}"
+        removed.append(folder)
+        parent = os.path.dirname(folder)
+        if os.path.basename(parent).startswith("bowline-split-"):
+            try:
+                os.rmdir(parent)                # only when it is empty: the folder tempfile made for this worktree
+            except OSError:
+                pass
+    git(root, "worktree", "prune")
+    return removed, None
+
+
 def do_forget(root, path, merged):
     state = load_state(root, path)
     if not state:
         print(f"bowline autosplit: no split of {path} is known; 'bowline autosplit status' lists them.", file=sys.stderr)
         return 1
-    if state.get("state") in ("starting", "running"):
-        print(f"bowline autosplit: the split of {path} is still running (process {state.get('pid')}); wait for it, or stop that process first.", file=sys.stderr)
-        return 1
     branch = state.get("branch") or branch_of(path)
+    left = ""
+    if state.get("state") in ("starting", "running"):
+        gone = worker_gone(root, state)
+        if not gone:
+            print(f"bowline autosplit: the split of {path} is still running (process {state.get('pid')}); wait for it, or stop that process first.", file=sys.stderr)
+            return 1
+        removed, problem = remove_left_worktrees(root, branch)
+        if problem:
+            print(f"bowline autosplit: the worker of the split of {path} is gone ({gone}), but {problem}. "
+                  f"Close what uses that folder and run this again; the record is kept.", file=sys.stderr)
+            return 1
+        left = f" Its worker was gone ({gone})" + (f"; the worktree it left, {removed[0]}, is removed." if removed else "; it left no worktree.")
     exists = git(root, "rev-parse", "--verify", "-q", "refs/heads/" + branch)[0] == 0
     code, out = git(root, "branch", "-D", branch) if exists else (1, "")
-    for ext in (".json", ".log"):
+    for ext in (".json", ".json.tmp", ".log"):
         try:
             os.remove(os.path.join(state_dir(root), slug_of(path) + ext))
         except OSError:
@@ -731,7 +810,7 @@ def do_forget(root, path, merged):
     if state.get("state") == "merged":
         print(f"bowline autosplit: the record of the split of {path} is cleared; its commits stay on {state.get('merged_onto')}.")
         return 0
-    print(f"bowline autosplit: the split of {path} is {words}; " + (f"the branch {branch} is deleted." if exists else f"there was no branch {branch} to delete."))
+    print(f"bowline autosplit: the split of {path} is {words}; " + (f"the branch {branch} is deleted." if exists else f"there was no branch {branch} to delete.") + left)
     return 0
 
 

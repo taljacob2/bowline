@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -143,6 +144,69 @@ class AutosplitTests(ScratchRepo):
         self.assertFalse(os.path.exists(refused[0]), "the worktree's folder is gone")
         self.assertEqual(len(self.git_out("worktree", "list").strip().splitlines()), 1)
         self.assertEqual(self.calls_made(), [], "no session was started")
+
+    def test_a_worker_that_is_gone_is_told_from_one_at_work_and_discard_clears_what_it_left(self):
+        import autosplit
+        self.enable()
+        branch = "bowline/split/sub-CLAUDE-md"
+        # What a worker leaves when it is stopped in the middle, or the machine restarts: the record at "running" with
+        # the id of a process that no longer exists, the branch, and the worktree in a temporary folder of its own.
+        ended = subprocess.Popen([sys.executable, "-I", "-c", "pass"])
+        ended.wait()
+        temp = os.path.realpath(tempfile.mkdtemp(prefix="bowline-split-", dir=self.root))
+        worktree = os.path.join(temp, "sub-CLAUDE-md")
+        git(self.repo, "worktree", "add", "-q", "-b", branch, worktree, "HEAD")
+        record = {"file": "sub/CLAUDE.md", "state": "running", "branch": branch, "started": "2026-11-21 10:57",
+                  "pid": ended.pid, "log": os.path.join(os.path.dirname(self.state_file()), "sub-CLAUDE-md.log")}
+        autosplit.save_state(self.repo, "sub/CLAUDE.md", record)
+        gone = f"its process {ended.pid} no longer exists"
+        code, out, _ = self.bowline("autosplit", "status")
+        self.assertIn("sub/CLAUDE.md: stopped without recording how it ended: " + gone, out)
+        self.assertNotIn("being prepared in the background", out)
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertIn("WARN", out)
+        self.assertIn("The background split of sub/CLAUDE.md stopped without recording how it ended: " + gone, out)
+        self.assertIn("bowline autosplit discard --file sub/CLAUDE.md", out)
+        code, out, _ = self.bowline("doctor", "--brief", "--no-memory")
+        self.assertIn("stopped without recording how it ended", out)
+        # Nothing starts on its own for a file that has a record, and a run in the foreground says how to clear it.
+        self.hook()
+        time.sleep(1)
+        self.assertEqual(self.calls_made(), [])
+        code, out, err = self.bowline("autosplit", "run", "--file", "sub/CLAUDE.md")
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("Clear it first: bowline autosplit discard --file sub/CLAUDE.md", err)
+        # discard removes the worktree, its temporary folder, the branch and the record.
+        code, out, err = self.bowline("autosplit", "discard", "--file", "sub/CLAUDE.md")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("Its worker was gone (" + gone + ")", out)
+        self.assertIn("is removed", out)
+        self.assertFalse(os.path.exists(temp), "the worktree and the folder made for it are gone")
+        self.assertEqual(len(self.git_out("worktree", "list").strip().splitlines()), 1)
+        self.assertEqual(self.git_out("branch", "--list", "bowline/split/*").strip(), "")
+        self.assertFalse(os.path.exists(self.state_file()))
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertIn("autosplit will start on sub/CLAUDE.md after the next reply", out)
+        # A worker whose process exists is at work: the doctor says so, and discard still refuses.
+        autosplit.save_state(self.repo, "sub/CLAUDE.md", dict(record, pid=os.getpid()))
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertIn("A split of sub/CLAUDE.md is being prepared in the background", out)
+        code, out, err = self.bowline("autosplit", "discard", "--file", "sub/CLAUDE.md")
+        self.assertEqual(code, 1, out + err)
+        self.assertIn(f"still running (process {os.getpid()})", err)
+        # A record at "starting" names no process yet. It is young for a second; after two minutes no worker began.
+        starting = {key: value for key, value in record.items() if key != "pid"}
+        autosplit.save_state(self.repo, "sub/CLAUDE.md", dict(starting, state="starting"))
+        code, out, _ = self.bowline("autosplit", "status")
+        self.assertIn("being prepared in the background", out)
+        long_ago = time.time() - 300
+        os.utime(self.state_file(), (long_ago, long_ago))
+        code, out, _ = self.bowline("autosplit", "status")
+        self.assertIn("stopped without recording how it ended: its worker did not begin within 120 seconds", out)
+        code, out, err = self.bowline("autosplit", "discard", "--file", "sub/CLAUDE.md")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("it left no worktree", out)
+        self.assertFalse(os.path.exists(self.state_file()))
 
     def test_hook_does_nothing_when_off_when_the_file_is_dirty_or_inside_the_worker(self):
         code, out, err = self.hook()

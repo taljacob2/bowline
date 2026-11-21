@@ -41,9 +41,10 @@ means for this repository, in plain words, and name the skill that fixes it:
 - The memory not backed up, or no hook pushing it: `/bowline:memory-backup`.
 - A split that autosplit prepared in the background, ready on its branch: `/bowline:split-instructions review <file>`.
   One that failed: read its log with the person, then `/bowline:split-instructions` by hand, or
-  `bowline autosplit discard --file <file>` to let autosplit try again. One that autosplit merged on its own (the
-  repository sets `deliver` to `merge`): read what landed with `bowline autosplit show --file <file>`, then
-  `bowline autosplit done --file <file>`.
+  `bowline autosplit discard --file <file>` to let autosplit try again. One that stopped without recording how it
+  ended (its worker is gone): the same, and `discard` also removes the worktree it left. One that autosplit merged
+  on its own (the repository sets `deliver` to `merge`): read what landed with
+  `bowline autosplit show --file <file>`, then `bowline autosplit done --file <file>`.
 
 Then stop. Do not fix anything from this skill; each fix is its own skill with the person's yes. If the report is clean,
 say so in one line and what the numbers were.

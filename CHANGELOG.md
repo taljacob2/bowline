@@ -4,6 +4,23 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+A split whose worker is gone no longer has to be cleared by hand. No Claude Code limit moved. The reasoning is in
+`plugin/docs/decisions.md`, "a worker that is gone is told from one at work".
+
+- A worker that is stopped, or whose machine restarts, leaves its record at "running", and until now the doctor and
+  `bowline autosplit status` said "being prepared in the background" for good. They now say that the split
+  "stopped without recording how it ended", with the reason: the process the record names no longer exists, or, for
+  a record still at "starting", no worker began within two minutes. The doctor reports it as a warning.
+- `bowline autosplit discard` accepts such a record. It removes the worktree the worker left and the temporary
+  folder made for it, deletes the branch and clears the record, and autosplit starts again after the next reply.
+  The steps by hand that 0.13.3 named are no longer needed. A worker that is at work is still refused, as before.
+- `bowline autosplit run` on such a file says to discard the record first. The hook still starts nothing on its
+  own for a file that has a record: a headless session costs money, so a second try is the person's decision.
+- `common.process_alive()` says whether a process exists, without starting a program: through kernel32 on Windows,
+  with signal 0 elsewhere.
+
 ## 0.13.3 (2026-11-21)
 
 A fix for Windows: an autosplit worker could stop for good at the moment something else read its record. No Claude

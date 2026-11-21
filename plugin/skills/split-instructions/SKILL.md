@@ -134,6 +134,8 @@ was made: resolve it by hand, or `git cherry-pick --abort` and `autosplit discar
 autosplit prepares a fresh one after the next reply. When the person does not want the split, `discard` deletes the
 branch and the record. A failed split says why in the doctor and keeps its log under the repository's `.git` folder;
 read the log with the person, then split by hand with the steps above, or `discard` to let autosplit try again.
+A split that "stopped without recording how it ended" had its worker stopped, or the machine restarted: `discard`
+removes the worktree and the branch it left, and autosplit starts again after the next reply.
 
 When the repository sets `deliver` to `merge`, the two commits land on the current branch on their own, and the doctor
 says so until `done`. The review is then of what landed: `show` prints the commits, and the `git revert` it names

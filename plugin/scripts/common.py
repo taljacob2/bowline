@@ -78,6 +78,42 @@ def replace_file(temp, target, seconds=REPLACE_SECONDS):
         pause = min(pause * 2, 0.2)
 
 
+def process_alive(pid):
+    """Whether a process with this id exists on this machine now. A process of another user counts as existing. The id
+    of a process that ended can be given to a new one, so True means only that some process has the id; False is
+    certain. Nothing is started to find out: Windows is asked through kernel32, and elsewhere signal 0 is sent, which
+    reaches no process. On Windows os.kill() is never used for this, because there it ends the process."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        handle = kernel32.OpenProcess(0x1000, False, pid)        # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ctypes.get_last_error() == 5                  # access is denied: it exists, and is not ours to ask
+        try:
+            code = wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return True
+            return code.value == 259                             # STILL_ACTIVE; an ended process keeps its exit code
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 # What a run learns about the folders' layout, kept for the rest of the run: which folder is a repository's top, and which
 # repositories a folder holds. A doctor over a folder of N repositories asked both for each repository, and each answer
 # rescanned the folder and started git, about N squared calls, minutes on a slow mount. A run of bowline is short and
