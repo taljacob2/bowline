@@ -1,6 +1,7 @@
 """The crew: working beside other Claude Code sessions in one repository, each in its own worktree.
 
-    python -I scripts/bowline.py crew [--repo <path>] [--verbose]          who is here, and what each has taken
+    python -I scripts/bowline.py crew [--repo <path>] [--verbose] [--json] who is here, and what each has taken
+    python -I scripts/bowline.py crew watch [--every <seconds>]            the same, drawn again until Ctrl+C
     python -I scripts/bowline.py crew claim <key> [--why <words>]          take a note, a file or a number, or refuse
     python -I scripts/bowline.py crew claim <list> --new [--why <words>]   take the next free number of a numbered list
     python -I scripts/bowline.py crew release <key>... | --all             give back what this worktree took
@@ -11,6 +12,7 @@
     python -I scripts/bowline.py crew refresh                              measure the worktrees again, for the record
     python -I scripts/bowline.py crew before-edit --file <path> | --hook   whether another worktree holds this file
     python -I scripts/bowline.py crew say [<words> | --clear]              what this worktree's session wants the others to know
+    python -I scripts/bowline.py crew say --asks [<question> | --clear]    this session waits for the person's answer
 
 Several sessions in one repository share more than they see: one machine's processor, one memory folder, one roadmap
 whose numbers each of them extends, and the ports a person's own servers listen on. This command gives each session
@@ -26,6 +28,16 @@ transcript written lately stands for a session, named by the title line at its e
 of its session, else to the one its command line names, else to that of its children when all of them agree, else to
 that of its nearest parent with one. A worktree whose folder has no .git file of its own, as while it is being
 removed, is named as broken and left out, because git asked there answers for the main checkout.
+
+The printout puts what matters first, each worktree once: WAITS FOR YOU (a session asks the person a question or is
+blocked, or its sessions are idle and it holds files not committed or commits not on the pushed branch), AT WORK (a
+session is busy or a heavy check runs), IDLE (sessions idle, nothing held) a line each, and QUIET (no session, no sign
+of work) folded into one line that says whether any of them holds work; a commit counts as held only when its change
+is not on the pushed branch (git cherry), because a rebased commit reaches it under another hash. Then what concerns
+more than one worktree. Every line is plain ASCII within 100 columns. --json prints the model the printout is drawn
+from, for any other view; watch draws the printout again every crew.watchSeconds, measuring the worktrees in the
+background, for a terminal kept beside the app. A question the person is waited on for is set by `crew say --asks`,
+or by the Stop hook when a reply ends with one (crew.asksFromReply), and taken back at the person's next prompt.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -79,6 +91,8 @@ import re
 import shutil
 import subprocess
 import sys
+import textwrap
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -550,9 +564,9 @@ def owners(snapshot, trees, session_pids=None):
     """The worktree each process belongs to, as {pid: worktree or None}. A session's own process (session_pids, from
     the sessions Claude Code lists) belongs to the session's worktree; any other process to the worktree its command
     line names. A process that names none, such as `cmd.exe /d /s /c tsc -b && vite build`, takes the worktree of its
-    children when every one of them names the same, and otherwise that of its nearest parent that belongs to one: a
-    session's shell, the session itself. The children count only when all of them agree, because a system process
-    such as services.exe has a hundred children and belongs to none of them."""
+    children when every one of them belongs to the same, each judged the same way, and otherwise that of its nearest
+    parent that belongs to one: a session's shell, the session itself. The children count only when all of them
+    agree, because a system process such as services.exe has a hundred children and belongs to none of them."""
     session_pids = session_pids or {}
     direct = {p["pid"]: session_pids.get(p["pid"]) or owner(p["command"], trees) for p in snapshot}
     parent = {p["pid"]: p["ppid"] for p in snapshot}
@@ -560,13 +574,39 @@ def owners(snapshot, trees, session_pids=None):
     for process in snapshot:
         if process["ppid"] != process["pid"]:
             children.setdefault(process["ppid"], []).append(process["pid"])
+    below = {}
+
+    def from_below(pid, seen):
+        # Judged from the bottom up, so that a chain of processes that name no path, such as Git Bash's
+        # `bash -> npx -> cmd /c vitest -> node .../vitest.mjs`, takes the worktree its last one names. Git Bash's
+        # processes report a parent that has already exited, so from them only the way down is open.
+        if pid in below:
+            return below[pid]
+        if pid in seen:
+            return None
+        seen.add(pid)
+        tree = direct.get(pid)
+        if tree is None:
+            kids = [from_below(kid, seen) for kid in children.get(pid, [])]
+            if kids and all(kid is not None and kid is kids[0] for kid in kids):
+                tree = kids[0]
+        below[pid] = tree
+        return tree
+
     found = {}
     for process in snapshot:
         pid = process["pid"]
-        tree = direct.get(pid)
-        kids = [direct.get(kid) for kid in children.get(pid, [])]
-        if tree is None and kids and all(kid is not None and kid is kids[0] for kid in kids):
-            tree = kids[0]
+        tree = from_below(pid, set())
+        if tree is not None and tree.get("main") and pid not in session_pids:
+            # A path in the main checkout is a weak sign: worktrees share folders with it through links, such as
+            # node_modules, and a test runner in a worktree starts its workers from there. The nearest parent that
+            # belongs to a worktree decides.
+            seen, up = {pid}, parent.get(pid)
+            while up and up not in seen and direct.get(up) is None:
+                seen.add(up)
+                up = parent.get(up)
+            if direct.get(up) is not None:
+                tree = direct[up]
         seen, up = {pid}, parent.get(pid)
         while tree is None and up and up not in seen:
             seen.add(up)
@@ -901,6 +941,8 @@ def do_say(options):
     limit = int(settings(place.config).get("sayChars") or 0)
     words = " ".join(" ".join(options.words).split())
     here = place.here["path"]
+    if options.asks:
+        return say_asks(place, words, options.clear, limit)
     with Lock(state_dir(place.root)):
         # A worktree git no longer lists has nobody left to speak for it.
         alive = {same(tree["path"]) for tree in place.trees} | {same(path) for path in place.unreachable}
@@ -928,6 +970,114 @@ def do_say(options):
         write_json(said_path(place.root), {"said": others + [
             {"worktree": here, "words": words, "at": now_stamp(), "seconds": time.time()}]})
     print(f"bowline crew: said, for every session that looks with `bowline crew`: {words}")
+    return 0
+
+
+# A question for the person.
+#
+# `claude agents` shows a session that ended its reply with a question to the person as plain "idle", the same as one
+# that is done, and on the day this was built three such sessions were in fact waiting for the person. A session says
+# so with `crew say --asks`, and the Stop hook says so for it when its last reply ends with a question; the person's
+# next prompt in that session takes it back.
+
+QUESTION_CHARS = 300
+
+
+def asks_path(root):
+    return os.path.join(state_dir(root), "asks.json")
+
+
+def load_asks(root):
+    """The questions sessions wait on the person for, as [{"worktree", "session", "words", "seconds", "by"}]: by "say"
+    when a session said so itself, by "reply" when its last reply ended with a question. session is Claude Code's id
+    for the session, or None when it was not known."""
+    return [a for a in read_json(asks_path(root), {}).get("asks") or [] if isinstance(a, dict) and a.get("worktree")]
+
+
+def change_asks(root, change):
+    """Changes the questions under the crew's lock: change takes the list and returns the new one."""
+    with Lock(state_dir(root)):
+        asks = change(load_asks(root))
+        write_json(asks_path(root), {"asks": asks})
+    return asks
+
+
+def question_in(text):
+    """The question a reply ends with, or None: the last sentence of its last line that holds words, without the marks
+    Markdown puts around a line, when it ends with a question mark. A question in the middle of a reply that goes on
+    to say something else is not one the person is waited on for."""
+    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    if not lines:
+        return None
+    last = lines[-1].strip("*_`>#- \t").strip()
+    if not last.endswith("?"):
+        return None
+    words = " ".join(re.split(r"(?<=[.!?])\s+", last)[-1].split())
+    return words if len(words) <= QUESTION_CHARS else "..." + words[-(QUESTION_CHARS - 3):]
+
+
+def note_reply(facts):
+    """For the Stop hook: when the reply that just ended asks the person a question, record that its session waits for
+    them; when it does not, take back what an earlier reply of the same session recorded. Claude Code gives the reply's
+    text as last_assistant_message, and nothing else of it is kept. crew.asksFromReply false turns this off."""
+    root = common.repo_root(facts.get("cwd") or os.getcwd())
+    session = str(facts.get("session_id") or "")
+    message = facts.get("last_assistant_message")
+    if not root or not session or not isinstance(message, str):
+        return
+    if not settings(common.load_config(root)).get("asksFromReply", True):
+        return
+    words = question_in(message)
+    earlier = any(a.get("session") == session and a.get("by") == "reply" for a in load_asks(root))
+    if not words and not earlier:
+        return
+
+    def change(asks):
+        kept = [a for a in asks if not (a.get("session") == session and a.get("by") == "reply")]
+        if words:
+            kept.append({"worktree": root, "session": session, "words": words, "seconds": time.time(), "by": "reply"})
+        return kept
+    change_asks(root, change)
+
+
+def clear_asks(facts):
+    """For the hook before a prompt: the person has answered, so this session's questions are taken back, and any in
+    its worktree that name no session."""
+    root = common.repo_root(facts.get("cwd") or os.getcwd())
+    session = str(facts.get("session_id") or "")
+    if not root:
+        return
+
+    def answered(entry):
+        return (session and entry.get("session") == session) or (not entry.get("session") and same(entry["worktree"]) == same(root))
+    if any(answered(entry) for entry in load_asks(root)):
+        change_asks(root, lambda asks: [entry for entry in asks if not answered(entry)])
+
+
+def say_asks(place, words, clear, limit):
+    """`crew say --asks`: this session waits for the person's answer to a question, shown first in every look until the
+    person's next prompt. The session is the one Claude Code names in CLAUDE_CODE_SESSION_ID."""
+    here = place.here["path"]
+    session = os.environ.get("CLAUDE_CODE_SESSION_ID") or None
+
+    def mine(entry):
+        return same(entry["worktree"]) == same(here) and (entry.get("session") or None) == session
+    current = [entry for entry in load_asks(place.root) if mine(entry)]
+    if clear:
+        change_asks(place.root, lambda asks: [entry for entry in asks if not mine(entry)])
+        print("bowline crew: taken back; this session asks nothing now." if current else "bowline crew: this session had asked nothing.")
+        return 0
+    if not words:
+        print(f"bowline crew: this session asks: \"{current[-1]['words']}\"" if current else
+              "bowline crew: this session asks nothing. When you wait for the person's answer: crew say --asks \"<the question>\"")
+        return 0
+    if limit and len(words) > limit:
+        print(f"bowline crew: that is {len(words)} characters, and a question may hold {limit} ({common.CONFIG_FILE}, "
+              "crew.sayChars). Nothing was changed.", file=sys.stderr)
+        return 1
+    change_asks(place.root, lambda asks: [entry for entry in asks if not mine(entry)] + [
+        {"worktree": here, "session": session, "words": words, "seconds": time.time(), "by": "say"}])
+    print(f"bowline crew: asked; every look shows it first, until the person's next prompt here: {words}")
     return 0
 
 
@@ -1197,16 +1347,24 @@ def ago(stamp, now):
 def survey_tree(tree, base):
     """One worktree's distance from the base and the files it changed, committed or not, as a record."""
     path = tree["path"]
-    ahead = behind = None
+    ahead = behind = not_on_base = None
     blobs = {}
     if tree.get("broken"):
         # git asked there would answer for the main checkout; nothing it said would be this worktree's.
         return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": False, "head": tree.get("head"),
-                "ahead": None, "behind": None, "uncommitted": 0, "files": [], "blobs": {}, "dirty": [], "broken": True}
+                "ahead": None, "behind": None, "notOnBase": None, "uncommitted": 0, "files": [], "blobs": {}, "dirty": [],
+                "broken": True}
     if base:
         code, out = git(path, "rev-list", "--left-right", "--count", f"{base}...HEAD")
         if code == 0 and len(out.split()) == 2:
             behind, ahead = (int(n) for n in out.split())
+            not_on_base = ahead
+        if ahead:
+            # A rebased commit reaches the pushed branch under another hash. git cherry compares the changes
+            # themselves, and marks with + each commit whose change the pushed branch does not hold.
+            code, out = git(path, "cherry", base, "HEAD")
+            if code == 0:
+                not_on_base = sum(1 for line in out.splitlines() if line.startswith("+"))
         # Each committed change with the id of the content it ends in, so that two worktrees whose branches hold the
         # same commit are seen to hold the same file, not two changes of it.
         code, out = git(path, "diff", "--raw", "--no-abbrev", "--no-renames", f"{base}...HEAD")
@@ -1221,9 +1379,8 @@ def survey_tree(tree, base):
             dirty.append(line[3:].split(" -> ")[-1].strip('"'))
             blobs.setdefault(dirty[-1], None)                           # changed here, in no commit yet
     return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": tree["main"],
-            "head": tree.get("head"), "ahead": ahead,
-            "behind": behind, "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty),
-            "broken": False}
+            "head": tree.get("head"), "ahead": ahead, "behind": behind, "notOnBase": not_on_base,
+            "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty), "broken": False}
 
 
 def collisions(trees):
@@ -1263,7 +1420,9 @@ def survey(place):
 def cached_survey(root):
     """What the last look or `crew refresh` measured, without starting git, or None when nothing was measured yet:
     {"at": seconds since 1970, "base": the pushed branch or None, "trees": [{"path", "name", "branch", "main", "head":
-    the commit the worktree is at, "ahead", "behind", "uncommitted", "files": every file the worktree changed, committed or not, by its path from the
+    the commit the worktree is at, "ahead", "behind", "notOnBase": how many of the commits ahead hold a change the
+    pushed branch does not (git cherry), "broken": its folder has no .git file and nothing was measured, "uncommitted",
+    "files": every file the worktree changed, committed or not, by its path from the
     repository's top, "blobs": {each of those files: the id of the content its commits end in, or None when no commit
     of the worktree changed it}, "dirty": the files with a change that is not committed}]}. collisions(record["trees"]) gives the files two worktrees changed differently. Measuring a large repository's worktrees cold took over two minutes on the first one that
     was tried, so a hook that runs before every edit reads this and lets `crew refresh` measure in the background."""
@@ -1303,124 +1462,467 @@ def session_name(session):
     return quoted(session["name"]) if session.get("name") else f"{session.get('id', '')[:8] or 'with no id'} (no title)"
 
 
-def do_look(options):
-    place = Place(options.repo)
+# Who is here: the model every view draws from, and the views.
+#
+# `crew --json` prints the model; the printout, `crew watch` and anything later (a page, a status line) draw from it,
+# so that every view says the same thing. The printout is plain ASCII, needs no colour for its meaning, and keeps every
+# line within WIDTH columns, because Claude Desktop shows a command's output in a narrow pane.
+
+WIDTH = 100
+GROUPS = ("waits", "work", "idle", "quiet", "broken")
+
+
+def display_names(trees):
+    """How the printout names each worktree: "the main checkout", else its folder's name, or its path from the main
+    checkout when two worktrees' folders have one name."""
+    seen = {}
+    for tree in trees:
+        seen[tree["short"].lower()] = seen.get(tree["short"].lower(), 0) + 1
+    return {same(tree["path"]): "the main checkout" if tree["main"] else
+            (tree["short"] if seen[tree["short"].lower()] == 1 else tree["name"]) for tree in trees}
+
+
+def plain_command(command, tree_path=None):
+    """What a process runs, as a person reads it: a Claude Code shell by the command it evaluates, the worktree's own
+    path left out, quotation marks dropped, and node_modules/.bin/.. folded into node_modules."""
+    found = re.search(r"\beval '((?:[^']|'\\'')*)'", command)
+    if found and "shell-snapshots" in command:
+        command = "a shell: " + found.group(1).replace("'\\''", "'").replace('\\"', '"')
+    text = " ".join(command.replace('"', "").split())
+    for path in sorted({tree_path, tree_path.replace("\\", "/")} if tree_path else (), key=len, reverse=True):
+        text = re.sub(re.escape(path) + r"[\\/]+", "", text, flags=re.IGNORECASE)
+    return re.sub(r"node_modules([\\/])\.bin[\\/]+\.\.[\\/]+", r"node_modules\1", text)
+
+
+def standing(item, minutes, now):
+    """The group a worktree goes in and why, as (group, reason). The first that fits: a session asks the person a
+    question or is blocked (waits); a session is busy, or a heavy check runs (work); a session's state is not known
+    but its transcript was written lately (work); its sessions are idle and it holds files not committed or commits
+    not on the pushed branch (waits); its sessions are idle and it holds nothing (idle); no session, but a sign of work
+    lately, as from a session that works here by path (work); nothing (quiet)."""
+    if item["broken"]:
+        return "broken", "broken"
+    sessions = item["sessions"]
+    if item["asks"] or any(session.get("asks") for session in sessions):
+        return "waits", "asks"
+    if any(session["status"] == "blocked" for session in sessions):
+        return "waits", "blocked"
+    if any(session["status"] == "busy" for session in sessions):
+        return "work", "busy"
+    if item["turn"] or any(process["heavy"] for process in item["processes"]):
+        return "work", "heavy"
+    if any(session["status"] == "unknown" for session in sessions):
+        return "work", "wrote"
+    if sessions and (item["uncommitted"] or item["notOnBase"]):
+        return "waits", "idle-uncommitted" if item["uncommitted"] else "idle-unpushed"
+    if sessions:
+        return "idle", "idle"
+    if item["lastSign"] and now - item["lastSign"]["at"] <= minutes * 60:
+        return "work", "sign"
+    return "quiet", "quiet"
+
+
+def newest(item):
+    """When a worktree last showed anything: its newest session's transcript or start, or its last sign of work."""
+    stamps = [session.get("wrote") or session.get("started") or 0 for session in item["sessions"]]
+    stamps += [(session.get("asks") or {}).get("at") or 0 for session in item["sessions"]]
+    stamps += [question.get("at") or 0 for question in item["asks"]] + [(item["lastSign"] or {}).get("at") or 0]
+    return max(stamps)
+
+
+def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, now, verbose=False):
+    """The model of a look, from what was measured: the worktrees in the order the printout shows them, each with its
+    group, its sessions, its processes, its claims and what it said; then what concerns more than one worktree."""
     crew = settings(place.config)
-    now = time.time()
-    with Lock(state_dir(place.root)):
-        claims, dropped = place.settled()
-    spoken = load_said(place.root)
-    record = survey(place)
-    rows = fetch_sessions(place.root, place.config)
-    by_tree = sessions_by_tree(place.trees, rows, crew.get("activeMinutes") or 30, now)
-    snapshot = processes()
-    ports = listening()
+    minutes = crew.get("activeMinutes") or 30
+    by_tree = sessions_by_tree(place.trees, rows, minutes, now)
     patterns = heavy_patterns(place.config)
     heavy = {p["pid"] for p in heavy_now(snapshot, patterns)}
+    whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
+    turn = turn_holder(place.root, snapshot)
+    names = display_names(place.trees)
+    measured = {same(tree["path"]): tree for tree in record["trees"]}
     keep = [int(p) for p in crew.get("keepPorts") or [] if str(p).isdigit()]
+    listed = {str(row.get("sessionId")) for row in rows or [] if row.get("sessionId")}
+    items = []
+    for tree in place.trees:
+        key = same(tree["path"])
+        m = measured.get(key) or {}
+        sessions = [dict(session) for session in by_tree.get(key, [])]
+        loose = []
+        for question in asks:
+            if same(question["worktree"]) != key:
+                continue
+            entry = {"words": question.get("words"), "at": question.get("seconds"), "by": question.get("by")}
+            match = next((s for s in sessions if question.get("session") and s["id"] == question["session"]), None)
+            if match:
+                match["asks"] = entry
+            elif question.get("session") and rows is not None and question["session"] not in listed:
+                continue                                    # its session is closed: nobody waits any more
+            else:
+                loose.append(entry)
+        own = [p for p in snapshot if whose.get(p["pid"]) is tree and p["pid"] != os.getpid()]
+        named = []
+        for process in own:
+            listens = sorted((ports or {}).get(process["pid"], []))
+            if verbose or process["pid"] in heavy or listens:
+                named.append({"pid": process["pid"], "command": shown(process["command"], 300),
+                              "shown": plain_command(process["command"], tree["path"]), "heavy": process["pid"] in heavy,
+                              "ports": listens, "keep": [port for port in listens if port in keep]})
+        stamp, what = last_sign(tree["path"], claims, spoken)
+        spoke = said_by(tree["path"], spoken)
+        ahead = m.get("ahead")
+        item = {"name": tree["name"], "display": names[key], "path": tree["path"], "branch": tree["branch"],
+                "main": tree["main"], "this": tree is place.here, "broken": bool(tree.get("broken")),
+                "ahead": ahead, "behind": m.get("behind"),
+                "notOnBase": m.get("notOnBase") if m.get("notOnBase") is not None else ahead,
+                "uncommitted": m.get("uncommitted") or 0, "lastSign": {"at": stamp, "what": what} if stamp else None,
+                "sessions": sessions, "asks": loose, "processes": named, "otherProcesses": len(own) - len(named),
+                "claims": [{"key": c["key"], "since": c.get("since"), "why": c.get("why") or ""}
+                           for c in claims if same(c.get("worktree") or "") == key],
+                "said": {"words": spoke.get("words"), "at": said_at(spoke)} if spoke else None,
+                "turn": bool(turn) and same(turn.get("worktree") or "") == key}
+        item["group"], item["reason"] = standing(item, minutes, now)
+        items.append(item)
+    order = {"asks": 0, "blocked": 1}
+    items.sort(key=lambda item: (GROUPS.index(item["group"]), order.get(item["reason"], 2), -newest(item)))
+    by_name = {tree["name"]: names[same(tree["path"])] for tree in place.trees}
+    quiet = {item["display"] for item in items if item["group"] == "quiet"}
+    both = sorted(collisions(record["trees"]).items())
+    shared = [(path, held) for path, held in both if shared_record(path, place.config)]
+    groups = {}
+    for path, held in both:
+        if (path, held) not in shared:
+            groups.setdefault(tuple(by_name.get(name, name) for name in held), []).append(path)
     by_pid = {p["pid"]: p for p in snapshot}
     port_owner = {port: pid for pid, found in (ports or {}).items() for port in found}
-    whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
-    broken = [tree for tree in place.trees if tree.get("broken")]
+    keep_rows = []
+    for port in keep:
+        pid = port_owner.get(port)
+        tree = whose.get(pid) if pid else None
+        keep_rows.append({"port": port, "pid": pid, "worktree": names[same(tree["path"])] if tree else None,
+                          "command": shown(by_pid[pid]["command"], 300) if pid in by_pid else None})
+    counts = {group: sum(1 for item in items if item["group"] == group) for group in GROUPS}
+    counts["worktrees"] = len(items) - counts["broken"]
+    counts["sessions"] = sum(len(item["sessions"]) for item in items)
+    trees_folder = {os.path.dirname(tree["name"]) for tree in place.trees if not tree["main"]}
+    return {
+        "repository": place.trees[0]["path"], "base": place.base, "at": now, "measuredAt": record.get("at"),
+        "activeMinutes": minutes, "sessionsListed": rows is not None, "claude": claude_command(place.config),
+        "processesListed": bool(snapshot), "portsListed": ports is not None, "heavyPatterns": bool(patterns),
+        "worktreesFolder": trees_folder.pop() if len(trees_folder) == 1 and "" not in trees_folder else None,
+        "counts": counts, "worktrees": items,
+        "overlaps": [{"worktrees": list(held), "quiet": [name for name in held if name in quiet], "files": paths}
+                     for held, paths in sorted(groups.items(), key=lambda pair: (-len(pair[1]), pair[0]))],
+        "shared": [{"file": path, "worktrees": [by_name.get(name, name) for name in held],
+                    "quiet": [by_name.get(name, name) for name in held if by_name.get(name, name) in quiet]}
+                   for path, held in shared],
+        "keepPorts": keep_rows,
+        "outside": [{"pid": p["pid"], "command": shown(p["command"], 300)} for p in snapshot
+                    if p["pid"] in heavy and whose.get(p["pid"]) is None],
+        "turn": {"worktree": by_name.get(holder_name(turn, place.trees), holder_name(turn, place.trees)),
+                 "since": turn.get("since"), "command": turn.get("command")} if turn else None,
+        "unreachable": list(place.unreachable),
+        "dropped": [{"key": claim["key"], "holder": holder_name(claim, place.trees), "reason": reason} for claim, reason in dropped],
+    }
 
-    print(f"bowline crew: {place.trees[0]['path']}, {common.count(len(place.trees) - len(broken), 'worktree', 'worktrees')}"
-          + (f" and {common.count(len(broken), 'broken one', 'broken ones')}" if broken else "")
-          + (f", measured against {place.base}" if place.base else ", with no pushed branch to measure against"))
-    if rows is None:
-        print(f"  Claude Code's list of sessions could not be asked ({' '.join(claude_command(place.config))} agents --json), "
-              "so a session is named from its transcript's title, and whether it is busy is not known.")
-    if place.unreachable:
-        print(f"  {common.count(len(place.unreachable), 'worktree that git lists is', 'worktrees that git lists are')} left out, "
-              "because this system cannot enter the folder (made from another system's view of the disk, or removed "
-              f"by hand): {common.names(place.unreachable, options.verbose)}")
-    if not snapshot:
-        print("  The system would not list its processes, so none are shown.")
-    if ports is None:
-        print("  The system has no tool that lists listening ports (netstat, ss or lsof), so none are shown.")
-    print()
-    quiet = {}
-    for tree, measured in zip(place.trees, record["trees"]):
-        if tree.get("broken"):
-            print(f"  {tree['name']}, branch {tree['branch']}: broken or being removed. Its folder has no .git file of its "
-                  "own, so git asked there answers for the main checkout; it is left out of the counts and of the files "
-                  "changed in more than one worktree.")
-            print()
-            continue
-        head = f"  {tree['name']}" + (" (this one)" if tree is place.here else "") + f", branch {tree['branch']}"
-        if measured["ahead"] is not None:
-            head += f": {common.count(measured['ahead'], 'commit', 'commits')} ahead of {place.base}, {measured['behind']} behind"
-        head += f", {common.count(measured['uncommitted'], 'file', 'files')} not committed"
-        print(head)
-        stamp, what = last_sign(tree["path"], claims, spoken)
-        if stamp is None or now - stamp > 24 * 3600:
-            quiet[tree["name"]] = "no sign of work" if stamp is None else f"quiet for {how_long(now - stamp)}"
-        print("      last sign of work: " + (f"{ago(stamp, now)}, {what}" if stamp else "none on this machine"))
-        here_now = by_tree.get(same(tree["path"]), [])
-        for session in here_now:
-            print(f"      session {session_name(session)}: {session_state(session, now)}")
-        if sum(1 for session in here_now if session["status"] == "busy") > 1:
-            print("      warning: more than one session is busy in this one worktree, and they may change the same files")
-        own = [p for p in snapshot if whose[p["pid"]] is tree and p["pid"] != os.getpid()]
-        named = [p for p in own if p["pid"] in heavy or (ports or {}).get(p["pid"])]
-        for process in named if not options.verbose else own:
-            marks = (["heavy"] if process["pid"] in heavy else []) + [f"listens on {port}" for port in sorted((ports or {}).get(process["pid"], []))]
-            print(f"      process: pid {process['pid']} {shown(process['command'])}" + (f" ({', '.join(marks)})" if marks else ""))
-        rest = len(own) - len(named)
-        if rest and not options.verbose:
-            print(f"      and {common.count(rest, 'other process', 'other processes')} that neither count as heavy nor listen (--verbose lists them)")
-        for claim in claims:
-            if same(claim["worktree"]) == same(tree["path"]):
-                why = f": {claim['why']}" if claim.get("why") else ""
-                print(f"      claim: {claim['key']}, since {claim.get('since')}{why}")
-        spoke = said_by(tree["path"], spoken)
-        if spoke:
-            when = said_at(spoke)
-            # In quotation marks: the words are the session's own, and a status that holds "claim:" or "process:"
-            # must not read as one of the look's own lines.
-            print(f"      said, {ago(when, now) if when else spoke.get('at')}: \"{spoke.get('words')}\"")
-        print()
-    outside = [p for p in snapshot if p["pid"] in heavy and whose[p["pid"]] is None]
-    if outside:
-        print("  Heavy processes that belong to no worktree:")
-        for process in outside:
-            print(f"      pid {process['pid']} {shown(process['command'])}")
-        print()
-    if keep:
-        print("  The person's own ports, named in " + common.CONFIG_FILE + " (crew.keepPorts). Never stop what listens on them:")
-        for port in keep:
-            pid = port_owner.get(port)
-            who = f"pid {pid} {shown(by_pid[pid]['command'], 70)}" if pid in by_pid else (f"pid {pid}" if pid else "nothing listens now")
-            print(f"      {port}: {who}")
-        print()
 
-    def said(names):
-        return ", ".join(name + (f" ({quiet[name]})" if name in quiet else "") for name in names)
-
-    both = sorted(collisions(record["trees"]).items())
-    records = [(path, names) for path, names in both if shared_record(path, place.config)]
-    both = [pair for pair in both if pair not in records]
-    if both:
-        print("  Changed differently in more than one worktree, so a rebase will meet both changes:")
-        for path, names in both[:20] if not options.verbose else both:
-            print(f"      {path}: {said(names)}")
-        if len(both) > 20 and not options.verbose:
-            print(f"      and {len(both) - 20} more (--verbose lists them)")
-        print()
-    if records:
-        print("  Shared records (crew.shared), which every session adds to, changed in more than one worktree as they are meant to be:")
-        for path, names in records:
-            print(f"      {path}: {said(names)}")
-        print()
-    for claim, reason in dropped:
-        print(f"  Dropped the claim {claim['key']} of {holder_name(claim, place.trees)}: {reason}.")
-    turn = turn_holder(place.root, snapshot)
-    if turn:
-        print(f"  The turn for a heavy check is held since {turn.get('since')} by {holder_name(turn, place.trees)}, for: {turn.get('command')}")
+def look(place, verbose=False, record=None, write=True):
+    """Measures what a look needs and returns its model. record is a survey already made, as `crew watch` keeps one;
+    write False reads the claims without dropping the ones that no longer hold."""
+    now = time.time()
+    if write:
+        with Lock(state_dir(place.root)):
+            claims, dropped = place.settled()
     else:
-        print("  The turn for a heavy check is free." + ("" if patterns else f" {common.CONFIG_FILE} names no heavy processes (crew.heavy)."))
-    print("  To tell a session what you take: SendMessage." if rows is not None else
-          "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
+        claims, dropped = place.settled(write=False)
+    spoken = load_said(place.root)
+    record = survey(place) if record is None else record
+    rows = fetch_sessions(place.root, place.config)
+    snapshot = processes()
+    ports = listening()
+    return gather(place, record, rows, snapshot, ports, claims, dropped, spoken, load_asks(place.root), now, verbose)
+
+
+def lines_of(text, first="  ", rest=None):
+    """A sentence as lines of at most WIDTH columns; the lines after the first are indented by rest."""
+    rest = first + "    " if rest is None else rest
+    return textwrap.wrap(text, WIDTH, initial_indent=first, subsequent_indent=rest, break_on_hyphens=False) or [first.rstrip()]
+
+
+def clock(stamp, now):
+    """A claim's time as the person reads it: the hour alone today, the date and the hour before."""
+    text = str(stamp or "")
+    return text[11:] if text[:10] == time.strftime("%Y-%m-%d", time.localtime(now)) else text
+
+
+def holds(item, base, short=False):
+    """What a worktree holds that is not on the pushed branch, in words; short leaves out how far behind it is."""
+    parts = []
+    if item["uncommitted"]:
+        parts.append(common.count(item["uncommitted"], "file", "files") + " not committed")
+    if item["notOnBase"]:
+        parts.append(common.count(item["notOnBase"], "commit", "commits") + f" not on {base}")
+    elif item["ahead"] and not short:
+        parts.append(common.count(item["ahead"], "commit", "commits") + f" ahead, on {base} by content")
+    if item["behind"] and not short:
+        parts.append(f"{item['behind']} behind")
+    return ", ".join(parts) or (f"nothing that is not on {base}" if base else "nothing not committed")
+
+
+def reason_words(item, model):
+    """Why a worktree is in its group, in a few words."""
+    reason, sessions, now = item["reason"], item["sessions"], model["at"]
+    if reason == "asks":
+        return "a session asks you a question"
+    if reason == "blocked":
+        blocked = sum(1 for session in sessions if session["status"] == "blocked")
+        return "a session is blocked" if blocked == 1 else f"{blocked} sessions are blocked"
+    if reason == "idle-uncommitted":
+        return "idle, with work not committed"
+    if reason == "idle-unpushed":
+        return f"idle, with work not on {model['base']}"
+    if reason == "busy":
+        return common.count(sum(1 for session in sessions if session["status"] == "busy"), "session", "sessions") + " busy"
+    if reason == "heavy":
+        return "a heavy check runs" + (", its sessions idle" if sessions else "")
+    if reason == "wrote":
+        wrote = max([session.get("wrote") or 0 for session in sessions] or [0])
+        return "a session wrote " + ago(wrote, now) if wrote else "a session at work"
+    if reason == "sign" and item["lastSign"]:
+        return f"a sign of work {ago(item['lastSign']['at'], now)} ({item['lastSign']['what']}), and no session listed here"
+    return reason
+
+
+def head_of(item, model):
+    head = item["display"]
+    plain = {"claude/" + os.path.basename(item["path"]), "worktree-" + os.path.basename(item["path"]),
+             os.path.basename(item["path"]), (model["base"] or "/").split("/", 1)[-1], "main", "master"}
+    if item["branch"] not in plain:
+        head += f" (branch {item['branch']})"
+    return head + (" (this one)" if item["this"] else "")
+
+
+def block(item, model, verbose=False):
+    """One worktree's lines in the printout."""
+    now, base = model["at"], model["base"]
+    out = lines_of(f"{head_of(item, model)}: {reason_words(item, model)}")
+    out += lines_of("holds: " + holds(item, base), "      ", "        ")
+    for session in item["sessions"]:
+        out += lines_of(f"session {session_name(session)}: {session_state(session, now)}", "      ", "        ")
+        if session.get("asks"):
+            asked = session["asks"]
+            out += lines_of(f"asks, {ago(asked['at'], now) if asked.get('at') else 'lately'}: {quoted(asked['words'])}",
+                            "        ", "          ")
+    for asked in item["asks"]:
+        out += lines_of(f"asks, {ago(asked['at'], now) if asked.get('at') else 'lately'}: {quoted(asked['words'])}",
+                        "      ", "        ")
+    if sum(1 for session in item["sessions"] if session["status"] == "busy") > 1:
+        out += lines_of("warning: more than one session is busy in this one worktree, and they may change the same files",
+                        "      ", "        ")
+    if not item["sessions"] and item["reason"] != "sign":              # a "sign" worktree's heading names it already
+        sign = item["lastSign"]
+        out += lines_of("last sign of work: " + (f"{ago(sign['at'], now)}, {sign['what']}" if sign else "none on this machine"),
+                        "      ", "        ")
+    for process in item["processes"]:
+        marks = (["heavy"] if process["heavy"] else []) + [
+            f"listens on {port}" + (", the person's own" if port in process["keep"] else "") for port in process["ports"]]
+        out += lines_of(f"pid {process['pid']} {shown(process['shown'], 170)}" + (f" ({', '.join(marks)})" if marks else ""),
+                        "      process: ", "        ")
+    if item["turn"] and model["turn"]:
+        out += lines_of(f"holds the turn for a heavy check since {clock(model['turn']['since'], now)}, for: "
+                        f"{model['turn']['command']}", "      ", "        ")
+    for claim in item["claims"]:
+        out += lines_of(f"{claim['key']}, since {clock(claim['since'], now)}" + (f": {claim['why']}" if claim["why"] else ""),
+                        "      claim: ", "        ")
+    if item["said"]:
+        # In quotation marks: the words are the session's own, and a status that holds "claim:" or "process:" must
+        # not read as one of the look's own lines.
+        when = ago(item["said"]["at"], now) if item["said"].get("at") else "lately"
+        out += lines_of(f"said, {when}: \"{item['said']['words']}\"", "      ", "        ")
+    return out
+
+
+def idle_line(item, model):
+    extra = [f"listens on {port}" for process in item["processes"] for port in process["ports"]]
+    if item["claims"]:
+        extra.append("still claims " + ", ".join(claim["key"] for claim in item["claims"]))
+    names = "; ".join(session_name(session) for session in item["sessions"])
+    return lines_of(f"{head_of(item, model)}: {names}" + (", " + ", ".join(extra) if extra else ""), "  ", "      ")
+
+
+def quiet_line(quiet, model):
+    base, n = model["base"], len(quiet)
+    words = (f"QUIET: {common.count(n, 'worktree', 'worktrees')} with no session and no sign of work in "
+             f"{model['activeMinutes']} minutes. ")
+    held = [item for item in quiet if item["uncommitted"] or item["notOnBase"]]
+    if held:
+        words += (f"{len(held)} {'holds' if len(held) == 1 else 'hold'} work that is not on {base or 'a pushed branch'}: "
+                  + ", ".join(f"{item['display']} ({holds(item, base, short=True)})" for item in held) + ". ")
+    else:
+        words += f"None holds work that is not on {base}. " if base else "None holds files not committed. "
+    content = [item for item in quiet if item["ahead"] and not item["notOnBase"]]
+    for item in content[:3]:
+        words += f"{item['display']}'s {common.count(item['ahead'], 'commit is', 'commits are')} on {base} by content. "
+    if len(content) > 3:
+        words += f"So are those of {len(content) - 3} more. "
+    for item in quiet:
+        for process in item["processes"]:
+            for port in process["ports"]:
+                words += f"A process listens on {port} in {item['display']}. "
+    return lines_of(words + "--verbose lists them.", "", "  ")
+
+
+def render(model, verbose=False):
+    """The printout of a look, as lines: what waits for the person first, then the worktrees at work, the idle ones a
+    line each, the quiet ones in one line, and then what concerns more than one worktree."""
+    now, base, counts = model["at"], model["base"], model["counts"]
+    out = lines_of(f"bowline crew: {model['repository']}, " + (f"measured against {base}" if base else
+                   "with no pushed branch to measure against") + time.strftime(", %H:%M", time.localtime(now)), "", "  ")
+    out += lines_of(f"{common.count(counts['worktrees'], 'worktree', 'worktrees')} and "
+                    f"{common.count(counts['sessions'], 'session', 'sessions')}: {counts['waits']} wait for you, "
+                    f"{counts['work']} at work, {counts['idle']} idle, {counts['quiet']} quiet"
+                    + (f", {counts['broken']} broken" if counts["broken"] else "") + "."
+                    + (f" A worktree is named by its folder in {model['worktreesFolder']}." if model["worktreesFolder"] else ""))
+    if not model["sessionsListed"]:
+        out += lines_of(f"Claude Code's list of sessions could not be asked ({' '.join(model['claude'])} agents --json), so "
+                        "a session is named from its transcript's title, and whether it is busy is not known.")
+    if model["unreachable"]:
+        out += lines_of(f"Left out: {common.count(len(model['unreachable']), 'worktree', 'worktrees')} that git lists and "
+                        "this system cannot enter (made from another system's view of the disk, or removed by hand): "
+                        + common.names([os.path.basename(path) for path in model["unreachable"]], verbose) + ".")
+    if not model["processesListed"]:
+        out += lines_of("The system would not list its processes, so none are shown.")
+    if not model["portsListed"]:
+        out += lines_of("The system has no tool that lists listening ports (netstat, ss or lsof), so none are shown.")
+    out.append("")
+    group = {name: [item for item in model["worktrees"] if item["group"] == name] for name in GROUPS}
+    out.append("WAITS FOR YOU" if group["waits"] else "WAITS FOR YOU: nothing.")
+    for item in group["waits"]:
+        out += block(item, model, verbose) + [""]
+    if not group["waits"]:
+        out.append("")
+    out.append("AT WORK" if group["work"] else "AT WORK: no session is busy, and no heavy check runs.")
+    for item in group["work"]:
+        out += block(item, model, verbose) + [""]
+    if not group["work"]:
+        out.append("")
+    if group["idle"]:
+        out.append("IDLE, HOLDING NOTHING: nothing to commit" + (f", and every commit is on {base}" if base else ""))
+        for item in group["idle"]:
+            out += idle_line(item, model)
+        out.append("")
+    if group["quiet"] and verbose:
+        out.append(f"QUIET: no session and no sign of work in {model['activeMinutes']} minutes")
+        for item in group["quiet"]:
+            out += block(item, model, verbose) + [""]
+    elif group["quiet"]:
+        out += quiet_line(group["quiet"], model) + [""]
+    for item in group["broken"]:
+        out += lines_of(f"BROKEN OR BEING REMOVED: {head_of(item, model)}. Its folder has no .git file of its own, so git "
+                        "asked there answers for the main checkout; it is left out of the counts and of the files "
+                        "changed in more than one worktree.", "", "  ") + [""]
+    out.append("ACROSS THE WORKTREES")
+    if model["overlaps"]:
+        out.append("  Changed differently in more than one worktree, so a rebase will meet both changes:")
+        for overlap in model["overlaps"] if verbose else model["overlaps"][:20]:
+            names = " and ".join(name + (" (quiet)" if name in overlap["quiet"] else "") for name in overlap["worktrees"])
+            out += lines_of(names + ":", "      ", "      ")
+            out += lines_of(", ".join(overlap["files"]), "          ", "          ")
+        if len(model["overlaps"]) > 20 and not verbose:
+            out.append(f"      and {len(model['overlaps']) - 20} more (--verbose lists them)")
+    if model["shared"]:
+        out.append("  Shared records (crew.shared), changed in more than one worktree as they are meant to be:")
+        for entry in model["shared"]:
+            out += lines_of(f"{entry['file']}: " + ", ".join(name + (" (quiet)" if name in entry["quiet"] else "")
+                                                            for name in entry["worktrees"]), "      ", "          ")
+    if model["keepPorts"]:
+        out.append(f"  The person's own ports ({common.CONFIG_FILE}, crew.keepPorts). Never stop what listens on them:")
+        for row in model["keepPorts"]:
+            who = ("nothing listens now" if not row["pid"] else f"pid {row['pid']}, in {row['worktree']}" if row["worktree"]
+                   else f"pid {row['pid']} {shown(row['command'] or '', 70)}")
+            out.append(f"      {row['port']}: {who}")
+    for process in model["outside"]:
+        out += lines_of(f"A heavy process in no worktree: pid {process['pid']} {shown(process['command'], 170)}")
+    for claim in model["dropped"]:
+        out += lines_of(f"Dropped the claim {claim['key']} of {claim['holder']}: {claim['reason']}.")
+    if model["turn"]:
+        out += lines_of(f"The turn for a heavy check is held since {model['turn']['since']} by {model['turn']['worktree']}, "
+                        f"for: {model['turn']['command']}")
+    else:
+        out += lines_of("The turn for a heavy check is free." + ("" if model["heavyPatterns"] else
+                        f" {common.CONFIG_FILE} names no heavy processes (crew.heavy)."))
+    out.append("  To tell a session what you take: SendMessage." if model["sessionsListed"] else
+               "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
+    return out
+
+
+def do_look(options):
+    model = look(Place(options.repo), verbose=options.verbose)
+    if options.json:
+        print(json.dumps(model, indent=2))
+    else:
+        print("\n".join(render(model, options.verbose)))
     return 0
+
+
+def terminal_codes():
+    """Whether the terminal reads the codes that clear it. A Windows console is told to; elsewhere a terminal does."""
+    if not WINDOWS:
+        return True
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)
+        mode = ctypes.c_uint32()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))     # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    except Exception:  # noqa: BLE001 - without the codes the printouts follow one another
+        return False
+
+
+def do_watch(options):
+    """The printout, drawn again every few seconds until Ctrl+C, for a terminal kept beside Claude Code or Claude
+    Desktop. The sessions, the processes and the claims are asked again at every drawing; the worktrees are measured
+    in the background, one measuring after another, because a large repository's take minutes."""
+    place = Place(options.repo)
+    every = options.every if options.every is not None else (settings(place.config).get("watchSeconds") or 10)
+    every = max(0.2, float(every))
+    latest = {"record": None}
+    stop = threading.Event()
+
+    def measure():
+        while not stop.is_set():
+            try:
+                latest["record"] = survey(Place(options.repo))
+            except Exception:  # noqa: BLE001 - a measuring that fails is tried again; the last one stays shown
+                pass
+            stop.wait(every)
+    clear = sys.stdout.isatty() and terminal_codes()
+    print(f"Measuring the worktrees of {place.trees[0]['path']}; the first drawing follows.", flush=True)
+    threading.Thread(target=measure, daemon=True).start()
+    drawn = 0
+    try:
+        while latest["record"] is None:
+            time.sleep(0.1)
+        while True:
+            model = look(Place(options.repo), record=latest["record"], write=False)
+            lines = render(model)
+            lines += lines_of(f"Redrawn every {every:g} seconds; the worktrees were measured "
+                              f"{ago(latest['record'].get('at') or time.time(), time.time())}, the sessions and the "
+                              "processes now. Ctrl+C stops it.")
+            sys.stdout.write(("\x1b[H\x1b[2J" if clear else "") + "\n".join(lines) + ("\n" if clear else "\n\n"))
+            sys.stdout.flush()
+            drawn += 1
+            if options.times and drawn >= options.times:
+                return 0
+            time.sleep(every)
+    except KeyboardInterrupt:
+        print()
+        return 0
+    finally:
+        stop.set()
 
 
 def main(argv=None):
@@ -1433,8 +1935,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="bowline crew",
                                      description="Working beside other Claude Code sessions in one repository.")
     parser.add_argument("--repo", help="a path inside the repository (default: the current folder)")
-    parser.add_argument("--verbose", action="store_true", help="every process of a worktree and every file changed twice")
+    parser.add_argument("--verbose", action="store_true",
+                        help="every process of a worktree, every quiet worktree and every file changed twice")
+    parser.add_argument("--json", action="store_true", help="the look's model as JSON, which every view draws from")
     sub = parser.add_subparsers(dest="action")
+    p = sub.add_parser("watch", help="the look, drawn again every few seconds until Ctrl+C, for a terminal beside the app")
+    p.add_argument("--every", type=float, help="seconds between two drawings (default: crew.watchSeconds)")
+    p.add_argument("--times", type=int, help="stop after this many drawings")
     p = sub.add_parser("claim", help="take a note, a file or a number, or the next free number of a list with --new")
     p.add_argument("key")
     p.add_argument("--why", help="what it is taken for, in a few words the other sessions read")
@@ -1454,7 +1961,9 @@ def main(argv=None):
     p.add_argument("--hook", action="store_true", help="read a PreToolUse hook's JSON on standard input; always exit 0")
     p = sub.add_parser("say", help="a few sentences about this worktree's work, for the other sessions' look")
     p.add_argument("words", nargs="*", help="what is done, what you wait on, what you ask; none prints what was said")
-    p.add_argument("--clear", action="store_true", help="take back what this worktree said")
+    p.add_argument("--clear", action="store_true", help="take back what this worktree said, or with --asks the question")
+    p.add_argument("--asks", action="store_true",
+                   help="the words are a question this session waits for the person to answer; shown first until their next prompt")
     for p in sub.choices.values():
         p.add_argument("--repo", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     options = parser.parse_args(argv)
@@ -1481,6 +1990,8 @@ def main(argv=None):
         return do_refresh(options)
     if options.action == "say":
         return do_say(options)
+    if options.action == "watch":
+        return do_watch(options)
     if command:
         print("bowline crew: a command after two dashes belongs to crew run: crew run -- <command>", file=sys.stderr)
         return 2

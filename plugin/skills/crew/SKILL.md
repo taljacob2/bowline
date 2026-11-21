@@ -18,13 +18,24 @@ The command, in every step below, is `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mj
 node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew
 ```
 
-It lists every worktree of the repository: its branch, how far it is from the branch every session pushes to, its
-files not yet committed, the last sign of work there, the sessions in it by name with whether each is busy, idle or
-blocked, its processes that count as heavy or listen on a port, the claims it holds, the files changed differently in
-more than one worktree, and who holds the turn for a heavy check. The sessions come from `claude agents --json`; when
+It puts what matters first, each worktree once: **WAITS FOR YOU** (a session asks the person a question or is
+blocked, or its sessions are idle while it holds files not committed or commits not on the pushed branch), **AT
+WORK** (a session is busy, or a heavy check runs), **IDLE** (a line each), and **QUIET** (one line, saying whether
+any of them holds work). Each worktree shows its sessions by name, what it holds, its heavy and listening processes,
+its claims and what its session said; then come the files changed differently in more than one worktree, grouped by
+the worktrees that share them, the person's ports and the turn. The sessions come from `claude agents --json`; when
 the look says that list could not be asked, call `ListAgents` for who is busy. Look before the first change of a
 session that was told at its start that others are at work, and again before a push. `SendMessage` reaches a session
-by the name `ListAgents` gives it.
+by the name `ListAgents` gives it. `crew --json` gives the same as data.
+
+- **When you wait for the person's answer**, say so: `crew say --asks "<the question>"`. Claude Code lists a session
+  that ended its reply with a question as plain idle, the same as one that is done. The hook after a reply sets it
+  for you when your reply ends with a question, and the person's next prompt takes it back.
+- **A worktree to watch.** The person can keep the look open in a terminal beside the app, drawn again every ten
+  seconds until Ctrl+C: give them the command with this skill's path written out,
+  `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew watch`, run from inside the repository. It does not belong in
+  your own shell, where it never ends. In Claude Desktop, where a `!` command does not run, the person asks you for
+  `/bowline:crew` instead.
 
 - **Two sessions in one worktree** are both listed, with a warning when both are busy: they may change the same
   files. Ask the person which of them keeps the worktree.

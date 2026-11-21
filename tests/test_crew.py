@@ -21,6 +21,11 @@ HEAVY = "bowline-test-heavy-" + str(os.getpid())
 FAKE_CLAUDE = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")]
 
 
+def flat(text):
+    """A printout with its lines joined, since a long line is wrapped at 100 columns."""
+    return " ".join(text.split())
+
+
 class CrewTests(ScratchRepo):
     def setUp(self):
         super().setUp()
@@ -66,14 +71,15 @@ class CrewTests(ScratchRepo):
         code, out, err = self.crew()
         self.assertEqual(code, 0, out + err)
         self.assertIn("2 worktrees", out)
-        self.assertIn("the main checkout (this one), branch main", out)
-        self.assertIn(".claude/worktrees/other, branch other", out)
+        self.assertIn("\n  the main checkout (this one): ", out)
+        self.assertIn("\n  other: ", out)                                       # a worktree goes by its folder's name
+        self.assertIn("A worktree is named by its folder in .claude/worktrees.", flat(out))
         self.assertIn("Never stop what listens on them", out)
         self.assertIn("59999: nothing listens now", out)
         self.assertIn("The turn for a heavy check is free.", out)
         self.assertIn("To tell a session what you take: SendMessage.", out)
         code, out, _ = self.crew(cwd=self.other)
-        self.assertIn(".claude/worktrees/other (this one)", out)
+        self.assertIn("\n  other (this one): ", out)
 
     def test_a_file_changed_in_two_worktrees_is_named(self):
         write(os.path.join(self.repo, "docs", "ROADMAP.md"), ROADMAP + "4. **Four.** Mine.\n")
@@ -82,14 +88,15 @@ class CrewTests(ScratchRepo):
         write(os.path.join(self.other, "src", "parser.py"), "theirs = 1\n")
         code, out, _ = self.crew()
         self.assertIn("Changed differently in more than one worktree", out)
-        self.assertIn("docs/ROADMAP.md: the main checkout, .claude/worktrees/other", out)
+        # Grouped by the worktrees that share them, which says which sessions must talk.
+        self.assertIn("the main checkout and other: docs/ROADMAP.md, src/parser.py", flat(out))
         # The roadmap is a record every session adds to: named apart, so that the list keeps what nobody expects.
         self.configure({"shared": ["docs/ROAD*.md"]})
         code, out, _ = self.crew()
-        differently, _, records = out.partition("Shared records (crew.shared)")
-        self.assertIn("src/parser.py: the main checkout, .claude/worktrees/other", differently)
-        self.assertNotIn("docs/ROADMAP.md", differently)
-        self.assertIn("docs/ROADMAP.md: the main checkout, .claude/worktrees/other", records)
+        differently, _, records = flat(out).partition("Shared records (crew.shared)")
+        self.assertIn("the main checkout and other: src/parser.py", differently)
+        self.assertNotIn("docs/ROADMAP.md", differently.partition("ACROSS THE WORKTREES")[2])
+        self.assertIn("docs/ROADMAP.md: the main checkout, other", records)
         # What the look measured is kept for a hook that must answer at once.
         kept = crew.cached_survey(self.repo)
         self.assertEqual([tree["name"] for tree in kept["trees"]], ["the main checkout", ".claude/worktrees/other"])
@@ -123,8 +130,8 @@ class CrewTests(ScratchRepo):
         os.rename(self.other, os.path.join(self.root, "moved-away"))              # git still lists it; the folder is gone
         code, out, err = self.crew()
         self.assertEqual(code, 0, out + err)
-        self.assertIn(", 1 worktree, ", out)
-        self.assertIn("1 worktree that git lists is left out", out)
+        self.assertIn("1 worktree and 0 sessions", out)
+        self.assertIn("Left out: 1 worktree that git lists and this system cannot enter", flat(out))
         self.assertNotIn("Dropped the claim", out)
         code, out, _ = self.crew("claim", "file:src/a.py")
         self.assertEqual(code, 1, out)
@@ -177,8 +184,8 @@ class CrewTests(ScratchRepo):
         self.crew("claim", "file:src/a.py", cwd=self.other)
         git(self.repo, "worktree", "remove", "--force", self.other)
         code, out, _ = self.crew()
-        self.assertIn("Dropped the claim file:src/a.py", out)
-        self.assertIn("its worktree is gone", out)
+        self.assertIn("Dropped the claim file:src/a.py", flat(out))
+        self.assertIn("its worktree is gone", flat(out))
         code, out, _ = self.crew("claim", "file:src/a.py")
         self.assertEqual(code, 0, out)
 
@@ -280,7 +287,7 @@ class CrewTests(ScratchRepo):
         self.assertEqual(code, 3, out + err)
         self.assertIn("the turn, held since 2026-11-21 10:00 by .claude/worktrees/other for: the suite", err)
         code, out, _ = self.crew()
-        self.assertIn("The turn for a heavy check is held since 2026-11-21 10:00 by .claude/worktrees/other", out)
+        self.assertIn("The turn for a heavy check is held since 2026-11-21 10:00 by other", flat(out))
         dead = subprocess.Popen([sys.executable, "-c", "pass"])
         dead.wait()
         write(turn, json.dumps({"pid": dead.pid, "worktree": self.other, "command": "the suite", "since": "2026-11-21 10:00"}) + "\n")

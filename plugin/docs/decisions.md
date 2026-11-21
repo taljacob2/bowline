@@ -818,3 +818,56 @@ folder: a session that has run nothing yet has none.
 2. A process whose parent ended can be given a parent id that Windows has since given to an unrelated process, and
    then takes that process's worktree. It was not seen; comparing start times would rule it out, which the standard
    library cannot do on every system.
+
+## 2026-11-21: the look puts what waits for the person first, and is plain text
+
+**The question.** With the sessions named, the look was still a list of every worktree in git's order: 26 blocks on
+the first user's repository, where the three that waited for the person were in the middle, among thirteen nobody had
+touched for hours. And `claude agents` lists a session that ended its reply with a question as plain "idle", the same
+as one that is done; on that day three such sessions were in fact waiting for the person. The person asked for a way
+to watch and manage all the sessions, as console output "so it would be able to be presented in both a terminal and a
+claude desktop", agreed to the list, and said yes to a mock of the printout made from that repository's state.
+
+**The decision.** One model and views drawn from it. `crew --json` prints the model; the printout and `crew watch`
+draw from it, so that every view says the same thing, and a later view, such as a page, would draw from it too. The
+printout puts each worktree in one group, the first that fits: WAITS FOR YOU (a session asks a question or is blocked,
+or its sessions are idle while the worktree holds files not committed or commits not on the pushed branch), AT WORK (a
+session is busy, or a heavy check runs), IDLE (one line each), QUIET (one line for all of them, saying whether any
+holds work). Then what concerns more than one worktree, with the files changed twice grouped by the worktrees that
+share them, because that says which sessions must talk. Plain ASCII, no colour needed for its meaning, every line
+within 100 columns, because Claude Desktop shows a command's output in a narrow pane. `crew watch` draws it again every
+ten seconds in a terminal kept beside the app, asking the sessions and the processes anew each time and measuring the
+worktrees in the background, because a large repository's take a minute.
+
+**The question flag.** `crew say --asks "<question>"` says that a session waits for the person's answer, by the
+session's own id, which Claude Code gives every command as `CLAUDE_CODE_SESSION_ID`. The hook after a reply sets it
+when the reply's last sentence ends with a question mark, from the reply's text that Claude Code hands that hook as
+`last_assistant_message`; the documentation advises that over the transcript. The hook before the person's next prompt
+in that session takes it back. Only the question is kept, and `crew.asksFromReply: false` turns the automatic part off.
+A session idle with work not committed is shown as waiting too, as "idle, with work not committed", because that was
+the state of the three sessions that waited unseen; it is a guess, and the words say which kind of wait it is.
+
+**Why a commit counts by its content.** A worktree whose branch was rebased onto main and pushed still has its old
+commits, five of them on the first user's repository, which read as five commits not pushed. `git cherry` compares
+the changes themselves, so a commit whose change is on the pushed branch is not counted as held.
+
+**What the live repository showed while it was built.** A vitest run in one worktree was spread over three places:
+its `npx` shells were "in no worktree", because Git Bash's processes report a parent that has already exited, and one
+of its workers sat in the main checkout, because the worktrees share the main checkout's `node_modules` through a link
+and the worker's command line names that path. A process now takes its children's worktree judged from the bottom up,
+and a process whose path names only the main checkout takes its nearest owned parent's worktree when that is another.
+
+**Not chosen.** `crew line` for Claude Code's status line: the person tested a status line on 2026-11-21 and Claude
+Desktop sessions do not show one ("the statusline command only shows in this specific session"), and most of their
+sessions are Desktop ones; it can be offered later to terminal users. A web page: bowline runs no server, and text
+works in both places; a page could draw `crew --json` later. Colour: the meaning must survive a pane that shows none.
+Reading the transcript for the last reply: the hook is given the reply, and the transcript may not hold it yet.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. `crew watch` draws the whole printout again each time. On a terminal shorter than the printout the top scrolls
+   away; a view that fits the terminal's height, folding the idle and quiet groups first, would keep what waits on
+   the screen.
+2. A session can also ask through Claude Code's own question dialog, which does not end the reply, so the hook after
+   a reply does not see it. What `claude agents` lists for a session waiting in that dialog was not checked; if it is
+   "busy", the look should learn to tell it apart.

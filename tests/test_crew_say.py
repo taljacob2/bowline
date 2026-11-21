@@ -37,8 +37,9 @@ class SayTests(ScratchRepo):
         return result.returncode, result.stdout, result.stderr
 
     def block(self, out, name):
-        """One worktree's lines in a look: from its heading to the next empty line."""
-        return out[out.index(f"  {name}"):].split("\n\n")[0]
+        """One worktree's lines in a look, from its heading to the next empty line, joined, since a long line is
+        wrapped at 100 columns. A worktree goes by its folder's name."""
+        return " ".join(out[out.index(f"\n  {name}"):].split("\n\n")[0].split())
 
     def test_what_a_session_says_is_kept_shown_to_every_worktree_and_replaced(self):
         code, out, _ = self.crew("say")
@@ -50,13 +51,13 @@ class SayTests(ScratchRepo):
         code, out, _ = self.crew(cwd=self.other)                                  # the other session reads it at once
         mine = self.block(out, "the main checkout")
         self.assertIn('said, less than a minute ago: "Done: the parser, 1a2b3c4. Waiting on: nothing. Asking: a trial."', mine)
-        self.assertNotIn("said,", self.block(out, ".claude/worktrees/other"))
+        self.assertNotIn("said,", self.block(out, "other"))
         self.crew("say", "Theirs: reading the trial.", cwd=self.other)           # each worktree has its own
         self.crew("say", "Done: the parser and its tests.")                       # and a new one replaces the old
         code, out, _ = self.crew()
         self.assertIn('said, less than a minute ago: "Done: the parser and its tests."', self.block(out, "the main checkout"))
         self.assertNotIn("1a2b3c4", out)
-        self.assertIn('said, less than a minute ago: "Theirs: reading the trial."', self.block(out, ".claude/worktrees/other"))
+        self.assertIn('said, less than a minute ago: "Theirs: reading the trial."', self.block(out, "other"))
         code, out, _ = self.crew("say")
         self.assertIn("this worktree said, at ", out)
         self.assertIn("Done: the parser and its tests.", out)
@@ -100,7 +101,7 @@ class SayTests(ScratchRepo):
         self.crew("say", "Here, by path, with no transcript in this folder.", cwd=self.other)
         self.assertEqual(crew.others_active(self.repo, config), [{"name": ".claude/worktrees/other", "own": False, "sessions": []}])
         code, out, _ = self.crew()
-        self.assertIn("last sign of work: less than a minute ago, what it said", self.block(out, ".claude/worktrees/other"))
+        self.assertIn("other: a sign of work less than a minute ago (what it said)", self.block(out, "other"))
 
     def test_the_warning_before_an_edit_says_that_the_holder_spoke_and_never_its_words(self):
         import crew_edit

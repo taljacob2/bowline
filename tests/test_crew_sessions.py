@@ -44,8 +44,9 @@ class SessionTests(ScratchRepo):
         return result.returncode, result.stdout, result.stderr
 
     def block(self, out, name):
-        """One worktree's lines in a look: from its heading to the next empty line."""
-        return out[out.index(f"  {name}"):].split("\n\n")[0]
+        """One worktree's lines in a look, from its heading to the next empty line, joined, since a long line is
+        wrapped at 100 columns. A worktree goes by its folder's name."""
+        return " ".join(out[out.index(f"\n  {name}"):].split("\n\n")[0].split())
 
     def transcript(self, folder, session, title=None, minutes_ago=0, after=0):
         """A session's transcript in Claude Code's project folder for a folder, with a title line when one is given and
@@ -71,11 +72,12 @@ class SessionTests(ScratchRepo):
                          {"repo": False, "other": False, "leaving": True})
         code, out, err = self.crew()
         self.assertEqual(code, 0, out + err)
-        self.assertIn(", 2 worktrees and 1 broken one, ", out)
-        self.assertIn(".claude/worktrees/leaving, branch leaving: broken or being removed.", out)
+        flat = " ".join(out.split())
+        self.assertIn("2 worktrees and 0 sessions: 0 wait for you, 2 at work, 0 idle, 0 quiet, 1 broken.", flat)
+        self.assertIn("BROKEN OR BEING REMOVED: leaving. Its folder has no .git file of its own", flat)
         # git asked in that folder answers for the main checkout: its file is not the broken one's, and no overlap.
-        self.assertIn("src/parser.py: the main checkout, .claude/worktrees/other\n", out)
-        self.assertNotIn("leaving (", out)
+        self.assertIn("the main checkout and other: src/parser.py", flat)
+        self.assertEqual(flat.count("leaving"), 1, out)
         kept = [tree for tree in crew.cached_survey(self.repo)["trees"] if tree["name"].endswith("leaving")][0]
         self.assertEqual((kept["broken"], kept["files"], kept["uncommitted"]), (True, [], 0))
         self.assertEqual(crew.collisions(crew.cached_survey(self.repo)["trees"]),
@@ -96,16 +98,36 @@ class SessionTests(ScratchRepo):
             {"pid": 22, "ppid": 20, "name": "svchost.exe", "command": "svchost.exe -k netsvcs"},
             {"pid": 30, "ppid": 0, "name": "lonely.exe", "command": "lonely.exe --port 4000"},
             {"pid": 40, "ppid": 40, "name": "loop.exe", "command": "its own parent"},
+            # Git Bash's processes report a parent that has exited; the chain down names the worktree only at its end.
+            {"pid": 50, "ppid": 9999, "name": "bash.exe", "command": "bash.exe /c/node/npx vitest run"},
+            {"pid": 51, "ppid": 50, "name": "node.exe", "command": "node.exe npx-cli.js vitest run"},
+            {"pid": 52, "ppid": 51, "name": "cmd.exe", "command": "cmd.exe /d /s /c vitest run"},
+            {"pid": 53, "ppid": 52, "name": "node.exe", "command": f"node {os.path.join(other, 'node_modules', 'vitest.mjs')} run"},
+            # A worker started from the main checkout's node_modules, which the worktree shares through a link.
+            {"pid": 54, "ppid": 53, "name": "node.exe", "command": f"node {os.path.join(main, 'node_modules', 'forks.js')}"},
         ]
         trees = crew.worktrees(self.repo)
         named = {pid: (tree["name"] if tree else None) for pid, tree in crew.owners(snapshot, trees, {10: trees[1]}).items()}
         self.assertEqual(named, {10: ".claude/worktrees/other", 11: ".claude/worktrees/other", 12: ".claude/worktrees/other",
                                  13: ".claude/worktrees/other", 20: None, 21: "the main checkout", 22: None, 30: None,
-                                 40: None})
-        # Without the list of sessions the Desktop session names no worktree, and its build still goes by its child.
+                                 40: None, 50: ".claude/worktrees/other", 51: ".claude/worktrees/other",
+                                 52: ".claude/worktrees/other", 53: ".claude/worktrees/other", 54: ".claude/worktrees/other"})
+        # Without the list of sessions the Desktop session names no worktree itself, and is found by what it runs.
         named = {pid: (tree["name"] if tree else None) for pid, tree in crew.owners(snapshot, trees).items()}
-        self.assertEqual((named[10], named[11], named[12]), (None, None, ".claude/worktrees/other"))
+        self.assertEqual((named[10], named[11], named[12]), (".claude/worktrees/other",) * 3)
+        lonely = [p for p in snapshot if p["pid"] in (10, 30)] + [dict(snapshot[1], ppid=10), dict(snapshot[7], pid=31, ppid=10)]
+        named = {pid: (tree["name"] if tree else None) for pid, tree in crew.owners(lonely, trees).items()}
+        self.assertIsNone(named[10])                                             # two children that do not agree
         self.assertIsNone(crew.owner(f"claude.exe --project-config-root={main}", trees))
+
+    def test_a_process_is_shown_by_what_it_runs(self):
+        other = self.other["path"]
+        shell = ('bash.exe -c "source /c/x/.claude/shell-snapshots/snapshot-bash-1.sh && eval \'cd \\"'
+                 + other.replace("\\", "/") + '/webui\\" && npx vitest run\' < /dev/null && pwd -P"')
+        self.assertEqual(crew.plain_command(shell, other), "a shell: cd webui && npx vitest run")
+        vite = '"node" "' + os.path.join(other, "webui", "node_modules", ".bin", "..", "vite", "bin", "vite.js") + '" --port 5197'
+        self.assertEqual(crew.plain_command(vite, other),
+                         "node " + os.path.join("webui", "node_modules", "vite", "bin", "vite.js") + " --port 5197")
 
     @unittest.skipUnless(os.name == "nt", "wmic is a Windows program")
     def test_the_characters_wmic_escapes_are_read_back(self):
@@ -132,7 +154,7 @@ class SessionTests(ScratchRepo):
         self.transcript(self.main["path"], "sess-release", minutes_ago=5)
         code, out, err = self.crew()
         self.assertEqual(code, 0, out + err)
-        theirs = self.block(out, ".claude/worktrees/other")
+        theirs = self.block(out, "other")
         self.assertIn('session "the parser": busy', theirs)
         self.assertIn('session "the docs": busy', theirs)                      # started in a folder inside the worktree
         self.assertIn("warning: more than one session is busy in this one worktree", theirs)
@@ -153,7 +175,7 @@ class SessionTests(ScratchRepo):
         code, out, err = self.crew()
         self.assertEqual(code, 0, out + err)
         self.assertIn("Claude Code's list of sessions could not be asked (bowline-test-no-such-program agents --json)", out)
-        theirs = self.block(out, ".claude/worktrees/other")
+        theirs = self.block(out, "other")
         self.assertIn('session "the parser": last wrote less than a minute ago', theirs)
         self.assertNotIn("long gone", out)                                       # only a transcript written lately counts
         self.assertIn("ListAgents", out)

@@ -30,6 +30,28 @@ reasoning is in `plugin/docs/decisions.md`, "the crew names the sessions, and a 
   `in .claude/worktrees/other, "the parser"; in your own folder, the main checkout, "the docs"`. They count
   sessions, not places.
 
+The look puts what waits for the person first, and gives the same as data. The reasoning is in
+`plugin/docs/decisions.md`, "the look puts what waits for the person first, and is plain text".
+
+- `bowline crew` shows each worktree once, in the first group that fits: WAITS FOR YOU (a session asks a question or
+  is blocked, or its sessions are idle while the worktree holds files not committed or commits not on the pushed
+  branch), AT WORK (a session is busy or a heavy check runs), IDLE (a line each) and QUIET (one line for all, saying
+  whether any holds work). Then the files changed in more than one worktree, grouped by the worktrees that share
+  them, the person's ports and the turn. A worktree goes by its folder's name. Every line is plain ASCII within 100
+  columns, for Claude Desktop's narrow pane. `--verbose` shows the quiet worktrees one by one.
+- `bowline crew --json` prints the model the printout is drawn from.
+- `bowline crew watch` draws the printout again every ten seconds (`crew.watchSeconds`) until Ctrl+C, for a terminal
+  kept beside the app; it measures the worktrees in the background.
+- `bowline crew say --asks "<question>"` says that the session waits for the person's answer; every look shows it
+  first. The hook after a reply sets it when the reply ends with a question (`crew.asksFromReply`, on by default),
+  from the reply's text Claude Code gives that hook, and the hook before the person's next prompt takes it back.
+- A commit counts as not on the pushed branch only when its change is not there (`git cherry`), so a worktree whose
+  commits were rebased onto main no longer reads as holding them.
+- A chain of processes that name no path, as Git Bash starts them, takes the worktree its last one names, and a
+  worker that a worktree's test runner starts from the main checkout's shared `node_modules` stays with that
+  worktree. A Claude Code shell is shown by the command it runs.
+- Not built: `crew line` for Claude Code's status line, since Claude Desktop sessions do not show one.
+
 ## 0.13.4 (2026-11-21)
 
 A split whose worker is gone no longer has to be cleared by hand. No Claude Code limit moved. The reasoning is in

@@ -532,8 +532,14 @@ def arrived_line(root, watch, transcript):
 
 
 def do_watch(options):
-    """The Stop hook (--watch) and the UserPromptSubmit hook (--pending). Prints nothing when there is nothing new."""
+    """The Stop hook (--watch) and the UserPromptSubmit hook (--pending). Prints nothing when there is nothing new.
+    After a reply that ends with a question to the person, the crew records that the session waits for them; before
+    the person's next prompt in that session it takes that back."""
     facts = hook_input()
+    try:
+        crew.clear_asks(facts) if options.pending else crew.note_reply(facts)
+    except Exception:  # noqa: BLE001 - the crew's record is a convenience; the reminders go on without it
+        pass
     start = facts.get("cwd") or options.repo or os.getcwd()
     workspace, roots = common.roots_for(start)
     if not roots:

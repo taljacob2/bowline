@@ -77,7 +77,9 @@ question. One per worktree, replaced each time, a few sentences (the limit is `c
 the repository says otherwise). The look shows each worktree's with its age, so a session that needs your state
 reads it at once, whole, without asking you and without reading your conversation. `crew say` alone prints what you
 last said; `crew say --clear` takes it back when the work is over. A status over the limit is refused, not cut:
-shorten it, and put the rest in a commit message or a note. bowline's warning before an edit says when the worktree
+shorten it, and put the rest in a commit message or a note. A question you wait for the person to answer goes apart,
+`crew say --asks "<the question>"`, so that the look shows your session first, as waiting for them, until their next
+prompt; a reply of yours that ends with a question sets it on its own. bowline's warning before an edit says when the worktree
 that holds the file has said what it is doing; run `crew` and read it before you message that session, because it is
 often the answer to who changes what.
 
