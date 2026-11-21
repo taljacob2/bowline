@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.13.4 (2026-11-21)
 
 A split whose worker is gone no longer has to be cleared by hand. No Claude Code limit moved. The reasoning is in
 `plugin/docs/decisions.md`, "a worker that is gone is told from one at work".
