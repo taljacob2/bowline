@@ -21,6 +21,28 @@ A split whose worker is gone no longer has to be cleared by hand. No Claude Code
 - `common.process_alive()` says whether a process exists, without starting a program: through kernel32 on Windows,
   with signal 0 elsewhere.
 
+The tests also remove their scratch folders now, which they did not do on Windows. This part changes only `tests/`,
+nothing in the plugin.
+
+- On Windows every test left its scratch folder, `bowline-test-*`, in the system's temp folder. git writes its
+  object files read-only, Windows does not remove a read-only file, and the removal ignored every error, so nothing
+  said so: the machine where it was noticed held about six thousand such folders after a week. The removal
+  (`remove_tree()` in `tests/support.py`) now makes a file or a folder that is refused writable and removes it
+  again, and tries for up to ten seconds when a process the test started still holds a file. Linux and macOS
+  already removed the folders.
+- On every system a test whose own `setUp` failed left its folder too, because unittest runs no `tearDown` after
+  a `setUp` that failed. The removal, and putting the environment back, are now cleanups, which run in that case
+  as well.
+- A test whose scratch folder cannot be removed now fails and names what refused, so the folders cannot pile up
+  unseen again. `tests/test_support.py` checks it: a scratch repository is gone after its test, with its read-only
+  object files, and after a test whose `setUp` failed, and a folder that stays fails the test.
+- The folders left by earlier runs are not removed by this change. They are safe to delete when no test is
+  running: in PowerShell, `Get-ChildItem $env:TEMP -Directory -Filter 'bowline-test-*' | Remove-Item -Recurse
+  -Force`.
+- Not changed: how a worker removes its own temporary folder, `bowline-split-*`, when its split ends. git removes
+  that worktree itself, with read-only files in it, and the folder stays only while another process still has a
+  file open in the worktree or works in it, which clearing the read-only mark does not cure.
+
 ## 0.13.3 (2026-11-21)
 
 A fix for Windows: an autosplit worker could stop for good at the moment something else read its record. No Claude
