@@ -4,7 +4,10 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.14.0 (2026-11-21)
+
+The crew for a day of many sessions in one repository: it names who works where, puts what waits for the person
+first, says which worktrees may go, and keeps an order for pushes. It comes in three parts, below.
 
 The crew names the sessions, and gives each process to the right worktree. No Claude Code limit moved; one observed
 fact was added to `plugin/docs/facts.md`: what `claude agents --json` lists, as Claude Code 2.1.330 prints it. The
