@@ -19,7 +19,10 @@ Sessions that work as a team, not only beside one another. No Claude Code limit 
   what it waits on, what it asks. One per worktree, replaced each time, in the repository's git folder, never
   committed. `bowline crew` shows each worktree's with its age; `crew say` alone prints this worktree's, and
   `--clear` takes it back. A status longer than `crew.sayChars` (600 characters, a new setting) is refused, not cut.
-  Saying something counts as a sign of work, and a worktree that is removed takes its words with it.
+  Saying something counts as a sign of work, and a worktree that is removed takes its words with it. The look shows
+  the words in quotation marks, so that a session's free text never reads as one of the look's own lines. The warning
+  before an edit says when the worktree that holds the file has said what it is doing, and where to read it; it never
+  repeats the words.
 - The crew skill, the conventions skill, the conventions page, the guide, the README and `plugin/PRIVACY.md` name the
   new skill and the command.
 

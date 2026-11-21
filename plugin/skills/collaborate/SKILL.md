@@ -57,7 +57,10 @@ Say what is done with its commits, what you wait on, and what you ask of the oth
 question. One per worktree, replaced each time, a few sentences (the limit is `crew.sayChars`, 600 characters unless
 the repository says otherwise). The look shows each worktree's with its age, so a session that needs your state
 reads it at once, whole, without asking you and without reading your conversation. `crew say` alone prints what you
-last said; `crew say --clear` takes it back when the work is over.
+last said; `crew say --clear` takes it back when the work is over. A status over the limit is refused, not cut:
+shorten it, and put the rest in a commit message or a note. bowline's warning before an edit says when the worktree
+that holds the file has said what it is doing; run `crew` and read it before you message that session, because it is
+often the answer to who changes what.
 
 Where the client has session tools, as the Claude desktop app does (the list of sessions, a session's state and its
 events), a neighbour's last report can also be read there; it is at the end of its turn.

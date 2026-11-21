@@ -215,9 +215,15 @@ def words(found, now=None):
     rel, record = found["rel"], found["record"] or {}
     base = record.get("base")
     places = []
+    said = crew.load_said(found["root"])
     for tree, how, why in found["holders"]:
-        stamp, sign = crew.last_sign(tree["path"], found["claims"])
+        stamp, sign = crew.last_sign(tree["path"], found["claims"], said)
         when = f"last sign of work there: {sign}, {crew.ago(stamp, now)}" if stamp else "no sign of when a session last worked there"
+        # That the worktree's session said something of itself, and when; never the words. They are that session's
+        # free text, and `bowline crew`, which Claude runs on purpose, shows them as what they are.
+        spoke = crew.said_by(tree["path"], said)
+        if spoke and crew.said_at(spoke):
+            when += f"; its session said what it is doing {crew.ago(crew.said_at(spoke), now)}, and `bowline crew` shows it"
         if how == "claimed":
             state = "claimed there" + (f" for: {why}" if why else "")
         elif how == "not committed":

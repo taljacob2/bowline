@@ -55,7 +55,7 @@ crew_edit.py, which reads what the look measured and measures nothing itself.
 
 say keeps a few sentences a session writes about itself: what it finished, with the commits, what it waits on, what
 it asks of the others or offers them. The look shows each worktree's with its age. One per worktree, replaced each
-time, no longer than crew.sayChars, kept beside the claims and never committed. A message between sessions arrives
+time, no longer than crew.sayChars, kept beside the claims and never committed; over the limit it is refused with exit code 1 and nothing changes. A message between sessions arrives
 when the other one next looks, and may cross the answer on its way; what a session said is there whenever anyone
 looks, and it is the session itself that chooses the words, so nothing is read out of a transcript. With no words it
 prints what this worktree last said; --clear takes it back. A worktree that is removed takes its words with it.
@@ -711,7 +711,7 @@ def do_say(options):
             return 0
         if not words:
             if mine_now:
-                print(f"bowline crew: this worktree said, at {mine_now.get('at')}: {mine_now.get('words')}")
+                print(f"bowline crew: this worktree said, at {mine_now.get('at')}: \"{mine_now.get('words')}\"")
             else:
                 print("bowline crew: this worktree has said nothing. Say what you finished, what you wait on and what "
                       "you ask: crew say \"<a few sentences>\"")
@@ -721,7 +721,7 @@ def do_say(options):
                   f"({common.CONFIG_FILE}, crew.sayChars), so that every session can read every other's in one look. "
                   "Say what is done, what you wait on and what you ask; the rest belongs in a commit message or a "
                   "note. Nothing was changed.", file=sys.stderr)
-            return 2
+            return 1                # refused, as a claim another worktree holds is: 2 is for a command that could not run
         write_json(said_path(place.root), {"said": others + [
             {"worktree": here, "words": words, "at": now_stamp(), "seconds": time.time()}]})
     print(f"bowline crew: said, for every session that looks with `bowline crew`: {words}")
@@ -1124,7 +1124,9 @@ def do_look(options):
         spoke = said_by(tree["path"], spoken)
         if spoke:
             when = said_at(spoke)
-            print(f"      said, {ago(when, now) if when else spoke.get('at')}: {spoke.get('words')}")
+            # In quotation marks: the words are the session's own, and a status that holds "claim:" or "process:"
+            # must not read as one of the look's own lines.
+            print(f"      said, {ago(when, now) if when else spoke.get('at')}: \"{spoke.get('words')}\"")
         print()
     outside = [p for p in snapshot if p["pid"] in heavy and whose[p["pid"]] is None]
     if outside:
