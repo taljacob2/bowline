@@ -31,8 +31,9 @@ Nothing else bowline does reaches the network.
 - A private list of words never to commit, at `~/.claude/private/never-commit.txt`, when that file exists.
 - For the crew, which helps several sessions work in one repository: the list of the processes on your machine with
   their command lines and the TCP ports they listen on, when you or Claude run `bowline crew` or `bowline crew run`;
-  the files of the repository's other worktrees that the repository names as numbered lists; and, at a session's
-  start, when the transcript files in Claude Code's project folders for the repository's worktrees were last written.
+  the files of the repository's other worktrees that the repository names as numbered lists, and the names of the
+  files each worktree changed; and, at a session's start, when the transcript files in Claude Code's project folders
+  for the repository's worktrees, and each worktree's own git folder, were last written.
   bowline never opens a transcript, and nothing of this is stored or sent.
 
 ## What bowline writes
@@ -43,8 +44,9 @@ Nothing else bowline does reaches the network.
 - The commits of the memory backup, in the memory folder, once the backup is set up. From 0.10.0 each commit's message
   also names the session whose reply it follows, by the random identifier Claude Code gives it, so that bowline can
   tell when one session removed lines another had added; the identifier goes to your remote with the commit.
-- The crew's claims and its turn for a heavy check, in the repository's own git folder, and the list of memory
-  removals you said were meant, in Claude Code's project folder for the repository.
+- The crew's claims, its turn for a heavy check and the list of the files each worktree changed, as last measured,
+  in the repository's own git folder; and the list of memory removals you said were meant, in Claude Code's project
+  folder for the repository.
 - A hook entry in Claude Code's settings file, only when you run `memory setup` without the plugin.
 
 ## Personal data

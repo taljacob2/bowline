@@ -334,12 +334,33 @@ memory folder, which every worktree also shares, because the backup would commit
 notes are for what should outlast a session; a file in the repository, because a claim must be seen before a push,
 not after one.
 
-**Why a session is recognized by its transcript's time.** A script cannot ask Claude Code which sessions are open.
-What it can see is that each worktree has its own project folder in Claude Code's configuration, and that a session
-writes its transcript there as it works. The time the newest transcript was written says a session was there lately.
-Only the folder's listing is read, never a transcript. This is observed, not documented, and one session that had
-just started in a new worktree had no transcript there yet; the line at a session's start is a hint that points to the
-skill, and `ListAgents` is the list.
+**Why a session is recognized by three signs.** A script cannot ask Claude Code which sessions are open. What it can
+see is that each worktree has its own project folder in Claude Code's configuration, and that a session started there
+writes its transcript there as it works. Only the folder's listing is read, never a transcript. That sign alone
+missed the first session that worked beside the one building this: it had been started in another repository and
+worked in a worktree of this one by path, so its transcript was in the other repository's project folder, and the
+look said nobody had worked there while that session held three claims. So the last sign of work is the newest of
+three: a transcript, the worktree's own git folder being written (a commit, a staged file), and a claim. All three are
+observed, not documented; the line at a session's start is a hint that points to the skill, and `ListAgents` is the
+list.
+
+**What a second session found by using it.** Before the release, a session with a related task ran the uncommitted
+command from its own worktree and on the first user's repository, and sent eight findings; each changed the command.
+A look ran `git status` in every worktree, which refreshes that worktree's index and can make the other session's own
+git command fail on the index lock: every git question is now asked with `--no-optional-locks`. A session that waits
+on another's work heard nothing until a push, though a session on a branch of its own commits long before it pushes:
+the hook now speaks after a commit too. A claim's key was shown with its case folded: keys are compared folded and
+kept as typed. On the real repository the list of files changed in two worktrees named twelve files, one of them in
+two running sessions' worktrees, which nobody had noticed, and it also named the roadmap and the design document,
+which every session changes by rule, and four files of a worktree nobody had touched for three weeks: so the
+repository names its shared records (`crew.shared`), which are listed apart, and a worktree with no sign of work for a
+day is marked quiet. A branch cut from another's commit made every file of that commit look changed twice: a file now
+counts only when two worktrees hold different content of it, compared by the content's id. Two worktrees made from
+another system's view of the disk were left out without a word: they are named. The person's git showed a signature
+line before every commit in `git log`: the memory's history is read with `--no-show-signature`. And reading every
+worktree of that repository cold took over two minutes, far too long for a hook that runs before an edit: the look
+keeps what it measured in the repository's git folder, `crew refresh` measures again and prints nothing, and such a
+hook reads the record.
 
 **Why the doctor never quotes a lost line.** The memory-backup skill says that a note's content is shown only to a
 person who asked for it. The finding counts the lines and names the note and the commit; `bowline memory losses`,

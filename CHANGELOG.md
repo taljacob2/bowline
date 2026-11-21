@@ -15,7 +15,14 @@ crew".
 - A new command, `bowline crew`. Alone it lists every worktree of the repository: its branch, its distance from the
   pushed branch, its uncommitted files, when a session last worked there, its processes that are heavy or listen on a
   port, the person's own ports as never to be stopped, the files changed in more than one worktree, the claims and
-  the turn. It reads the machine's process list and its listening ports, and stores nothing of them.
+  the turn. It reads the machine's process list and its listening ports, and stores nothing of them. The last sign
+  of work in a worktree is the newest of a session's transcript, the worktree's own git folder being written, and a
+  claim, so a session started in another folder that works there by path is seen. A file counts as changed in two
+  worktrees only when they hold different content of it, so a branch cut from another's commit shows none; the files
+  a repository names as shared records (`crew.shared`) are listed apart; a worktree with no sign of work for a day is
+  marked quiet; and a worktree git lists but this system cannot enter is named. Every git question is asked with
+  `--no-optional-locks`, so a look never takes the lock another session's git command needs. What the look measured
+  is kept in the repository's git folder for a hook to read, and `crew refresh` measures again.
 - `crew claim <key>` takes a note, a file or a number for this worktree and refuses one another worktree holds, naming
   it; `crew claim <list> --new` takes one past the highest number of a numbered list in the pushed branch, in every
   worktree's copy of the file and in every claim; a key that starts with `waits:` says this worktree waits on
@@ -26,9 +33,10 @@ crew".
   `crew run` holds the turn, runs the command and passes its exit code through; after `crew.waitMinutes` it names what
   still runs and exits with code 3 without running it. It never stops a process.
 - `crew after-rebase` says when a number appears twice in a numbered list, when a number this worktree claimed
-  reached the pushed branch, or when a stamp names a commit the branch no longer holds; `crew after-push` says who
-  waits on this worktree. New hooks run them after a `git rebase`, `git pull` or `git push` that Claude issues, through
-  the Bash or the PowerShell tool, and say nothing when there is nothing to say.
+  reached the pushed branch, or when a stamp names a commit the branch no longer holds; `crew after-push` and
+  `crew after-commit` say who waits on this worktree. New hooks run them after a `git rebase`, `git pull`, `git push`
+  or `git commit` that Claude issues, through the Bash or the PowerShell tool, and say nothing when there is nothing
+  to say.
 - The doctor warns about a number that appears twice and about a stale stamp, in a repository that names its lists and
   stamps. At a session's start it adds one line when another session worked in the repository in the last
   `crew.activeMinutes` minutes, in another worktree or in the same folder, from the times the transcript files were
@@ -36,11 +44,12 @@ crew".
 - The memory backup's commits made by the hook name the session whose reply they follow ("Session: <id>"). The doctor
   warns when one session's commit removed lines that another session's commit had added within
   `crew.memoryLossHours` hours and no note holds them now, without quoting them; `bowline memory losses` lists them,
-  and `--meant <commit>` records a removal that was meant.
+  and `--meant <commit>` records a removal that was meant. The memory's history is read with `--no-show-signature`,
+  so a person whose git shows signatures on every commit gets neither their lines in the text nor a check of each.
 - A new skill, `crew`, with the procedure and the three rules for a file the sessions share; a rule template for a
   repository where several sessions work, `templates/crew/beside-other-sessions.md`, which the skill offers and `init`
   does not write; a `crew` section in `defaults.json` with each key's reason, all of it empty or off until a
-  repository fills it: `heavy`, `keepPorts`, `numbers`, `stamps`, `base`, `activeMinutes`, `waitMinutes`,
+  repository fills it: `heavy`, `keepPorts`, `numbers`, `shared`, `stamps`, `base`, `activeMinutes`, `waitMinutes`,
   `waitEverySeconds`, `memoryLossDays`, `memoryLossHours`.
 - `plugin/PRIVACY.md` says what the crew reads and writes, and that the backup's commits now carry the session's
   identifier to your remote.

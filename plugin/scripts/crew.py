@@ -7,15 +7,23 @@
     python -I scripts/bowline.py crew run [--timeout <minutes>] [--every <seconds>] -- <command> [<argument>...]
     python -I scripts/bowline.py crew after-rebase [--hook]                what a rebase changed: numbers and stamps
     python -I scripts/bowline.py crew after-push [--hook]                  who waits on this worktree's push
+    python -I scripts/bowline.py crew after-commit [--hook]                who waits on this worktree's commit
+    python -I scripts/bowline.py crew refresh                              measure the worktrees again, for the record
 
 Several sessions in one repository share more than they see: one machine's processor, one memory folder, one roadmap
 whose numbers each of them extends, and the ports a person's own servers listen on. This command gives each session
 what the others would otherwise have to say by hand.
 
 With no word after it, crew lists every worktree of the repository: its branch, how far it is from the branch every
-session pushes to, its changed files, when a session last worked there (the time the newest transcript file in Claude
-Code's project folder for it was written, never what the file holds), its processes that count as heavy or that listen
+session pushes to, its changed files, the last sign of work there, its processes that count as heavy or that listen
 on a port, the claims it holds, the files changed in more than one worktree, and who holds the turn for a heavy check.
+A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
+was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
+when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
+path, and then leaves no transcript there. Every git question is asked with --no-optional-locks, so that looking at
+another session's worktree never takes the lock its own git commands need. What the look measured is kept in the
+repository's git folder (changed.json), for a hook that must answer at once; `crew refresh` measures again and prints
+nothing.
 
 A claim is a name a worktree takes so that no other takes it: `roadmap:124`, `note:17`, `file:src/parser.py`. The
 claims live in the repository's git folder, which every worktree shares, on this machine only, never committed. A
@@ -33,14 +41,16 @@ names what still runs and exits with code 3 without running the command.
 
 after-rebase says, and only when something is wrong, that a number appears twice in a numbered list, that a number this
 worktree claimed has reached the pushed branch, or that a stamp (crew.stamps, a file whose text names a commit) names
-a commit that is not in the branch's history any more. after-push says who waits on this worktree. With --hook they
-read a Claude Code PostToolUse hook's JSON on standard input, speak only after a `git rebase`, `git pull` or `git push`,
-answer as the hook's additionalContext, and always exit 0.
+a commit that is not in the branch's history any more. after-push says who waits on this worktree and what it still
+holds; after-commit says only who waits, because a session on a branch of its own commits long before it pushes. With
+--hook they read a Claude Code PostToolUse hook's JSON on standard input, speak only after a `git rebase`, `git pull`,
+`git push` or `git commit`, answer as the hook's additionalContext, and always exit 0.
 """
 
 import argparse
 import concurrent.futures
 import datetime
+import fnmatch
 import json
 import os
 import re
@@ -72,7 +82,9 @@ def same(path):
 def git(folder, *args):
     """Runs git in a folder and returns (exit code, its standard output as text); a failure is returned, never raised."""
     try:
-        result = subprocess.run(["git", "-c", "core.quotepath=false", "-C", folder, *args], stdout=subprocess.PIPE,
+        # --no-optional-locks: a look into another session's worktree must not refresh its index, which would take
+        # the lock that session's own git command needs at that moment.
+        result = subprocess.run(["git", "--no-optional-locks", "-c", "core.quotepath=false", "-C", folder, *args], stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=120)
     except (OSError, subprocess.TimeoutExpired):
         return 1, ""
@@ -91,9 +103,11 @@ def state_dir(root):
 
 # The worktrees.
 
-def worktrees(root):
+def worktrees(root, unreachable=None):
     """Every worktree of the repository that is still on disk, the main checkout first: its path, branch and name. The
-    name is how a person says it: the path from the main checkout, or the path itself when it lies elsewhere."""
+    name is how a person says it: the path from the main checkout, or the path itself when it lies elsewhere. A
+    worktree git lists but this system cannot enter, such as one made from another system's view of the same disk, is
+    left out and its path added to unreachable, so that the caller can say so."""
     code, out = git(root, "worktree", "list", "--porcelain")
     found = []
     for block in out.split("\n\n") if code == 0 else []:
@@ -101,7 +115,11 @@ def worktrees(root):
         for line in block.splitlines():
             word, _, rest = line.partition(" ")
             entry[word] = rest
-        if "worktree" not in entry or "bare" in entry or not os.path.isdir(entry["worktree"]):
+        if "worktree" not in entry or "bare" in entry:
+            continue
+        if not os.path.isdir(entry["worktree"]):
+            if unreachable is not None:
+                unreachable.append(entry["worktree"])
             continue
         branch = entry.get("branch", "")
         found.append({"path": os.path.normpath(entry["worktree"]),
@@ -159,15 +177,64 @@ def transcripts(tree_path):
 
 
 def last_session(tree_path):
-    """When a session last worked in a worktree: the time its newest transcript file was written, or None."""
+    """When a session started in a worktree last worked: the time its newest transcript file was written, or None."""
     return max((stamp for _, stamp in transcripts(tree_path)), default=None)
+
+
+def git_written(tree_path):
+    """When a worktree's own git folder was last written: its index, its HEAD or its log, whichever is newest, or None.
+    A commit, a staged file or a checkout writes one of them. Read from the file system, without starting git."""
+    dot = os.path.join(tree_path, ".git")
+    folder = dot
+    if os.path.isfile(dot):
+        try:
+            words = common.read_text(dot).strip()
+        except OSError:
+            return None
+        if not words.startswith("gitdir:"):
+            return None
+        folder = words[len("gitdir:"):].strip()
+        folder = folder if os.path.isabs(folder) else os.path.join(tree_path, folder)
+    newest = None
+    for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
+        try:
+            stamp = os.path.getmtime(os.path.join(folder, name))
+        except OSError:
+            continue
+        newest = stamp if newest is None or stamp > newest else newest
+    return newest
+
+
+def claimed_at(tree_path, claims):
+    """When a worktree last took a claim, or None."""
+    newest = None
+    for claim in claims:
+        if same(claim.get("worktree") or "") != same(tree_path):
+            continue
+        try:
+            stamp = datetime.datetime.strptime(str(claim.get("since")), "%Y-%m-%d %H:%M").timestamp()
+        except ValueError:
+            continue
+        newest = stamp if newest is None or stamp > newest else newest
+    return newest
+
+
+def last_sign(tree_path, claims):
+    """The last sign of work in a worktree, as (time, what it was), or (None, None): a session's transcript, the
+    worktree's git folder, or a claim. A session started in another folder that works here by path leaves only the
+    last two."""
+    signs = [(last_session(tree_path), "a session's transcript"), (git_written(tree_path), "its git folder"),
+             (claimed_at(tree_path, claims), "a claim")]
+    signs = [sign for sign in signs if sign[0] is not None]
+    return max(signs) if signs else (None, None)
 
 
 def others_active(start, config, transcript=None, now=None):
     """The names of the places where another session worked in the last crew.activeMinutes: every other worktree of
-    the repository, and this worktree itself when a transcript other than this session's was written there. For the
-    line at a session's start. transcript is this session's own transcript, or a function that gives it, asked only
-    when this folder has a transcript written lately; without it, two such transcripts mean one is another session's."""
+    the repository with a sign of work that recent (a transcript, its git folder, a claim), and this worktree itself
+    when a transcript other than this session's was written there. For the line at a session's start. transcript is
+    this session's own transcript, or a function that gives it, asked only when this folder has a transcript written
+    lately; without it, two such transcripts mean one is another session's."""
     minutes = settings(config).get("activeMinutes") or 0
     root = common.repo_root(start)
     if not minutes or not root:
@@ -175,13 +242,16 @@ def others_active(start, config, transcript=None, now=None):
     now = time.time() if now is None else now
     trees = worktrees(root)
     here = mine(trees, root)
+    claims = load_claims(root)
     names = []
     for tree in trees:
+        if tree is not here:
+            stamp, _ = last_sign(tree["path"], claims)
+            if stamp is not None and now - stamp <= minutes * 60:
+                names.append(tree["name"])
+            continue
         recent = [path for path, stamp in transcripts(tree["path"]) if now - stamp <= minutes * 60]
         if not recent:
-            continue
-        if tree is not here:
-            names.append(tree["name"])
             continue
         own = transcript() if callable(transcript) else transcript
         if any(same(path) != same(own) for path in recent) if own else len(recent) > 1:
@@ -376,7 +446,7 @@ def read_json(path, default):
 
 def write_json(path, value):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    temp = path + ".tmp"
+    temp = f"{path}.{os.getpid()}.tmp"
     with open(temp, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(value, handle, indent=2)
         handle.write("\n")
@@ -391,9 +461,15 @@ def load_claims(root):
     return [c for c in read_json(claims_path(root), {}).get("claims") or [] if isinstance(c, dict) and c.get("key")]
 
 
+def fold(key):
+    """A key as two spellings of it compare. A claim keeps the spelling it was typed in, because a file's name is
+    shown as its holder wrote it; File:README.md and file:readme.md are still one claim."""
+    return str(key).strip().lower()
+
+
 def exclusive(key):
     """Whether only one worktree may hold a key. Several may wait on the same push."""
-    return not key.startswith("waits:")
+    return not fold(key).startswith("waits:")
 
 
 def number_lists(config):
@@ -435,15 +511,17 @@ def file_here(tree_path, path):
 
 def number_of(key, lists):
     """(list name, number) when a key is a number of one of the repository's lists, else None."""
-    name, _, digits = key.partition(":")
+    name, _, digits = fold(key).partition(":")
     return (name, int(digits)) if name in lists and digits.isdigit() else None
 
 
-def settle(claims, trees, here, lists, base, root):
+def settle(claims, trees, here, lists, base, root, unreachable=()):
     """The claims that still stand, and why each of the others was dropped. A claim of a worktree that no longer exists
     is dropped by whoever looks. A number that has reached the pushed branch is dropped only from the worktree that
     holds it, so that its holder is the one told."""
-    alive = {same(tree["path"]) for tree in trees}
+    # A worktree this system cannot enter is still one git lists, and a session on the system that made it may hold
+    # claims there; only a worktree git no longer lists has given its claims up.
+    alive = {same(tree["path"]) for tree in trees} | {same(path) for path in unreachable}
     landed = {}
     kept, dropped = [], []
     for claim in claims:
@@ -481,14 +559,16 @@ class Place:
         if not self.root:
             raise SystemExit("bowline crew: not inside a git repository. Run it from a repository, or name one with --repo.")
         self.config = common.load_config(self.root)
-        self.trees = worktrees(self.root)
+        self.unreachable = []
+        self.trees = worktrees(self.root, self.unreachable)
         self.here = mine(self.trees, self.root)
         self.lists = number_lists(self.config)
         self.base = base_ref(self.root, self.config)
 
     def settled(self, write=True):
         """The standing claims, after dropping the ones that no longer hold; call with the lock held to write."""
-        kept, dropped = settle(load_claims(self.root), self.trees, self.here, self.lists, self.base, self.root)
+        kept, dropped = settle(load_claims(self.root), self.trees, self.here, self.lists, self.base, self.root,
+                               self.unreachable)
         if dropped and write:
             write_json(claims_path(self.root), {"claims": kept})
         return kept, dropped
@@ -496,10 +576,11 @@ class Place:
 
 def do_claim(options):
     place = Place(options.repo)
-    key = options.key.strip().lower()
+    key = options.key.strip()
     with Lock(state_dir(place.root)):
         claims, _ = place.settled()
         if options.new:
+            key = fold(key)
             if key not in place.lists:
                 known = ", ".join(sorted(place.lists)) or "none"
                 print(f"bowline crew: {common.CONFIG_FILE} names no numbered list called {key!r} (crew.numbers names: {known}).",
@@ -519,7 +600,7 @@ def do_claim(options):
                   "or file:src/parser.py.", file=sys.stderr)
             return 2
         for claim in claims:
-            if claim["key"] != key or not exclusive(key):
+            if fold(claim["key"]) != fold(key) or not exclusive(key):
                 continue
             if same(claim["worktree"]) == same(place.here["path"]):
                 claim["why"] = options.why or claim.get("why") or ""
@@ -530,7 +611,7 @@ def do_claim(options):
             print(f"bowline crew: {key} is taken by {holder_name(claim, place.trees)} since {claim.get('since')}{why}. "
                   "Take another, or ask that session with SendMessage.")
             return 1
-        claims = [c for c in claims if not (c["key"] == key and same(c["worktree"]) == same(place.here["path"]))]
+        claims = [c for c in claims if not (fold(c["key"]) == fold(key) and same(c["worktree"]) == same(place.here["path"]))]
         claims.append({"key": key, "worktree": place.here["path"], "why": options.why or "", "since": now_stamp()})
         write_json(claims_path(place.root), {"claims": claims})
     if options.new:
@@ -543,22 +624,22 @@ def do_claim(options):
 
 def do_release(options):
     place = Place(options.repo)
-    wanted = {key.strip().lower() for key in options.keys}
+    wanted = {fold(key) for key in options.keys}
     if not wanted and not options.all:
         print("bowline crew: name the claims to give back, or --all for every claim of this worktree.", file=sys.stderr)
         return 2
     with Lock(state_dir(place.root)):
         claims, _ = place.settled()
         own = [c for c in claims if same(c["worktree"]) == same(place.here["path"])]
-        gone = [c for c in own if options.all or c["key"] in wanted]
+        gone = [c for c in own if options.all or fold(c["key"]) in wanted]
         kept = [c for c in claims if c not in gone]
         if gone:
             write_json(claims_path(place.root), {"claims": kept})
-    others = sorted(wanted - {c["key"] for c in own})
+    others = sorted(wanted - {fold(c["key"]) for c in own})
     if gone:
         print("bowline crew: given back: " + ", ".join(c["key"] for c in gone) + ".")
     for key in others:
-        held = [c for c in claims if c["key"] == key]
+        held = [c for c in claims if fold(c["key"]) == key]
         if held:
             print(f"bowline crew: {key} is {holder_name(held[0], place.trees)}'s, not this worktree's; it was left.")
         else:
@@ -678,8 +759,11 @@ def do_after_rebase(options):
     return 0 if options.hook or not lines else 1
 
 
-def do_after_push(options):
-    place = hook_place(("push",)) if options.hook else Place(options.repo)
+def do_after_push(options, word="push"):
+    """After a push, and after a commit: who waits on this worktree. A session on a branch of its own commits long
+    before it pushes, and whoever waits on it would otherwise hear nothing until then. After a push only, what this
+    worktree still holds, since a push is when a piece of work ends."""
+    place = hook_place((word,)) if options.hook else Place(options.repo)
     if place is None:
         return 0
     with Lock(state_dir(place.root)):
@@ -687,18 +771,18 @@ def do_after_push(options):
     here = place.here
     # A session that waits names the worktree as it knows it: by its folder, its path from the main checkout, or its branch.
     names = {here["short"].lower(), here["name"].lower(), here["branch"].lower()} | ({"main-checkout"} if here["main"] else set())
-    waiting = [c for c in claims if c["key"].startswith("waits:") and c["key"][len("waits:"):] in names
+    waiting = [c for c in claims if fold(c["key"]).startswith("waits:") and fold(c["key"])[len("waits:"):] in names
                and same(c["worktree"]) != same(here["path"])]
     lines = []
     if waiting:
         code, head = git(here["path"], "rev-parse", "--short", "HEAD")
-        lines.append(f"- {common.count(len(waiting), 'session waits', 'sessions wait')} on a push from this worktree; "
-                     f"its HEAD is {head.strip() or 'unknown'} on {here['branch']}. If this push holds what one waits for, "
+        lines.append(f"- {common.count(len(waiting), 'session waits', 'sessions wait')} on this worktree; after this {word} "
+                     f"its HEAD is {head.strip() or 'unknown'} on {here['branch']}. If this {word} holds what one waits for, "
                      "send it the hash with SendMessage:")
         for claim in waiting:
             why = f", for: {claim['why']}" if claim.get("why") else ""
             lines.append(f"  - {holder_name(claim, place.trees)}{why} (since {claim.get('since')})")
-    held = [c["key"] for c in claims if same(c["worktree"]) == same(here["path"])]
+    held = [c["key"] for c in claims if same(c["worktree"]) == same(here["path"])] if word == "push" else []
     if held:
         lines.append(f"- This worktree still holds: {', '.join(held)}. Give back what this push finished with `crew release <key>`.")
     say(lines, options.hook)
@@ -776,8 +860,10 @@ def do_run(options):
         turn = turn_holder(place.root, snapshot)
         if not busy and not turn and take_turn(place.root, place.here, command):
             break
-        waits = [f"pid {p['pid']} {shown(p['command'], 70)}" + (f" ({owner(p['command'], place.trees)['name']})"
-                 if owner(p["command"], place.trees) else "") for p in busy[:5]]
+        waits = []
+        for process in busy[:5]:
+            whose = owner(process["command"], place.trees)
+            waits.append(f"pid {process['pid']} {shown(process['command'], 70)}" + (f" ({whose['name']})" if whose else ""))
         if len(busy) > 5:
             waits.append(f"and {len(busy) - 5} more")
         if turn:
@@ -809,35 +895,99 @@ def do_run(options):
 
 # Who is here.
 
-def ago(stamp, now):
-    minutes = int(max(0, now - stamp) // 60)
+def how_long(seconds):
+    minutes = int(max(0, seconds) // 60)
     if minutes < 1:
-        return "less than a minute ago"
+        return "less than a minute"
     if minutes < 120:
-        return common.count(minutes, "minute", "minutes") + " ago"
+        return common.count(minutes, "minute", "minutes")
     if minutes < 48 * 60:
-        return common.count(minutes // 60, "hour", "hours") + " ago"
-    return common.count(minutes // (24 * 60), "day", "days") + " ago"
+        return common.count(minutes // 60, "hour", "hours")
+    return common.count(minutes // (24 * 60), "day", "days")
+
+
+def ago(stamp, now):
+    return how_long(now - stamp) + " ago"
 
 
 def survey_tree(tree, base):
-    """One worktree's distance from the base and the files it changed, committed or not."""
+    """One worktree's distance from the base and the files it changed, committed or not, as a record."""
     path = tree["path"]
     ahead = behind = None
-    changed = set()
+    blobs = {}
     if base:
         code, out = git(path, "rev-list", "--left-right", "--count", f"{base}...HEAD")
         if code == 0 and len(out.split()) == 2:
             behind, ahead = (int(n) for n in out.split())
-        code, out = git(path, "diff", "--name-only", f"{base}...HEAD")
-        changed.update(line for line in out.splitlines() if line) if code == 0 else None
-    code, out = git(path, "status", "--porcelain")
-    uncommitted = 0
+        # Each committed change with the id of the content it ends in, so that two worktrees whose branches hold the
+        # same commit are seen to hold the same file, not two changes of it.
+        code, out = git(path, "diff", "--raw", "--no-abbrev", "--no-renames", f"{base}...HEAD")
+        for line in out.splitlines() if code == 0 else []:
+            facts, _, name = line.partition("\t")
+            if line.startswith(":") and name and len(facts.split()) >= 4:
+                blobs[name.strip('"')] = facts.split()[3]
+    code, out = git(path, "status", "--porcelain", "--untracked-files=all")
+    dirty = []
     for line in out.splitlines() if code == 0 else []:
         if len(line) > 3:
-            uncommitted += 1
-            changed.add(line[3:].split(" -> ")[-1].strip('"'))
-    return ahead, behind, uncommitted, changed
+            dirty.append(line[3:].split(" -> ")[-1].strip('"'))
+            blobs.setdefault(dirty[-1], None)                           # changed here, in no commit yet
+    return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": tree["main"], "ahead": ahead,
+            "behind": behind, "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty)}
+
+
+def collisions(trees):
+    """The files that more than one worktree changed differently, as {path: [the worktrees' names]}, from the records
+    of a survey. Two worktrees whose commits end in the same content of a file, because one branch was cut from the
+    other or both took the same commit, did not change it differently, and neither did one of them that goes on from
+    there without a commit yet. It is a collision when their commits end in different content, or when two of them
+    each hold a change that is not committed."""
+    holders = {}
+    for tree in trees:
+        dirty = set(tree.get("dirty") or [])
+        for path, blob in (tree.get("blobs") or {}).items():
+            holders.setdefault(path, []).append((tree["name"], blob, path in dirty))
+    return {path: [name for name, _, _ in held] for path, held in holders.items()
+            if len({blob for _, blob, _ in held}) > 1 or sum(1 for _, _, dirty in held if dirty) > 1}
+
+
+def survey_path(root):
+    return os.path.join(state_dir(root), "changed.json")
+
+
+def survey(place):
+    """Measures every worktree, eight at a time, and keeps the result in the repository's git folder for whoever must
+    answer at once. The record is what cached_survey returns."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        trees = list(pool.map(lambda tree: survey_tree(tree, place.base), place.trees))
+    record = {"at": time.time(), "base": place.base, "trees": trees}
+    try:
+        write_json(survey_path(place.root), record)
+    except OSError:
+        pass                # the record is a convenience; a look that cannot keep it still answers
+    return record
+
+
+def cached_survey(root):
+    """What the last look or `crew refresh` measured, without starting git, or None when nothing was measured yet:
+    {"at": seconds since 1970, "base": the pushed branch or None, "trees": [{"path", "name", "branch", "main", "ahead",
+    "behind", "uncommitted", "files": every file the worktree changed, committed or not, by its path from the
+    repository's top, "blobs": {each of those files: the id of the content its commits end in, or None when no commit
+    of the worktree changed it}, "dirty": the files with a change that is not committed}]}. collisions(record["trees"]) gives the files two worktrees changed differently. Measuring a large repository's worktrees cold took over two minutes on the first one that
+    was tried, so a hook that runs before every edit reads this and lets `crew refresh` measure in the background."""
+    record = read_json(survey_path(root), None)
+    return record if isinstance(record, dict) and isinstance(record.get("trees"), list) else None
+
+
+def shared_record(path, config):
+    """Whether a file is one the repository says every session adds to (crew.shared, paths or patterns): a roadmap, a
+    design document, a changelog. Two worktrees that both changed one is how the work is meant to go."""
+    return any(fnmatch.fnmatchcase(path, str(pattern)) for pattern in settings(config).get("shared") or [])
+
+
+def do_refresh(options):
+    survey(Place(options.repo))
+    return 0
 
 
 def do_look(options):
@@ -846,8 +996,7 @@ def do_look(options):
     now = time.time()
     with Lock(state_dir(place.root)):
         claims, dropped = place.settled()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        surveys = list(pool.map(lambda tree: survey_tree(tree, place.base), place.trees))
+    record = survey(place)
     snapshot = processes()
     ports = listening()
     patterns = heavy_patterns(place.config)
@@ -855,27 +1004,31 @@ def do_look(options):
     keep = [int(p) for p in crew.get("keepPorts") or [] if str(p).isdigit()]
     by_pid = {p["pid"]: p for p in snapshot}
     port_owner = {port: pid for pid, found in (ports or {}).items() for port in found}
+    whose = {p["pid"]: owner(p["command"], place.trees) for p in snapshot}
 
     print(f"bowline crew: {place.trees[0]['path']}, {common.count(len(place.trees), 'worktree', 'worktrees')}"
           + (f", measured against {place.base}" if place.base else ", with no pushed branch to measure against"))
+    if place.unreachable:
+        print(f"  {common.count(len(place.unreachable), 'worktree that git lists is', 'worktrees that git lists are')} left out, "
+              "because this system cannot enter the folder (made from another system's view of the disk, or removed "
+              f"by hand): {common.names(place.unreachable, options.verbose)}")
     if not snapshot:
         print("  The system would not list its processes, so none are shown.")
     if ports is None:
         print("  The system has no tool that lists listening ports (netstat, ss or lsof), so none are shown.")
     print()
-    touched = {}
-    outside = [p for p in snapshot if p["pid"] in heavy and owner(p["command"], place.trees) is None]
-    for tree, (ahead, behind, uncommitted, changed) in zip(place.trees, surveys):
-        for path in changed:
-            touched.setdefault(path, []).append(tree["name"])
+    quiet = {}
+    for tree, measured in zip(place.trees, record["trees"]):
         head = f"  {tree['name']}" + (" (this one)" if tree is place.here else "") + f", branch {tree['branch']}"
-        if ahead is not None:
-            head += f": {common.count(ahead, 'commit', 'commits')} ahead of {place.base}, {behind} behind"
-        head += f", {common.count(uncommitted, 'file', 'files')} not committed"
+        if measured["ahead"] is not None:
+            head += f": {common.count(measured['ahead'], 'commit', 'commits')} ahead of {place.base}, {measured['behind']} behind"
+        head += f", {common.count(measured['uncommitted'], 'file', 'files')} not committed"
         print(head)
-        stamp = last_session(tree["path"])
-        print("      session: " + (f"last active {ago(stamp, now)}" if stamp else "none has worked here on this machine"))
-        own = [p for p in snapshot if owner(p["command"], place.trees) is tree and p["pid"] != os.getpid()]
+        stamp, what = last_sign(tree["path"], claims)
+        if stamp is None or now - stamp > 24 * 3600:
+            quiet[tree["name"]] = "no sign of work" if stamp is None else f"quiet for {how_long(now - stamp)}"
+        print("      last sign of work: " + (f"{ago(stamp, now)}, {what}" if stamp else "none on this machine"))
+        own = [p for p in snapshot if whose[p["pid"]] is tree and p["pid"] != os.getpid()]
         named = [p for p in own if p["pid"] in heavy or (ports or {}).get(p["pid"])]
         for process in named if not options.verbose else own:
             marks = (["heavy"] if process["pid"] in heavy else []) + [f"listens on {port}" for port in sorted((ports or {}).get(process["pid"], []))]
@@ -888,6 +1041,7 @@ def do_look(options):
                 why = f": {claim['why']}" if claim.get("why") else ""
                 print(f"      claim: {claim['key']}, since {claim.get('since')}{why}")
         print()
+    outside = [p for p in snapshot if p["pid"] in heavy and whose[p["pid"]] is None]
     if outside:
         print("  Heavy processes that belong to no worktree:")
         for process in outside:
@@ -900,13 +1054,24 @@ def do_look(options):
             who = f"pid {pid} {shown(by_pid[pid]['command'], 70)}" if pid in by_pid else (f"pid {pid}" if pid else "nothing listens now")
             print(f"      {port}: {who}")
         print()
-    both = sorted((path, names) for path, names in touched.items() if len(names) > 1)
+
+    def said(names):
+        return ", ".join(name + (f" ({quiet[name]})" if name in quiet else "") for name in names)
+
+    both = sorted(collisions(record["trees"]).items())
+    records = [(path, names) for path, names in both if shared_record(path, place.config)]
+    both = [pair for pair in both if pair not in records]
     if both:
-        print("  Changed in more than one worktree, so a rebase will meet both changes:")
+        print("  Changed differently in more than one worktree, so a rebase will meet both changes:")
         for path, names in both[:20] if not options.verbose else both:
-            print(f"      {path}: {', '.join(names)}")
+            print(f"      {path}: {said(names)}")
         if len(both) > 20 and not options.verbose:
             print(f"      and {len(both) - 20} more (--verbose lists them)")
+        print()
+    if records:
+        print("  Shared records (crew.shared), which every session adds to, changed in more than one worktree as they are meant to be:")
+        for path, names in records:
+            print(f"      {path}: {said(names)}")
         print()
     for claim, reason in dropped:
         print(f"  Dropped the claim {claim['key']} of {holder_name(claim, place.trees)}: {reason}.")
@@ -941,28 +1106,31 @@ def main(argv=None):
     p = sub.add_parser("run", help="wait for a quiet machine and the turn, then run the command after two dashes")
     p.add_argument("--timeout", type=float, help="minutes to wait before giving up (default: crew.waitMinutes)")
     p.add_argument("--every", type=float, help="seconds between two looks (default: crew.waitEverySeconds)")
-    for name in ("after-rebase", "after-push"):
+    for name in ("after-rebase", "after-push", "after-commit"):
         p = sub.add_parser(name)
         p.add_argument("--hook", action="store_true", help="read a PostToolUse hook's JSON on standard input; always exit 0")
+    sub.add_parser("refresh", help="measure the worktrees again and keep the result, printing nothing")
     for p in sub.choices.values():
         p.add_argument("--repo", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     options = parser.parse_args(argv)
     options.command = command
+    after = {"after-rebase": do_after_rebase, "after-push": lambda o: do_after_push(o, "push"),
+             "after-commit": lambda o: do_after_push(o, "commit")}
     if getattr(options, "hook", False):
         try:
-            return do_after_rebase(options) if options.action == "after-rebase" else do_after_push(options)
+            return after[options.action](options)
         except BaseException:  # noqa: BLE001 - a hook must never fail the command it follows
             return 0
+    if options.action in after:
+        return after[options.action](options)
     if options.action == "claim":
         return do_claim(options)
     if options.action == "release":
         return do_release(options)
     if options.action == "run":
         return do_run(options)
-    if options.action == "after-rebase":
-        return do_after_rebase(options)
-    if options.action == "after-push":
-        return do_after_push(options)
+    if options.action == "refresh":
+        return do_refresh(options)
     if command:
         print("bowline crew: a command after two dashes belongs to crew run: crew run -- <command>", file=sys.stderr)
         return 2

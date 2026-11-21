@@ -19,10 +19,21 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew
 ```
 
 It lists every worktree of the repository: its branch, how far it is from the branch every session pushes to, its
-files not yet committed, when a session last worked there, its processes that count as heavy or listen on a port, the
-claims it holds, the files changed in more than one worktree, and who holds the turn for a heavy check. Then call
-`ListAgents`: it names the sessions and says which are busy, which the script cannot know. Do both before the first
-change of a session that was told at its start that others are at work, and again before a push.
+files not yet committed, the last sign of work there, its processes that count as heavy or listen on a port, the
+claims it holds, the files changed differently in more than one worktree, and who holds the turn for a heavy check.
+Then call `ListAgents`: it names the sessions and says which are busy, which the script cannot know. Do both before
+the first change of a session that was told at its start that others are at work, and again before a push.
+
+- **A sign of work** is the newest of a session's transcript, the worktree's own git folder being written, and a
+  claim. A session that was started in another folder and works here by path leaves no transcript here, so the last
+  two are how it is seen; take a claim early when you work that way yourself.
+- **A file changed differently in more than one worktree** is one a rebase will meet twice. Tell the other session
+  which lines you change, or wait for its push. A worktree marked quiet has shown no sign of work for a day or more,
+  and its changes may be abandoned; ask the person before counting on that.
+- **A shared record** (`crew.shared`: a roadmap, a design document, a changelog) is listed apart, because every
+  session adds to it by rule.
+- **A worktree this system cannot enter**, such as one made from another system's view of the same disk, is named
+  and left out; a session may still be at work in it.
 
 Never stop a process you did not start. The ports the repository names as the person's own (`crew.keepPorts`) are
 listed with what listens on them and are never to be stopped; a server of your own takes a port nothing listens on.
@@ -109,11 +120,12 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew after-rebase
 
 Then run the checks again when the rebase changed what you are about to push.
 
-## 6. After a push, tell whoever waits
+## 6. After a commit or a push, tell whoever waits
 
-bowline's hook says, after a `git push` you issue, which sessions wait on this worktree and for what, with the
-commit's hash. Send each of them the hash with `SendMessage`, in one sentence that says what the commit holds. Then
-release the claims the push finished.
+bowline's hook says, after a `git commit` or a `git push` you issue, which sessions wait on this worktree and for
+what, with the commit's hash. A session on a branch of its own commits long before it pushes, and the session that
+waits may need only the commit. Send each of them the hash with `SendMessage`, in one sentence that says what the
+commit holds. After a push, release the claims it finished.
 
 ## Setting a repository up for it
 
@@ -125,6 +137,7 @@ keys and their reasons are in `${CLAUDE_PLUGIN_ROOT}/defaults.json`:
   what runs now. Leave out any server the person keeps running, which would never go quiet.
 - `keepPorts`: the ports of the person's own servers.
 - `numbers`: each numbered list the sessions extend, with its file and the pattern of an item's number.
+- `shared`: the files every session adds to by rule, as paths or patterns.
 - `stamps`: each file a build writes with a commit, and the command that remakes it.
 
 Then offer the rule in `${CLAUDE_PLUGIN_ROOT}/templates/crew/beside-other-sessions.md`: show it, adapt its words to

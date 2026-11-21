@@ -7,7 +7,7 @@
     "crlfFiles": ["*.cmd", "*.bat"]
   },
   "conventionsDir": "docs/conventions",
-  "_crew": "For a repository where several Claude Code sessions work at once, each in its own worktree: name the processes that must not run beside one another (heavy), the ports of your own servers (keepPorts), the numbered lists the sessions extend (numbers) and the files a build stamps with a commit (stamps); the keys and their reasons are in bowline's defaults.json, and /bowline:crew is the procedure.",
+  "_crew": "For a repository where several Claude Code sessions work at once, each in its own worktree: name the processes that must not run beside one another (heavy), the ports of your own servers (keepPorts), the numbered lists the sessions extend (numbers), the files every session adds to by rule (shared) and the files a build stamps with a commit (stamps); the keys and their reasons are in bowline's defaults.json, and /bowline:crew is the procedure.",
   "crew": {
     "heavy": [],
     "keepPorts": []

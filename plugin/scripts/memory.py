@@ -185,7 +185,7 @@ def do_status(options):
         print("backup: none. Run: bowline memory setup <private remote>")
         return 1
     _, remote = git(memory, "remote", "get-url", "origin", capture=True)
-    _, last = git(memory, "log", "-1", "--format=%ci %s", capture=True)
+    _, last = git(memory, "log", "-1", "--no-show-signature", "--format=%ci %s", capture=True)
     _, ahead = git(memory, "rev-list", "--count", "@{u}..HEAD", capture=True)
     _, dirty = git(memory, "status", "--porcelain", capture=True)
     print(f"remote: {remote.strip() or 'none'}")
@@ -274,9 +274,11 @@ def losses(memory, config, now=None):
     days, hours = crew.get("memoryLossDays") or 0, crew.get("memoryLossHours") or 0
     if not days or not hours or not os.path.isdir(os.path.join(memory, ".git")):
         return []
-    code, out = git(memory, "-c", "core.quotepath=false", "log", f"--since={int(days)}.days.ago", "--max-count=2000",
-                    "--no-color", "--no-renames", "-p", "--unified=0", "--format=%x1e%H%x1f%ct%x1f%B%x1f", "--", "*.md",
-                    capture=True)
+    # --no-show-signature: a person whose git shows signatures (log.showSignature) would otherwise get a line of
+    # words before every commit, inside the text read here, and a check of every signature in the week's history.
+    code, out = git(memory, "-c", "core.quotepath=false", "log", "--no-show-signature", f"--since={int(days)}.days.ago",
+                    "--max-count=2000", "--no-color", "--no-renames", "-p", "--unified=0",
+                    "--format=%x1e%H%x1f%ct%x1f%B%x1f", "--", "*.md", capture=True)
     if code != 0:
         return []
     commits = []

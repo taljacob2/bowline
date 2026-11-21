@@ -68,18 +68,68 @@ class CrewTests(ScratchRepo):
     def test_a_file_changed_in_two_worktrees_is_named(self):
         write(os.path.join(self.repo, "docs", "ROADMAP.md"), ROADMAP + "4. **Four.** Mine.\n")
         write(os.path.join(self.other, "docs", "ROADMAP.md"), ROADMAP + "4. **Four.** Theirs.\n")
+        write(os.path.join(self.repo, "src", "parser.py"), "mine = 1\n")
+        write(os.path.join(self.other, "src", "parser.py"), "theirs = 1\n")
         code, out, _ = self.crew()
-        self.assertIn("Changed in more than one worktree", out)
+        self.assertIn("Changed differently in more than one worktree", out)
         self.assertIn("docs/ROADMAP.md: the main checkout, .claude/worktrees/other", out)
+        # The roadmap is a record every session adds to: named apart, so that the list keeps what nobody expects.
+        self.configure({"shared": ["docs/ROAD*.md"]})
+        code, out, _ = self.crew()
+        differently, _, records = out.partition("Shared records (crew.shared)")
+        self.assertIn("src/parser.py: the main checkout, .claude/worktrees/other", differently)
+        self.assertNotIn("docs/ROADMAP.md", differently)
+        self.assertIn("docs/ROADMAP.md: the main checkout, .claude/worktrees/other", records)
+        # What the look measured is kept for a hook that must answer at once.
+        kept = crew.cached_survey(self.repo)
+        self.assertEqual([tree["name"] for tree in kept["trees"]], ["the main checkout", ".claude/worktrees/other"])
+        self.assertIn("src/parser.py", kept["trees"][1]["files"])
+        self.assertIn("src/parser.py", kept["trees"][1]["dirty"])
+        os.remove(os.path.join(self.repo, ".git", "bowline", "crew", "changed.json"))
+        self.assertIsNone(crew.cached_survey(self.repo))
+        self.assertEqual(self.crew("refresh"), (0, "", ""))
+        self.assertIsNotNone(crew.cached_survey(self.repo))
+
+    def test_the_same_content_in_two_worktrees_is_not_a_collision(self):
+        # The other branch is cut from this one's commit: both hold the file, and neither changed it differently.
+        self.with_origin()
+        write(os.path.join(self.repo, "src", "parser.py"), "shared = 1\n")
+        git(self.repo, "add", "src/parser.py")
+        git(self.repo, "commit", "-q", "-m", "a parser")
+        git(self.other, "merge", "-q", "--ff-only", "main")
+        trees = crew.survey(crew.Place(self.repo))["trees"]
+        self.assertEqual(trees[0]["blobs"]["src/parser.py"], trees[1]["blobs"]["src/parser.py"])
+        self.assertEqual(crew.collisions(trees), {})
+        write(os.path.join(self.other, "src", "parser.py"), "shared = 2\n")   # one goes on from there: still none
+        self.assertEqual(crew.collisions(crew.survey(crew.Place(self.repo))["trees"]), {})
+        write(os.path.join(self.repo, "src", "parser.py"), "shared = 3\n")    # both go on, each its own way
+        self.assertEqual(crew.collisions(crew.survey(crew.Place(self.repo))["trees"]),
+                         {"src/parser.py": ["the main checkout", ".claude/worktrees/other"]})
+
+    def test_a_worktree_this_system_cannot_enter_is_said_and_keeps_its_claims(self):
+        self.crew("claim", "file:src/a.py", cwd=self.other)
+        os.rename(self.other, os.path.join(self.root, "moved-away"))              # git still lists it; the folder is gone
+        code, out, err = self.crew()
+        self.assertEqual(code, 0, out + err)
+        self.assertIn(", 1 worktree, ", out)
+        self.assertIn("1 worktree that git lists is left out", out)
+        self.assertNotIn("Dropped the claim", out)
+        code, out, _ = self.crew("claim", "file:src/a.py")
+        self.assertEqual(code, 1, out)
 
     def test_a_claim_is_refused_to_a_second_worktree_and_given_back(self):
         code, out, _ = self.crew("claim", "note:17", "--why", "the slow start")
         self.assertEqual(code, 0, out)
         self.assertIn("note:17 is this worktree's", out)
-        code, out, _ = self.crew("claim", "Note:17", cwd=self.other)
+        code, out, _ = self.crew("claim", "Note:17", cwd=self.other)             # another spelling of the same key
         self.assertEqual(code, 1, out)
-        self.assertIn("note:17 is taken by the main checkout", out)
+        self.assertIn("is taken by the main checkout", out)
         self.assertIn("the slow start", out)
+        code, out, _ = self.crew("claim", "file:docs/README.md", cwd=self.other)  # a claim keeps the spelling typed
+        self.assertIn("file:docs/README.md is this worktree's", out)
+        code, out, _ = self.crew("claim", "FILE:docs/readme.md")
+        self.assertEqual(code, 1, out)
+        self.crew("release", "file:docs/readme.md", cwd=self.other)
         code, out, _ = self.crew("release", "note:17", cwd=self.other)          # not theirs to give back
         self.assertIn("note:17 is the main checkout's, not this worktree's; it was left.", out)
         code, out, _ = self.crew(cwd=self.other)
@@ -128,7 +178,7 @@ class CrewTests(ScratchRepo):
         self.assertEqual(code, 0, err)
         said = json.loads(out)["hookSpecificOutput"]
         self.assertEqual(said["hookEventName"], "PostToolUse")
-        self.assertIn("1 session waits on a push from this worktree", said["additionalContext"])
+        self.assertIn("1 session waits on this worktree; after this push its HEAD is", said["additionalContext"])
         self.assertIn(".claude/worktrees/other, for: the parser fix", said["additionalContext"])
         self.assertIn("SendMessage", said["additionalContext"])
         code, out, _ = self.hook("after-push", "git status", self.repo)          # not a push: nothing
@@ -139,6 +189,13 @@ class CrewTests(ScratchRepo):
         self.crew("claim", "waits:other", "--why", "its branch, by name")        # a wait may name a branch or a folder
         code, out, _ = self.hook("after-push", "git push", self.other)
         self.assertIn("the main checkout, for: its branch, by name", out)
+        # A session on a branch of its own commits long before it pushes: whoever waits is said after a commit too.
+        code, out, _ = self.hook("after-commit", "git commit -q -F message.txt", self.other)
+        said = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("1 session waits on this worktree; after this commit its HEAD is", said)
+        self.assertNotIn("still holds", said)
+        code, out, _ = self.hook("after-commit", "git push", self.other)          # not a commit: nothing
+        self.assertEqual((code, out), (0, ""))
         self.crew("release", "--all")
         code, out, _ = self.hook("after-push", "git push", self.repo)
         self.assertEqual((code, out), (0, ""))
@@ -241,10 +298,27 @@ class CrewTests(ScratchRepo):
                                 cwd=self.repo, capture_output=True, text=True, encoding="utf-8", env=dict(os.environ))
         return result.returncode, result.stdout, result.stderr
 
+    def quiet_git_folder(self, tree, minutes_ago):
+        """Makes a worktree's own git folder look last written some time ago, as one nobody commits in is."""
+        folder = os.path.join(self.repo, ".git", "worktrees", os.path.basename(tree))
+        stamp = time.time() - minutes_ago * 60
+        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
+            if os.path.exists(os.path.join(folder, name)):
+                os.utime(os.path.join(folder, name), (stamp, stamp))
+
     def test_a_sessions_start_says_when_another_session_is_at_work(self):
         mine = self.transcript(self.repo, "mine")
         payload = json.dumps({"hook_event_name": "SessionStart", "transcript_path": mine, "cwd": self.repo})
+        # A worktree made a moment ago shows a sign of work, its git folder, with no transcript at all: a session
+        # started in another folder that works here by path is seen this way.
+        code, out, _ = self.brief(payload)
+        self.assertIn("1 other Claude Code session has worked in this repository", out)
+        self.quiet_git_folder(self.other, 120)
         self.assertEqual(self.brief(payload), (0, "", ""))                       # alone: nothing
+        self.crew("claim", "note:3", cwd=self.other)                             # a claim is a sign of work too
+        code, out, _ = self.brief(payload)
+        self.assertIn("in .claude/worktrees/other.", out)
+        self.crew("release", "--all", cwd=self.other)
         self.transcript(self.other, "theirs", minutes_ago=90)
         self.assertEqual(self.brief(payload), (0, "", ""))                       # a session that ended long ago: nothing
         self.transcript(self.other, "theirs", minutes_ago=5)
