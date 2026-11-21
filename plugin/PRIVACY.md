@@ -56,8 +56,8 @@ Nothing else bowline does reaches the network.
 - The crew's claims, its turn for a heavy check, the list of the files each worktree changed, as last measured, the
   list of sessions `claude agents --json` last gave, the few sentences a session writes about its own work with
   `crew say`, and the question a session waits for you to answer (said with `crew say --asks`, or the last sentence
-  of a reply that ends with a question, which Claude Code gives the hook after each reply), in the repository's own
-  git folder, on your
+  of a reply that ends with a question, which Claude Code gives the hook after each reply), and the order of the
+  push queue, in the repository's own git folder, on your
   machine only and never committed; and the list of memory removals you said were meant, in Claude Code's project
   folder for the repository.
 - For the check before an edit, in the repository's own git folder: which warnings each session has already heard

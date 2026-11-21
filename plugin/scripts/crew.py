@@ -2,6 +2,8 @@
 
     python -I scripts/bowline.py crew [--repo <path>] [--verbose] [--json] who is here, and what each has taken
     python -I scripts/bowline.py crew watch [--every <seconds>]            the same, drawn again until Ctrl+C
+    python -I scripts/bowline.py crew queue [join [--why <words>] | leave] the order in which the worktrees push
+    python -I scripts/bowline.py crew prune [--remove <name>...]           the worktrees safe to remove; remove some
     python -I scripts/bowline.py crew claim <key> [--why <words>]          take a note, a file or a number, or refuse
     python -I scripts/bowline.py crew claim <list> --new [--why <words>]   take the next free number of a numbered list
     python -I scripts/bowline.py crew release <key>... | --all             give back what this worktree took
@@ -38,6 +40,14 @@ more than one worktree. Every line is plain ASCII within 100 columns. --json pri
 from, for any other view; watch draws the printout again every crew.watchSeconds, measuring the worktrees in the
 background, for a terminal kept beside the app. A question the person is waited on for is set by `crew say --asks`,
 or by the Stop hook when a reply ends with one (crew.asksFromReply), and taken back at the person's next prompt.
+
+queue keeps the order in which the worktrees push, in the repository's git folder: a session joins before its full
+checks and is told which worktrees ahead of it change a file it changes, so that it rebases onto their push first;
+crew run says the same, and after a push that the pushed branch holds, the hook gives the place up and names who
+comes next with the same files. prune names the worktrees that are safe to remove (every file committed, every
+commit's change on the pushed branch, no session, process, claim, lock or place in the queue, and no sign of work
+for crew.pruneHours) and why each other one is not; --remove removes the ones named, each checked again, with plain
+`git worktree remove`, which takes ignored files and refuses a change, so nothing is ever forced; the branch stays.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -159,7 +169,9 @@ def worktrees(root, unreachable=None):
             continue
         branch = entry.get("branch", "")
         found.append({"path": os.path.normpath(entry["worktree"]), "head": entry.get("HEAD") or None,
-                      "branch": branch[len("refs/heads/"):] if branch.startswith("refs/heads/") else (branch or "no branch")})
+                      "branch": branch[len("refs/heads/"):] if branch.startswith("refs/heads/") else (branch or "no branch"),
+                      # git keeps a worktree locked with `git worktree lock`, with a reason or none; None is not locked.
+                      "locked": entry.get("locked") if "locked" in entry else None})
     if not found:
         found = [{"path": os.path.normpath(root), "branch": "no branch", "head": None}]
     main = found[0]["path"]
@@ -1217,6 +1229,8 @@ def do_after_push(options, word="push"):
     held = [c["key"] for c in claims if same(c["worktree"]) == same(here["path"])] if word == "push" else []
     if held:
         lines.append(f"- This worktree still holds: {', '.join(held)}. Give back what this push finished with `crew release <key>`.")
+    if word == "push":
+        lines += queue_after_push(place)
     say(lines, options.hook)
     return 0
 
@@ -1279,6 +1293,9 @@ def do_run(options):
     place = Place(options.repo)
     patterns = heavy_patterns(place.config)
     crew = settings(place.config)
+    behind = queue_warning(place)
+    if behind:
+        print("\n".join(lines_of(behind, "", "  ")), file=sys.stderr, flush=True)
     minutes = options.timeout if options.timeout is not None else (crew.get("waitMinutes") or 30)
     every = max(1, options.every if options.every is not None else (crew.get("waitEverySeconds") or 15))
     if not patterns:
@@ -1462,6 +1479,260 @@ def session_name(session):
     return quoted(session["name"]) if session.get("name") else f"{session.get('id', '')[:8] or 'with no id'} (no title)"
 
 
+# The push queue.
+#
+# Two worktrees that change one file meet at the second one's rebase. When the second runs its full checks first and
+# rebases after, the checks ran on code that changed under them, and a full check of the first repository that used
+# this takes twenty minutes or more. So the sessions take places in one queue, and the one behind another that
+# changes the same file rebases onto that push before its full checks.
+
+def queue_path(root):
+    return os.path.join(state_dir(root), "queue.json")
+
+
+def load_queue(root, trees=None):
+    """The places in the push queue, first first, as [{"worktree", "why", "since", "seconds"}]; with trees given, only
+    those of worktrees that still exist."""
+    places = [p for p in read_json(queue_path(root), {}).get("queue") or [] if isinstance(p, dict) and p.get("worktree")]
+    if trees is not None:
+        alive = {same(tree["path"]) for tree in trees}
+        places = [p for p in places if same(p["worktree"]) in alive]
+    return places
+
+
+def change_queue(root, change):
+    with Lock(state_dir(root)):
+        places = change(load_queue(root))
+        write_json(queue_path(root), {"queue": places})
+    return places
+
+
+def shared_files(record, one, other):
+    """The files two worktrees changed differently, from a survey's record, by their paths."""
+    trees = [t for t in (record or {}).get("trees") or [] if same(t["path"]) in (same(one), same(other))]
+    return sorted(collisions(trees)) if len(trees) == 2 else []
+
+
+def queue_rows(place, record):
+    """The queue as the views show it: [{"place", "worktree", "path", "since", "why", "shares": [{"with", "files"}]}],
+    where shares names the places ahead that change a file this one changes too."""
+    names = display_names(place.trees)
+    places = load_queue(place.root, place.trees)
+    rows = []
+    for index, entry in enumerate(places):
+        shares = []
+        for ahead in places[:index]:
+            files = shared_files(record, ahead["worktree"], entry["worktree"])
+            if files:
+                shares.append({"with": names.get(same(ahead["worktree"]), ahead["worktree"]), "files": files})
+        rows.append({"place": index + 1, "worktree": names.get(same(entry["worktree"]), entry["worktree"]),
+                     "path": entry["worktree"], "since": entry.get("since"), "why": entry.get("why") or "", "shares": shares})
+    return rows
+
+
+def shares_words(shares, before="your full checks"):
+    return " ".join(f"{share['with']} is ahead of you and changes {', '.join(share['files'])} too: rebase onto its push "
+                    f"before {before}." for share in shares)
+
+
+def do_queue(options):
+    place = Place(options.repo)
+    here = place.here["path"]
+    names = display_names(place.trees)
+    mine = names[same(here)]
+    if options.step == "leave":
+        before = load_queue(place.root)
+        change_queue(place.root, lambda places: [p for p in places if same(p["worktree"]) != same(here)])
+        held = any(same(p["worktree"]) == same(here) for p in before)
+        print(f"bowline crew: {mine} left the push queue." if held else f"bowline crew: {mine} had no place in the push queue.")
+        return 0
+    if options.step == "join":
+        def join(places):
+            places = [p for p in places if same(p["worktree"]) in {same(t["path"]) for t in place.trees}]
+            for entry in places:
+                if same(entry["worktree"]) == same(here):
+                    entry["why"] = options.why or entry.get("why") or ""
+                    return places
+            return places + [{"worktree": here, "why": options.why or "", "since": now_stamp(), "seconds": time.time()}]
+        change_queue(place.root, join)
+    record = survey(place)
+    rows = queue_rows(place, record)
+    if options.step == "join":
+        row = next(r for r in rows if same(r["path"]) == same(here))
+        words = f"bowline crew: {mine} has place {row['place']} in the push queue."
+        words += (" " + shares_words(row["shares"])) if row["shares"] else (
+            " Nobody ahead of you changes a file you change." if row["place"] > 1 else " Nobody is ahead of you.")
+        print("\n".join(lines_of(words, "", "  ")))
+        return 0
+    if not rows:
+        print("bowline crew: the push queue is empty. Take a place with `crew queue join` before your full checks.")
+        return 0
+    print(f"bowline crew: the push queue of {place.trees[0]['path']}, first first:")
+    for line in queue_lines(rows, place.here and mine):
+        print(line)
+    return 0
+
+
+def queue_lines(rows, mine=None):
+    out = []
+    for row in rows:
+        words = f"{row['place']}. {row['worktree']}" + (" (this one)" if row["worktree"] == mine else "")
+        words += f", since {row['since']}" + (f": {row['why']}" if row["why"] else "")
+        out += lines_of(words, "      ", "         ")
+        for share in row["shares"]:
+            out += lines_of(f"shares {', '.join(share['files'])} with {share['with']}: rebase onto its push before the "
+                            "full checks", "         ", "           ")
+    return out
+
+
+def pushed(tree_path, base):
+    """Whether everything this worktree's HEAD holds is on the pushed branch: its commit is there, or every change of
+    its commits is (git cherry), as after a rebase."""
+    if not base:
+        return False
+    if git(tree_path, "merge-base", "--is-ancestor", "HEAD", base)[0] == 0:
+        return True
+    code, out = git(tree_path, "cherry", base, "HEAD")
+    return code == 0 and not any(line.startswith("+") for line in out.splitlines())
+
+
+def queue_after_push(place):
+    """After a push: when the pushed branch holds this worktree's work, its place in the queue is given up, and the
+    lines say who comes next and changes the same files, for the session to tell."""
+    here = place.here["path"]
+    places = load_queue(place.root, place.trees)
+    index = next((i for i, p in enumerate(places) if same(p["worktree"]) == same(here)), None)
+    if index is None or not pushed(here, place.base):
+        return []
+    change_queue(place.root, lambda current: [p for p in current if same(p["worktree"]) != same(here)])
+    names = display_names(place.trees)
+    record = cached_survey(place.root)
+    lines = [f"- {names[same(here)]}'s place in the push queue is given up, since {place.base} holds this push."]
+    for position, entry in enumerate(places[index + 1:]):
+        files = shared_files(record, here, entry["worktree"])
+        if files:
+            who = names.get(same(entry["worktree"]), entry["worktree"])
+            lines.append(f"- {who} {'comes next' if position == 0 else 'waits in the push queue'} and changes "
+                         f"{', '.join(files)} too: tell it to rebase onto this push now, before its full checks, with "
+                         "SendMessage.")
+    return lines
+
+
+def queue_warning(place):
+    """For crew run: the worktrees ahead of this one in the queue that change a file it changes, in words, or ''."""
+    record = cached_survey(place.root)
+    for row in queue_rows(place, record):
+        if same(row["path"]) == same(place.here["path"]) and row["shares"]:
+            return " ".join(f"bowline crew: {share['with']} is ahead of you in the push queue and changes "
+                            f"{', '.join(share['files'])} too. Rebase onto its push before this check, or the check runs "
+                            "on code that will change; it runs now all the same." for share in row["shares"])
+    return ""
+
+
+# Worktrees that are safe to remove.
+
+def prune_reasons(item, model, hours, queued):
+    """Why a worktree is not safe to remove, as a list of reasons; empty when it is. Safe means: nothing in it is not
+    committed (ignored files aside, which `git worktree remove` takes with it), every commit's change is on the pushed
+    branch, no session, process, claim, lock or place in the push queue holds it, and it showed no sign of work for
+    crew.pruneHours."""
+    base, now = model["base"], model["at"]
+    reasons = []
+    if item["this"]:
+        reasons.append("it is the worktree this command runs in")
+    if item["broken"]:
+        reasons.append("it is broken or being removed; `git worktree prune` clears what git keeps of it")
+    if item.get("locked") is not None:
+        reasons.append("git keeps it locked" + (f" ({item['locked']})" if item["locked"] else ""))
+    if item["sessions"]:
+        reasons.append("a session is open in it, " + ", ".join(session_name(s) for s in item["sessions"]))
+    if item["processes"]:
+        pids = ", ".join(str(process["pid"]) for process in item["processes"][:3])
+        reasons.append(f"{common.count(len(item['processes']), 'process runs', 'processes run')} in it (pid {pids})")
+    if item["claims"]:
+        reasons.append(("it holds the claim " if len(item["claims"]) == 1 else "it holds the claims ")
+                       + ", ".join(claim["key"] for claim in item["claims"]))
+    if same(item["path"]) in queued:
+        reasons.append("it has a place in the push queue")
+    if item["uncommitted"]:
+        reasons.append(common.count(item["uncommitted"], "file", "files") + " not committed")
+    if not base:
+        reasons.append("there is no pushed branch to compare its commits with")
+    elif item["notOnBase"]:
+        reasons.append(common.count(item["notOnBase"], "commit", "commits") + f" not on {base}")
+    sign = item["lastSign"]
+    if sign and now - sign["at"] < hours * 3600:
+        reasons.append(f"a sign of work {ago(sign['at'], now)} ({sign['what']})")
+    return reasons
+
+
+def prune_safe_words(item, model):
+    sign, now, base = item["lastSign"], model["at"], model["base"]
+    words = f"quiet for {how_long(now - sign['at'])}" if sign else "no sign of work on this machine"
+    if item["ahead"]:
+        words += f"; its {common.count(item['ahead'], 'commit is', 'commits are')} on {base} by content"
+    return words
+
+
+def do_prune(options):
+    place = Place(options.repo)
+    hours = settings(place.config).get("pruneHours") or 6
+    model = look(place, verbose=True)
+    queued = {same(p["worktree"]) for p in load_queue(place.root, place.trees)}
+    items = [item for item in model["worktrees"] if not item["main"]]
+    if options.remove:
+        wanted = []
+        for name in options.remove:
+            folded = name.strip().lower().replace("\\", "/").rstrip("/")
+            match = [item for item in items if folded in {item["display"].lower(), item["name"].lower(),
+                     os.path.basename(item["path"]).lower(), item["branch"].lower(), same(item["path"]).lower()}]
+            if not match:
+                print(f"bowline crew: no worktree of this repository is called {name}; nothing was removed. "
+                      "`crew prune` lists them.", file=sys.stderr)
+                return 2
+            wanted.append(match[0])
+        code = 0
+        for item in wanted:
+            reasons = prune_reasons(item, model, hours, queued)
+            if reasons:
+                print("\n".join(lines_of(f"bowline crew: {item['display']} is not removed: {'; '.join(reasons)}.", "", "  ")))
+                code = 1
+                continue
+            status, out = git(place.trees[0]["path"], "worktree", "remove", item["path"])
+            if status == 0:
+                print(f"bowline crew: removed {item['display']} ({item['path']}); its branch {item['branch']} stays.")
+            else:
+                print(f"bowline crew: git did not remove {item['display']}: {out.strip() or 'it said nothing'}. Nothing "
+                      "was forced.")
+                code = 1
+        return code
+    print("\n".join(lines_of(f"bowline crew prune: {model['repository']}, " + (f"measured against {model['base']}"
+                                                                             if model["base"] else "with no pushed branch"), "", "  ")))
+    safe = [item for item in items if not prune_reasons(item, model, hours, queued)]
+    rest = [(item, prune_reasons(item, model, hours, queued)) for item in items if item not in safe]
+    if safe:
+        out = lines_of(f"Safe to remove: {common.count(len(safe), 'worktree', 'worktrees')}. Each has every file "
+                       f"committed and every commit on {model['base']} by content; no session, process, claim, lock or "
+                       f"place in the push queue holds it, and it showed no sign of work for {hours} hours:")
+        for item in safe:
+            out += lines_of(f"{item['display']}: {prune_safe_words(item, model)}", "      ", "        ")
+    else:
+        out = lines_of("Safe to remove: none.")
+    if rest:
+        out += lines_of(f"Not safe: {common.count(len(rest), 'worktree', 'worktrees')}.")
+        for item, reasons in rest:
+            out += lines_of(f"{item['display']}: {'; '.join(reasons)}", "      ", "        ")
+    if model["unreachable"]:
+        out += lines_of(f"Left out: {common.count(len(model['unreachable']), 'worktree', 'worktrees')} that git lists and "
+                        "this system cannot enter, never offered here, since the system that made them may use them: "
+                        + common.names([os.path.basename(path) for path in model["unreachable"]]) + ".")
+    if safe:
+        out += lines_of("To remove them, with the person's yes: crew prune --remove <name> [<name>...]. Each is checked "
+                        "again first and removed with git worktree remove, which never removes a change; its branch stays.")
+    print("\n".join(out))
+    return 0
+
+
 # Who is here: the model every view draws from, and the views.
 #
 # `crew --json` prints the model; the printout, `crew watch` and anything later (a page, a status line) draw from it,
@@ -1574,7 +1845,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
         ahead = m.get("ahead")
         item = {"name": tree["name"], "display": names[key], "path": tree["path"], "branch": tree["branch"],
                 "main": tree["main"], "this": tree is place.here, "broken": bool(tree.get("broken")),
-                "ahead": ahead, "behind": m.get("behind"),
+                "locked": tree.get("locked"), "ahead": ahead, "behind": m.get("behind"),
                 "notOnBase": m.get("notOnBase") if m.get("notOnBase") is not None else ahead,
                 "uncommitted": m.get("uncommitted") or 0, "lastSign": {"at": stamp, "what": what} if stamp else None,
                 "sessions": sessions, "asks": loose, "processes": named, "otherProcesses": len(own) - len(named),
@@ -1618,6 +1889,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                     "quiet": [by_name.get(name, name) for name in held if by_name.get(name, name) in quiet]}
                    for path, held in shared],
         "keepPorts": keep_rows,
+        "queue": queue_rows(place, record),
         "outside": [{"pid": p["pid"], "command": shown(p["command"], 300)} for p in snapshot
                     if p["pid"] in heavy and whose.get(p["pid"]) is None],
         "turn": {"worktree": by_name.get(holder_name(turn, place.trees), holder_name(turn, place.trees)),
@@ -1842,6 +2114,9 @@ def render(model, verbose=False):
             who = ("nothing listens now" if not row["pid"] else f"pid {row['pid']}, in {row['worktree']}" if row["worktree"]
                    else f"pid {row['pid']} {shown(row['command'] or '', 70)}")
             out.append(f"      {row['port']}: {who}")
+    if model["queue"]:
+        out.append("  The push queue (crew queue): rebase onto the push of a worktree ahead that changes your files")
+        out += queue_lines(model["queue"])
     for process in model["outside"]:
         out += lines_of(f"A heavy process in no worktree: pid {process['pid']} {shown(process['command'], 170)}")
     for claim in model["dropped"]:
@@ -1939,6 +2214,11 @@ def main(argv=None):
                         help="every process of a worktree, every quiet worktree and every file changed twice")
     parser.add_argument("--json", action="store_true", help="the look's model as JSON, which every view draws from")
     sub = parser.add_subparsers(dest="action")
+    p = sub.add_parser("queue", help="the push queue: take a place before your full checks, or give it up")
+    p.add_argument("step", nargs="?", choices=("join", "leave"), help="join or leave; none lists the queue")
+    p.add_argument("--why", help="what this worktree will push, in a few words")
+    p = sub.add_parser("prune", help="the worktrees that are safe to remove, and why the others are not")
+    p.add_argument("--remove", nargs="+", metavar="NAME", help="remove these, each checked again first; only on the person's yes")
     p = sub.add_parser("watch", help="the look, drawn again every few seconds until Ctrl+C, for a terminal beside the app")
     p.add_argument("--every", type=float, help="seconds between two drawings (default: crew.watchSeconds)")
     p.add_argument("--times", type=int, help="stop after this many drawings")
@@ -1992,6 +2272,10 @@ def main(argv=None):
         return do_say(options)
     if options.action == "watch":
         return do_watch(options)
+    if options.action == "queue":
+        return do_queue(options)
+    if options.action == "prune":
+        return do_prune(options)
     if command:
         print("bowline crew: a command after two dashes belongs to crew run: crew run -- <command>", file=sys.stderr)
         return 2

@@ -1,6 +1,6 @@
 ---
 name: crew
-description: Work beside other Claude Code sessions in one repository without colliding - see who is here (each worktree's session, heavy processes and ports), claim a roadmap number, a note or a file before working on it, edit the files the sessions share (the memory above all) and never save one over whole, wait for a quiet machine before a heavy check, and re-read numbers and stamps after a rebase. Use when a session's start says other sessions are at work, before taking a number or a note, before a test suite or a build another session may also be running, after a rebase, after a push someone waits on, or when the person asks who else is working here.
+description: Work beside other Claude Code sessions in one repository without colliding - see who is here and what waits for the person (each worktree's sessions by name, heavy processes and ports), claim a roadmap number, a note or a file before working on it, edit the files the sessions share (the memory above all) and never save one over whole, wait for a quiet machine before a heavy check, take a place in the push queue before full checks, re-read numbers and stamps after a rebase, and list the worktrees that are safe to remove. Use when a session's start says other sessions are at work, before taking a number or a note, before a test suite or a build another session may also be running, after a rebase, after a push someone waits on, or when the person asks who else is working here, what waits for them, or which worktrees can go.
 ---
 
 # The crew
@@ -140,6 +140,19 @@ still running. Then ask that session, or wait; never stop its process.
 The order of a repository's own checks, and which of them may run together, stay the repository's rules. The turn
 adds one thing to them: one heavy command at a time, across every session.
 
+**Take a place in the push queue before your full checks.** When two worktrees change one file, the second should
+rebase onto the first's push before its full checks, not after: checks that ran on code about to change must run
+again, and a full check takes many minutes.
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew queue join --why "<what you will push>"
+```
+
+It says which worktrees ahead of you change a file you change. Wait for that push, rebase onto it, and then run the
+checks; `crew run` says the same when you start a heavy check behind such a worktree, and runs it all the same. After
+your push the hook gives your place up and names who comes next with your files: send it the hash with `SendMessage`
+so that it rebases now. `crew queue` lists the queue; `crew queue leave` gives the place up when the work is dropped.
+
 ## 5. After a rebase, read again what the others also write
 
 A rebase can succeed and still leave two items with the same number, or a build's stamp that names a commit which no
@@ -186,6 +199,18 @@ work allows it, so that a round stays one subject and ends in one commit.
 - **Reading and checking stay with you.** A search, a review or a test run goes to a subagent, whose answer comes
   back in the same turn. A session is for work that ends in a commit of its own.
 
+## Remove the worktrees nobody needs
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew prune
+```
+
+It names the worktrees that are safe to remove (every file committed, every commit on the pushed branch by content,
+no session, process, claim, lock or place in the queue, and no sign of work for `crew.pruneHours`) and why each
+other one is not. Show the list to the person. Only on their yes, run `crew prune --remove <name>...`: each is checked
+again and removed with `git worktree remove`, never with `--force`, and its branch stays. Never remove a worktree the
+list calls not safe, and never one by hand.
+
 ## Setting a repository up for it
 
 The first time in a repository, ask the person and write the answers into `.claude/bowline.json` under `crew`; the
@@ -214,7 +239,8 @@ every repository: several sessions in one repository is taken as the usual case,
 
 ## What not to do
 
-- Do not stop, restart or "clean up" a process, a server or a worktree that another session or the person started.
+- Do not stop, restart or "clean up" a process, a server or a worktree that another session or the person started;
+  a worktree goes only through `crew prune --remove`, on the person's yes.
 - Do not take a number by reading the list, and do not reuse a number that was given back.
 - Do not treat silence as agreement: a message is delivered when the other session next looks, and a session in
   another permission mode may hold it for its person.

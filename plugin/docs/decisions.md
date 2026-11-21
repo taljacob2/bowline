@@ -871,3 +871,43 @@ Reading the transcript for the last reply: the hook is given the reply, and the 
 2. A session can also ask through Claude Code's own question dialog, which does not end the reply, so the hook after
    a reply does not see it. What `claude agents` lists for a session waiting in that dialog was not checked; if it is
    "busy", the look should learn to tell it apart.
+
+## 2026-11-21: which worktrees may go, and an order for pushes
+
+**The question.** The first user's repository had 26 worktrees, thirteen of which nobody had touched for hours, and
+one being removed had made the look count the main checkout's changes as its own. Which of them may be removed
+without losing anything, and who says so? And twice that day two sessions changed one file: the second ran its full
+checks, twenty minutes or more, and then met the first one's push at its rebase, so its checks had run on code that
+was about to change. The user agreed to both: "about all the other things you suggested i agree".
+
+**The decision, for removing.** `crew prune` names the worktrees that are safe to remove and why each other one is
+not. Safe means all of these: nothing in it is not committed, every commit's change is on the pushed branch
+(compared by content with `git cherry`, because a rebased commit reaches main under another hash), no session is open
+in it, no process runs in it, it holds no claim and no place in the push queue, git does not keep it locked, and it
+showed no sign of work for `crew.pruneHours` (six). `crew prune --remove <name>...` removes only the worktrees it is
+told, each checked again at that moment, with plain `git worktree remove`, from the main checkout. That command
+refuses a worktree with a change or an untracked file and takes ignored files such as `node_modules` with it, which
+was tried before this was built, so bowline never needs `--force`, and never passes it. The branch stays. The skill
+says that the list goes to the person and `--remove` runs only on their yes: removing a folder is not something to do
+on a script's judgment alone.
+
+**The decision, for the order of pushes.** A queue in the repository's git folder that the sessions take a place in:
+`crew queue join` before the full checks, `crew queue leave` when the work is dropped. Joining says which worktrees
+ahead change a file this one changes, and tells the session to rebase onto that push before its full checks. `crew
+run`, the turn for a heavy check, says the same on its way in and runs the check all the same, because the queue is
+advice and the check may be one that does not depend on the other's change. After a push that the pushed branch now
+holds, the hook gives up the worktree's place and names who comes next and changes the same files, for the session to
+tell with `SendMessage`; a push to a branch of its own keeps the place. The look shows the queue.
+
+**Not chosen.** Removing the quiet worktrees on its own: a worktree can hold a person's experiment that only they know
+is worth keeping. Deleting the branch with the worktree: the branch costs nothing and is the last copy of its name. A
+queue that blocks a push or a check: bowline advises and never stops a person or a session; a check that waits for a
+place would turn a twenty-minute check into an hour behind a session that went to lunch.
+
+A worktree whose folder this system cannot enter, such as one made from another system's view of the disk, is named
+apart and never offered: it may be in use there.
+
+**Left for later**, a concrete piece of work this round did not do:
+
+1. The place in the queue could be taken by the turn itself: a `crew run` of the repository's full checks (a pattern
+   in `crew.heavy` the repository marks as full) could join the queue when the session has no place.

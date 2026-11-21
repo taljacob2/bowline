@@ -92,7 +92,8 @@
     "sayChars": 600,
     "claude": "claude",
     "asksFromReply": true,
-    "watchSeconds": 10
+    "watchSeconds": 10,
+    "pruneHours": 6
   },
   "crewWhy": {
     "activeMinutes": "How far back a sign of work counts: a session's start names another session when a transcript of another worktree, or another transcript of this folder, was written within this many minutes, and a running session is told before a prompt when one appears; 0 says nothing at all. It is not a wait: the look happens at once, and half an hour only decides who still counts as at work, which covers a session that is thinking or waiting for a check and forgets one that was closed.",
@@ -112,7 +113,8 @@
     "sayChars": "How long what a session says of itself with crew say may be; 0 sets no limit. Six hundred characters hold what is done with its commits, what the session waits on and what it asks, and still let a look at ten worktrees be read at once; a longer one is refused, not cut, because a cut report is the loss this exists to prevent.",
     "claude": "The program crew asks for the list of sessions, as `<program> agents --json`: a name on the path or a full path, or a list for a program with its arguments. That list holds every session on the machine, Claude Desktop's included, with its name, its folder, its process and whether it is busy, idle or blocked. It answered in under a second on the first machine tried; only the look asks it, and the hooks read what the last look kept. Where it cannot be asked, a transcript written lately stands for a session and its title line names it.",
     "asksFromReply": "true, the default: when a session's reply ends with a question, the Stop hook records that the session waits for the person, and every look shows it first until the person's next prompt in that session. Claude Code lists such a session as plain idle, the same as one that is done; on the day this was built three of them were waiting for the person unseen. Only the reply's last sentence is kept, in the repository's git folder, from the hook's last_assistant_message. false leaves it to the sessions to say so with crew say --asks.",
-    "watchSeconds": "How often crew watch draws the look again. The sessions and the processes are asked anew at each drawing, which takes a second or two; the worktrees are measured in the background, one measuring after another, because a large repository's take a minute."
+    "watchSeconds": "How often crew watch draws the look again. The sessions and the processes are asked anew at each drawing, which takes a second or two; the worktrees are measured in the background, one measuring after another, because a large repository's take a minute.",
+    "pruneHours": "How long a worktree must have shown no sign of work before crew prune calls it safe to remove, with everything else it asks: nothing not committed, every commit's change on the pushed branch, no session, process, claim, lock or place in the push queue. A session that thinks over a long check for an hour still counts as there; six hours is past a working morning or afternoon."
   },
   "outsidePaths": [
     "scratchpad['`\\\\/]",

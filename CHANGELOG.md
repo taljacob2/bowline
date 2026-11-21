@@ -52,6 +52,21 @@ The look puts what waits for the person first, and gives the same as data. The r
   worktree. A Claude Code shell is shown by the command it runs.
 - Not built: `crew line` for Claude Code's status line, since Claude Desktop sessions do not show one.
 
+Which worktrees may go, and an order for pushes. The reasoning is in `plugin/docs/decisions.md`, "which worktrees
+may go, and an order for pushes".
+
+- `bowline crew prune` names the worktrees that are safe to remove: every file committed, every commit's change on
+  the pushed branch (by content, so rebased commits count as pushed), no session, process, claim, lock or place in
+  the push queue, and no sign of work for `crew.pruneHours` (six). It says why each other one is not. `crew prune
+  --remove <name>...` removes the ones named, each checked again first, with plain `git worktree remove`, which
+  takes ignored files such as `node_modules` and refuses a change, so nothing is ever forced; the branch stays. The
+  skill runs it only on the person's yes.
+- `bowline crew queue join` takes a place in the push queue before the full checks and says which worktrees ahead
+  change a file this one changes, so that the session rebases onto their push first; `crew queue` lists it and
+  `crew queue leave` gives the place up. `crew run` says the same before a heavy check, and runs it all the same.
+  After a push that the pushed branch holds, the hook gives the place up and names who comes next with the same
+  files. The look shows the queue.
+
 ## 0.13.4 (2026-11-21)
 
 A split whose worker is gone no longer has to be cleared by hand. No Claude Code limit moved. The reasoning is in
