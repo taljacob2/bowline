@@ -1,7 +1,7 @@
 # Privacy
 
 This page says what the bowline plugin reads, writes and sends, for anyone who installs it. It applies from bowline
-0.6.2 on; what the crew reads and writes was added in 0.10.0.
+0.6.2 on; what the crew reads and writes was added in 0.10.0, and its check before an edit in 0.11.0.
 
 ## Who is behind bowline, and what they receive
 
@@ -35,6 +35,8 @@ Nothing else bowline does reaches the network.
   files each worktree changed; and, at a session's start, when the transcript files in Claude Code's project folders
   for the repository's worktrees, and each worktree's own git folder, were last written.
   bowline never opens a transcript, and nothing of this is stored or sent.
+- Before an edit that Claude makes with the Edit, Write or NotebookEdit tool: the path of the file, from the hook's
+  input, to say whether another worktree of the repository holds that file. Never the file's content or the edit.
 
 ## What bowline writes
 
@@ -47,6 +49,9 @@ Nothing else bowline does reaches the network.
 - The crew's claims, its turn for a heavy check and the list of the files each worktree changed, as last measured,
   in the repository's own git folder; and the list of memory removals you said were meant, in Claude Code's project
   folder for the repository.
+- For the check before an edit, in the repository's own git folder: which warnings each session has already heard
+  (the session's random identifier, the file's path and the worktrees named), kept for a day, and a marker while
+  the worktrees are being measured.
 - A hook entry in Claude Code's settings file, only when you run `memory setup` without the plugin.
 
 ## Personal data

@@ -9,6 +9,7 @@
     python -I scripts/bowline.py crew after-push [--hook]                  who waits on this worktree's push
     python -I scripts/bowline.py crew after-commit [--hook]                who waits on this worktree's commit
     python -I scripts/bowline.py crew refresh                              measure the worktrees again, for the record
+    python -I scripts/bowline.py crew before-edit --file <path> | --hook   whether another worktree holds this file
 
 Several sessions in one repository share more than they see: one machine's processor, one memory folder, one roadmap
 whose numbers each of them extends, and the ports a person's own servers listen on. This command gives each session
@@ -45,6 +46,11 @@ a commit that is not in the branch's history any more. after-push says who waits
 holds; after-commit says only who waits, because a session on a branch of its own commits long before it pushes. With
 --hook they read a Claude Code PostToolUse hook's JSON on standard input, speak only after a `git rebase`, `git pull`,
 `git push` or `git commit`, answer as the hook's additionalContext, and always exit 0.
+
+before-edit says whether another worktree holds a file: changed there and not committed, committed there and in
+neither the pushed branch nor this one, or claimed there. With --hook it is a PreToolUse hook on Edit, Write and
+NotebookEdit that tells Claude once per session and file and never blocks the edit. It is a module of its own,
+crew_edit.py, which reads what the look measured and measures nothing itself.
 """
 
 import argparse
@@ -1111,10 +1117,16 @@ def main(argv=None):
         p = sub.add_parser(name)
         p.add_argument("--hook", action="store_true", help="read a PostToolUse hook's JSON on standard input; always exit 0")
     sub.add_parser("refresh", help="measure the worktrees again and keep the result, printing nothing")
+    p = sub.add_parser("before-edit", help="whether another worktree holds a file: changed, committed or claimed there")
+    p.add_argument("--file", help="the file to ask about")
+    p.add_argument("--hook", action="store_true", help="read a PreToolUse hook's JSON on standard input; always exit 0")
     for p in sub.choices.values():
         p.add_argument("--repo", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     options = parser.parse_args(argv)
     options.command = command
+    if options.action == "before-edit":
+        import crew_edit                    # imported here, because crew_edit imports this module
+        return crew_edit.do_before_edit(options)
     after = {"after-rebase": do_after_rebase, "after-push": lambda o: do_after_push(o, "push"),
              "after-commit": lambda o: do_after_push(o, "commit")}
     if getattr(options, "hook", False):

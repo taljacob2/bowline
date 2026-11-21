@@ -67,6 +67,22 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew claim file:src/parser.py --why
 - **Give it back.** `crew release <key>` when the work is pushed or dropped, `crew release --all` at the end. A number
   that has reached the pushed branch, and every claim of a worktree that was removed, are dropped on their own.
 
+## When bowline warns before an edit
+
+Before an edit with the Edit, Write or NotebookEdit tool, bowline tells you when the file is held by another worktree:
+changed there and not committed, committed there and not pushed, or claimed there with `file:<path>`. The message
+begins "bowline crew:", names the worktree, its branch and the last sign of work there, and arrives beside the edit's
+result. It says so once per session and file and never blocks the edit. Then message that session, agree who changes
+what, and name the agreement in your commit message; when the work there is old and no session holds it, say so to
+the person and go on. To ask the same question by hand:
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew before-edit --file <path>
+```
+
+A file every session adds to belongs in `crew.shared`, and is then never warned about; the files of `crew.numbers`
+and `crew.stamps` are skipped on their own. The warning does not see a file changed through a shell command.
+
 ## 3. Edit a shared file; never save it over whole
 
 Every worktree of a repository reads and writes the same memory folder, and several sessions add to the same notes
@@ -160,6 +176,10 @@ keys and their reasons are in `${CLAUDE_PLUGIN_ROOT}/defaults.json`:
 - `numbers`: each numbered list the sessions extend, with its file and the pattern of an item's number.
 - `shared`: the files every session adds to by rule, as paths or patterns.
 - `stamps`: each file a build writes with a commit, and the command that remakes it.
+- `warnBeforeEdit`: leave it on, unless the repository's worktrees are not sessions; `false` turns the warning before
+  an edit off.
+- `changedCacheSeconds`: how old the record of what each worktree changed may be before the warning has it measured
+  again in the background; 60 unless the person asks for another value.
 
 Then offer the rule in `${CLAUDE_PLUGIN_ROOT}/templates/crew/beside-other-sessions.md`: show it, adapt its words to
 the repository, and with the person's yes write it to `.claude/rules/beside-other-sessions.md`. It holds both halves,

@@ -17,6 +17,7 @@ For each finding it prints three lines: what it found, why it matters, what to d
   removed soon after (the memory is one folder for every worktree, so a note saved whole from an older copy loses them);
 - for a repository that names them in its .claude/bowline.json (crew): a number that appears twice in a numbered list
   such as a roadmap, and a stamp that names a commit the branch no longer holds, both of which a rebase leaves behind;
+- as a note, a repository that has several worktrees and no rule about working beside other sessions;
 - whether the root CLAUDE.md has a compaction section, whether the gate and the budget check are installed, and
   whether the repository has a .claude/bowline.json;
 - a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
@@ -51,6 +52,7 @@ import autosplit  # noqa: E402
 import budget  # noqa: E402
 import common  # noqa: E402
 import crew  # noqa: E402
+import crew_edit  # noqa: E402
 import memory  # noqa: E402
 
 HEADING = re.compile(r"^#{1,3} (.+)$", re.MULTILINE)
@@ -343,6 +345,7 @@ def repository_findings(root, config):
     findings += root_claude_md_findings(root, facts)
     findings += layout_findings(root)
     findings += crew.findings(root, config)
+    findings += crew_edit.findings(root, config)
     autosplit.adjust(findings, root)
     return findings, facts
 

@@ -13,7 +13,8 @@ wherever the work allows it. The `/bowline:crew` skill is the procedure they fol
   not start, and never one that listens on a port `.claude/bowline.json` names as the person's own.
 - **Split the work by files.** Two sessions never edit the same file at the same time. When your round needs a file
   that another session has changed, message that session before you edit it, agree who changes what, and name the
-  agreement in your commit message. When you cannot reach it, wait for its push and rebase onto it.
+  agreement in your commit message. When you cannot reach it, wait for its push and rebase onto it. bowline warns
+  before an edit of a file another worktree holds.
 - **Claim before you work.** A new number of <the roadmap> comes from `bowline crew claim <list> --new`, never from
   reading the file, because two sessions that each add one take the same number. Claim a note or a file the same
   way, and tell the sessions it concerns with `SendMessage`.

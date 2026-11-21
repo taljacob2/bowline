@@ -85,7 +85,9 @@
     "waitMinutes": 30,
     "waitEverySeconds": 15,
     "memoryLossDays": 7,
-    "memoryLossHours": 24
+    "memoryLossHours": 24,
+    "warnBeforeEdit": true,
+    "changedCacheSeconds": 60
   },
   "crewWhy": {
     "activeMinutes": "A session's start says that other sessions are at work when a transcript of another worktree, or another transcript of this folder, was written within this many minutes; 0 says nothing. Half an hour covers a session that is thinking or waiting for a check, and forgets one that was closed.",
@@ -98,7 +100,9 @@
     "waitMinutes": "How long crew run waits for a quiet machine before it gives up without running the command; a full test suite of the first repository that used it takes about ten minutes, and two may be ahead.",
     "waitEverySeconds": "How often crew run looks again. Listing every process takes about a second on Windows, so a look every quarter of a minute costs little and starts the command soon after the machine goes quiet.",
     "memoryLossDays": "How far back in the memory backup's history the doctor looks for lines one session added and another removed; 0 turns the check off. A week is long enough to notice at the next session's start and short enough that the history is read in well under a second.",
-    "memoryLossHours": "A removed line counts as a loss when another session had added it within this many hours. A note saved whole from an older copy loses what was added since that copy was read, which is hours at most; a curation removes lines that are days or weeks old, and stays silent."
+    "memoryLossHours": "A removed line counts as a loss when another session had added it within this many hours. A note saved whole from an older copy loses what was added since that copy was read, which is hours at most; a curation removes lines that are days or weeks old, and stays silent.",
+    "warnBeforeEdit": "Before Claude edits a file that another worktree of the repository holds (changed there and not committed, committed there and in neither the pushed branch nor this one, or claimed there as file:<path>), a hook tells Claude which worktree and branch hold it, once per session and file, so that the two sessions agree who changes what before both have built on their own copy. It never blocks the edit, and skips the files of shared, numbers and stamps. false turns it off, for a repository whose worktrees are not sessions.",
+    "changedCacheSeconds": "How old the record of what every worktree changed (changed.json in the repository's git folder) may be before the hook before an edit has it measured again, in the background. Measuring nineteen worktrees on a slow disk took over two minutes on the first repository that was tried, and an edit must not wait for that; a minute is short enough that a file another session just changed is known by the next edit or the one after."
   },
   "outsidePaths": [
     "scratchpad['`\\\\/]",

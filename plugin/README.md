@@ -24,7 +24,8 @@ claude plugin install bowline@bowline
 Then, in any repository, `/bowline:doctor`. The plugin's hooks run on their own: at a session's start the doctor puts a
 one-line finding into Claude's context when something is over budget or unbacked, and nothing when all is well; after
 every reply the memory folder is pushed to its backup once `/bowline:memory-backup` has tied it to a private remote; and
-before every `git commit` Claude issues, the gate checks the staged lines. During a session, when a `CLAUDE.md`, the
+before every `git commit` Claude issues, the gate checks the staged lines; and before an edit of a file that another
+worktree of the repository holds, Claude is told which one, without the edit being blocked. During a session, when a `CLAUDE.md`, the
 memory index or one of its notes crosses a limit, you get one reminder in the doctor's words, and Claude gets the same line at your next
 message. A repository that turns `autosplit` on in `.claude/bowline.json` gets one more: when a `CLAUDE.md` outgrows
 the limits, the hook after a reply starts a worker that prepares its split in the background, on a branch of its own,
@@ -43,7 +44,7 @@ The doctor prints three lines per finding: what it found, why it matters, and wh
 | `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
 | `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
 | `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. `memory losses` lists the lines one session added to a note and another session removed within a day, from the backup's history, and `--meant <commit>` records a removal that was meant. |
-| `crew` | For several sessions in one repository, each in its own worktree. Alone, it lists every worktree with its branch, the last sign of work there (a session's transcript, its git folder, a claim), its heavy processes and listening ports, the claims, and the files changed differently in more than one worktree, with the shared records apart; it asks git nothing that takes another worktree's lock, and keeps what it measured for a hook to read (`crew refresh` measures again). `crew claim <key>` takes a note, a file or a number and is refused when another worktree holds it; `crew claim <list> --new` takes the next free number of a numbered list across every worktree; `crew release` gives it back. `crew run -- <command>` waits until no heavy process runs on the machine and no other session holds the turn, then runs the command; it never stops a process. `crew after-rebase` says when a number appears twice or a stamp names a commit the branch lost, and `crew after-push` and `crew after-commit` who waits on this worktree; all three also run as hooks. |
+| `crew` | For several sessions in one repository, each in its own worktree. Alone, it lists every worktree with its branch, the last sign of work there (a session's transcript, its git folder, a claim), its heavy processes and listening ports, the claims, and the files changed differently in more than one worktree, with the shared records apart; it asks git nothing that takes another worktree's lock, and keeps what it measured for a hook to read (`crew refresh` measures again). `crew claim <key>` takes a note, a file or a number and is refused when another worktree holds it; `crew claim <list> --new` takes the next free number of a numbered list across every worktree; `crew release` gives it back. `crew run -- <command>` waits until no heavy process runs on the machine and no other session holds the turn, then runs the command; it never stops a process. `crew after-rebase` says when a number appears twice or a stamp names a commit the branch lost, and `crew after-push` and `crew after-commit` who waits on this worktree; all three also run as hooks. `crew before-edit --file <path>` says whether another worktree holds a file, and runs as a hook before every edit. |
 | `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/bowline.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. From a folder of repositories it writes the folder's own scaffold; `--no-describe` leaves the table of repositories for you to fill, and `--verbose` names every repository in a list. |
 | `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
 | `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `deliver` chooses between that branch (the default) and merging onto your branch on its own when your tree is clean. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
@@ -105,14 +106,17 @@ list, so two sessions cannot take the same one. A shared file, the memory above 
 saved over whole; the doctor warns when the memory's backup shows that one session removed lines another had added
 within a day, and `memory losses` lists them. A test suite or a build runs through `crew run`, which waits for a quiet
 machine and never stops anything. After a rebase, Claude is told when a number appears twice or a build's stamp names
-a commit that no longer exists.
+a commit that no longer exists. Before an edit, Claude is told when another worktree holds the file: changed there and
+not committed, committed there and not pushed, or claimed there. It is told once per session and file, the edit is
+never blocked, and `crew before-edit --file <path>` asks the same by hand.
 
 What is yours stays in the repository's `.claude/bowline.json`, under `crew`: `heavy`, the processes that must not
 run beside one another, as regular expressions over a command line; `keepPorts`, the ports of your own servers, which
 `crew` lists as never to be stopped; `numbers`, the numbered lists and the pattern of an item's number; `shared`, the
 files every session adds to by rule, which `crew` lists apart; and `stamps`, the files a build writes with a commit
 and the command that remakes each. All are empty until you fill them, and the
-skill asks for them the first time. The claims and the turn live in the repository's git folder on your machine, and
+skill asks for them the first time. `warnBeforeEdit: false` turns the warning before an edit off, and the files of
+`shared`, `numbers` and `stamps` are never warned about. The claims and the turn live in the repository's git folder on your machine, and
 bowline sends no message itself: Claude tells the other sessions with its own tools.
 
 ## The skills, for Claude Code

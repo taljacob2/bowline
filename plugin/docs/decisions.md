@@ -412,3 +412,72 @@ need.
    only at the remote.
 4. From a folder of repositories, the line at a session's start says nothing about other sessions; it could look at
    each repository's worktrees.
+
+## 2026-11-21: a warning before an edit of a file another worktree holds
+
+**The question.** After a round in which three sessions worked on one repository without a collision, the first user
+asked to keep how they did it as a standard, "where possible", in bowline. Most of that behaviour had come from the
+instructions the Claude desktop app gives Claude, which another client and another contributor never see. A rule in
+the repository makes it the repository's own; what makes it hold without anyone remembering is a hook. The crew, built
+the same day by another session, covers who is here, claims, shared files, heavy checks and rebases. What it did not
+have is the moment that matters most for a file: the edit.
+
+**The decision.** A PreToolUse hook on Edit, Write and NotebookEdit, `crew before-edit --hook`. When another worktree
+holds the file about to be edited, Claude is told which worktree and branch hold it, how, and the last sign of work
+there, and is asked to agree with that session who changes what and to name the agreement in the commit message. It
+is part of the crew: one feature has one name, one settings section and one rule template, so this version adds no
+second word for it.
+
+**Why a warning and never a block.** The hook answers with `hookSpecificOutput.additionalContext` and no
+`permissionDecision`. The documentation says a hook that reports no decision lets the tool call continue "through the
+normal permission flow", so the person's own approvals are untouched and nothing is auto-approved. A block would be
+wrong more often than right: bowline cannot know whether a session still works in the other worktree, whether the two
+sessions already agreed, or whether the file is one both are meant to add to. A check that stops work on a guess gets
+turned off; one that says what it sees and what to do is read.
+
+**What counts as held.** A change there that is not committed; a commit there that is in neither the pushed branch
+nor the branch being edited; or a claim `file:<path>`. The second was learned by building it: this feature's branch
+was cut from the crew's branch before that was pushed, so every file the crew's commit touched looked changed in both
+worktrees. The hook therefore asks git, for the one file, what the other branch holds from where the two branches
+part; nothing means this branch already has the change. The claim was learned the same way: the session that built
+this held claims on three files and the other session edited them all the same, because nothing read a claim at the
+moment of an edit.
+
+**Why the hook measures nothing.** It runs before every edit, and measuring nineteen worktrees one after another took
+140 seconds on the first user's repository, on a slow disk with stale indexes. So the hook reads the record the crew
+keeps (`changed.json`), starts `crew refresh` detached when the record is older than `crew.changedCacheSeconds`, waits
+two seconds, and answers from what it has. A file another session changed in the last minute may be missed at one
+edit and is caught at the next; an edit never waits for a disk. A record over an hour old says nothing true about who
+works here now and is not used.
+
+**Why the launcher answers when it can.** Starting Python took 1.3 seconds on a machine where other sessions ran test
+suites, and this hook runs before every edit of every session in every repository that has bowline. Most repositories
+have one worktree. `run.mjs` reads the hook's JSON, walks up from the edited file to its `.git`, and exits when that
+is a folder with no worktrees under it. A worktree's own `.git` is a file, which already means there are two.
+
+**Why once per session and file.** A warning repeated at every edit of one file is read past by the tenth. It is said
+again when the state changes: another worktree joins, or an uncommitted change becomes a commit.
+
+**Why the doctor's finding is a note.** A repository can have several worktrees with no parallel session: Claude Code
+makes one for a subagent, and a person keeps a second checkout. A convention is offered, not pressed, and only
+problems and warnings are said at a session's start. The hook does the telling when there is something to tell.
+
+**How it was built.** Beside the session that built the crew, in a worktree of its own, each telling the other which
+files it took. The two collided once in three files while messages were queued; neither lost work, and the claim check
+above came out of it. The second session's findings from using the crew for real are in the crew's entry.
+
+**Not chosen.** A settings section and a rule template of its own, as first asked: the first user agreed that bowline
+ships one rule for working beside other sessions, and the crew's template has it. A list of every other worktree's
+changed files at a session's start: the crew's one line says that others are at work, and the list is `bowline crew`.
+A cache of its own: two records of one thing in one folder disagreed within minutes.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. An edit made through a shell command (a redirect, `sed -i`, a script that writes the file) is not seen: the hook
+   matches the three editing tools. The Bash and PowerShell tools name no file, so this needs the changed paths that
+   Claude Code reports after a shell command.
+2. A session that edits and stages nothing leaves no sign of work for the others until its files are measured. The
+   hook could record "a session edited here" in the repository's git folder, and the crew's last sign of work could
+   read it, which would also name sessions started in another folder.
+3. The warning names each worktree in full. With many holders of one file it grows long; it could name the two with
+   the newest sign of work and count the rest.

@@ -4,16 +4,41 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.11.0 (2026-11-21)
 
+A warning before an edit of a file that another worktree holds, and one rule template for working beside other
+sessions. No Claude Code limit moved. One row of `plugin/docs/facts.md`, what a PreToolUse hook can tell Claude, was
+read in the documentation on 2026-11-21. The reasoning is in `plugin/docs/decisions.md`, "a warning before an edit"
+and, inside the crew's entry, "One rule, with both halves".
+
+- A new hook before every Edit, Write and NotebookEdit that Claude makes. When another worktree of the repository
+  holds the file, Claude is told which worktree and branch, how (changed there and not committed, committed there and
+  in neither the pushed branch nor this one, or claimed there as `file:<path>` with the claim's reason), and the last
+  sign of work there. It says so once per session and file, as the hook's `additionalContext` with no permission
+  decision, so the edit is never blocked and the person's permission flow is unchanged. It goes by the edited file's
+  path, not by the folder the session started in, so a session that works in another repository by path is covered.
+- `crew before-edit --file <path>` asks the same question by hand and answers in a sentence either way.
+- The hook measures nothing. It reads the record `bowline crew` and `crew refresh` keep (`changed.json` in the
+  repository's git folder); when the record is older than `crew.changedCacheSeconds` (60, a new setting) it starts
+  `crew refresh` in the background, waits two seconds for it, and otherwise answers from the record it has. A record
+  over an hour old is not used.
+- Silent for the files every session adds to (`crew.shared`, and the files of `crew.numbers` and `crew.stamps`), in a
+  repository with one worktree, and when `crew.warnBeforeEdit` (a new setting, on by default) is false.
+- The launcher, `run.mjs`, answers this one hook itself when the edited file's repository has no other worktree, and
+  starts no Python for it: the hook runs before every edit of every session, and most repositories have one worktree.
+- The doctor notes a repository that has several worktrees and no rule about working beside other sessions, and
+  points to `/bowline:crew`. It is a note, so it is not said at a session's start.
 - The crew's rule template, `templates/crew/beside-other-sessions.md`, holds both halves of working side by side:
   keeping apart (look, split the work by files, claim, edit the shared records, the turn, read again after a rebase,
   send the hash) and giving work a session of its own (a task of its own gets one, parallel sessions where the pieces
   allow it, a new subject moves the round first, reading and checking stay in subagents). The second half comes from
   the rule the first user's repository wrote for itself, so that a repository gets one rule about this and not two.
-  The crew skill gains the rule about splitting by files and a seventh step for the second half, and the conventions
-  page names each habit with its loss.
+  The crew skill gains the rule about splitting by files, a section that names the warning before an edit and a
+  seventh step for the second half, and the conventions page names each habit with its loss.
 - The record a look keeps (`crew.cached_survey`) holds each worktree's commit as `head`.
+
+Not done in this version: an edit made through a shell command is not seen, a session that only edits leaves no sign
+of work for the others, and a file with many holders gets a long warning (the decisions page has them, numbered).
 
 ## 0.10.0 (2026-11-21)
 
