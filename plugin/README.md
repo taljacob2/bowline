@@ -28,8 +28,10 @@ before every `git commit` Claude issues, the gate checks the staged lines. Durin
 memory index or one of its notes crosses a limit, you get one reminder in the doctor's words, and Claude gets the same line at your next
 message. A repository that turns `autosplit` on in `.claude/bowline.json` gets one more: when a `CLAUDE.md` outgrows
 the limits, the hook after a reply starts a worker that prepares its split in the background, on a branch of its own,
-for you to review and merge. Everything else is a skill you or Claude invoke, with you approving before anything moves
-on your branch.
+for you to review and merge. When several sessions work in one repository, a session's start also says so in one line,
+and after a `git rebase`, `git pull` or `git push` that Claude issues, Claude is told when a roadmap number now appears
+twice, a build's stamp went stale, or another session waits on the push. Everything else is a skill you or Claude
+invoke, with you approving before anything moves on your branch.
 
 The doctor prints three lines per finding: what it found, why it matters, and what to do. Nothing is changed.
 
@@ -40,7 +42,8 @@ The doctor prints three lines per finding: what it found, why it matters, and wh
 | `doctor` | Measures every `CLAUDE.md` against the loading limits (naming the section where a nested file is cut), the rules and skills against their budgets, the memory folder against its index cap, its notes against the commits each one names (a note that keeps finished work like a log) and its backup, and the repository against the layout. From a folder of repositories it measures eight at a time, prints each repository as it is measured, and groups a finding found the same in several of them into one that names them; `--verbose` lists every finding, size and name one by one, and `--folder-only` measures the folder alone. As hooks: `--brief` at a session's start, `--watch` after every reply (one reminder when something new crosses a limit), `--pending` before a prompt (the same line for Claude). |
 | `gate` | Refuses a commit whose staged lines hold a token, a control byte, a carriage return, a byte-order mark, a character outside the accepted set when the repository says so, or a word from a private never-commit list kept outside every repository. Also runs as a Claude Code hook on `git commit`. |
 | `budget` | Refuses an instruction file over the sizes Claude Code reads, or one that names a path no other machine can see. |
-| `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. |
+| `memory setup <remote>` | Makes Claude Code's memory folder for the repository a git repository tied to a private remote of yours, and installs the hook that pushes it after every reply. `memory status`, `memory restore <remote>` on a new machine, `memory push`. `memory losses` lists the lines one session added to a note and another session removed within a day, from the backup's history, and `--meant <commit>` records a removal that was meant. |
+| `crew` | For several sessions in one repository, each in its own worktree. Alone, it lists every worktree with its branch, when a session last worked there, its heavy processes and listening ports, the claims, and the files changed in more than one worktree. `crew claim <key>` takes a note, a file or a number and is refused when another worktree holds it; `crew claim <list> --new` takes the next free number of a numbered list across every worktree; `crew release` gives it back. `crew run -- <command>` waits until no heavy process runs on the machine and no other session holds the turn, then runs the command; it never stops a process. `crew after-rebase` says when a number appears twice or a stamp names a commit the branch lost, and `crew after-push` who waits on the push; both also run as hooks. |
 | `init` | Scaffolds the repository's side: three sections for the root CLAUDE.md, `.claude/README.md`, two starter rules, two starter skills, repository-local copies of the gate and the budget check, a pre-commit hook, `.claude/bowline.json`. `--plan` shows, `--write` does; nothing that exists is overwritten. From a folder of repositories it writes the folder's own scaffold; `--no-describe` leaves the table of repositories for you to fill, and `--verbose` names every repository in a list. |
 | `move` | Moves an oversized CLAUDE.md into long-form pages, scoped rules and an index without losing a line: `plan` shows the sections and where the cutoffs fall, `run --spec` moves them verbatim, `find-pointers` and `pointers` update every mention, `place --spec` copies finished drafts into rules, skills, pages or an index. |
 | `autosplit` | With `autosplit.enabled` in `.claude/bowline.json`, prepares the split of a CLAUDE.md that outgrew the limits in the background: the hook after a reply starts a headless Claude Code session on a branch of its own, the worker checks the result, and the doctor says when it is ready for you to review and merge. `deliver` chooses between that branch (the default) and merging onto your branch on its own when your tree is clean. `run` does it now in the foreground; `status`, `show`, `done` after the merge, `discard`. |
@@ -91,11 +94,33 @@ you would rather not list them, an allowlist does it by hand: `/*` ignores every
 such as `!/.claude/`, `!/.githooks/`, `!/CLAUDE.md` and `!/.gitignore` bring back the folder's own files, new clones
 staying out.
 
+## Several sessions in one repository
+
+When you run more than one Claude Code session on a repository at once, each in its own worktree, the sessions share
+one machine, one memory folder and the lists each of them adds to. `/bowline:crew` is the procedure that keeps them
+apart, and `bowline crew` is what it runs. A session's start tells Claude, in one line, that other sessions worked in
+the repository in the last half hour; alone, it says nothing. `crew` shows who is here. A session claims a roadmap
+number, a note or a file before it works on it, and the next free number is taken across every worktree's copy of the
+list, so two sessions cannot take the same one. A shared file, the memory above all, is changed with an edit and never
+saved over whole; the doctor warns when the memory's backup shows that one session removed lines another had added
+within a day, and `memory losses` lists them. A test suite or a build runs through `crew run`, which waits for a quiet
+machine and never stops anything. After a rebase, Claude is told when a number appears twice or a build's stamp names
+a commit that no longer exists.
+
+What is yours stays in the repository's `.claude/bowline.json`, under `crew`: `heavy`, the processes that must not
+run beside one another, as regular expressions over a command line; `keepPorts`, the ports of your own servers, which
+`crew` lists as never to be stopped; `numbers`, the numbered lists and the pattern of an item's number; and `stamps`,
+the files a build writes with a commit and the command that remakes each. All are empty until you fill them, and the
+skill asks for them the first time. The claims and the turn live in the repository's git folder on your machine, and
+bowline sends no message itself: Claude tells the other sessions with its own tools.
+
 ## The skills, for Claude Code
 
-`skills/` holds the six procedures Claude runs these tools through, with the person in the loop: `doctor`, `init`,
+`skills/` holds the seven procedures Claude runs these tools through, with the person in the loop: `doctor`, `init`,
 `memory-backup`, `curate-memory` (sort the memory with a map you approve), `split-instructions` (move first, condense
-second) and `conventions` (a decisions section, a roadmap with slots, a notes queue, offered one at a time). You start
+second), `conventions` (a decisions section, a roadmap with slots, a notes queue, offered one at a time) and `crew`
+(several sessions in one repository: who is here, claims, shared files edited and never saved over, a quiet machine
+before a heavy check, what to read again after a rebase). You start
 one by its name, `/bowline:doctor` and the like, or Claude does when one fits the work. The commands they run, and the
 hooks, go through `scripts/run.mjs`, which finds Python on the machine and runs bowline.
 
@@ -127,7 +152,8 @@ Python 3.8 or later (standard library only), git, and Node.js on the PATH: Claud
 
 `defaults.json` holds every limit and policy with its reason. A repository lays its own values over them in
 `.claude/bowline.json`, for example to make characters outside ASCII a refusal rather than a warning, to name the
-characters it accepts, or to turn `autosplit` on.
+characters it accepts, to turn `autosplit` on, or to name under `crew` its heavy processes, your own ports, its
+numbered lists and its stamps.
 
 ## License
 

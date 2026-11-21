@@ -7,6 +7,11 @@
     "crlfFiles": ["*.cmd", "*.bat"]
   },
   "conventionsDir": "docs/conventions",
+  "_crew": "For a repository where several Claude Code sessions work at once, each in its own worktree: name the processes that must not run beside one another (heavy), the ports of your own servers (keepPorts), the numbered lists the sessions extend (numbers) and the files a build stamps with a commit (stamps); the keys and their reasons are in bowline's defaults.json, and /bowline:crew is the procedure.",
+  "crew": {
+    "heavy": [],
+    "keepPorts": []
+  },
   "_autosplit": "Set enabled to true to let bowline prepare the split of a CLAUDE.md that outgrew the limits in the background, on a branch for you to review and merge; the other keys and their reasons are in bowline's defaults.json.",
   "autosplit": {
     "enabled": false,

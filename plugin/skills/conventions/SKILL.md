@@ -27,6 +27,10 @@ reason and let the person choose. The reasons and templates are in `${CLAUDE_PLU
 5. **A fresh session at a finished item.** A summary of a summary loses more than a fresh start that reads the index
    and the instruction files. Offer the habit; nothing to install.
 
+When the person runs several sessions on the repository at once, each in its own worktree, there is one more, with a
+skill of its own: `/bowline:crew`, for who is here, claims before work, shared files that are edited and never saved
+over, and a quiet machine before a heavy check. Offer it by name; do not repeat its steps here.
+
 In a folder of repositories, each repository keeps its own decisions and roadmap, and the folder's own documents hold
 what spans them; ask which the person means before writing. For each one the person wants, write the template into
 the repository where they say, adapted to its words (ask for

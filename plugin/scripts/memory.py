@@ -4,6 +4,7 @@
     python -I scripts/bowline.py memory restore <remote> [--repo <path>]     the same, in a new machine's words
     python -I scripts/bowline.py memory status [--repo <path>]
     python -I scripts/bowline.py memory push [--repo <path>] [--hook]        what the hook runs after every reply
+    python -I scripts/bowline.py memory losses [--repo <path>] [--meant <commit>]   lines one session added and another removed
 
 Claude Code keeps notes between sessions in <config>/projects/<project>/memory/, one folder per person per machine,
 outside the repository; a lost machine loses them. setup ties that folder to a private remote: when the folder is
@@ -16,13 +17,21 @@ installed; pass --no-hook then.
 
 push commits what changed as "Memory as of <date>" and pushes when the branch is ahead; with --hook it prints nothing
 and always exits 0, so a failed push never interrupts a session. A project whose memory folder is not a git
-repository is left alone.
+repository is left alone. As a hook, the commit's message also names the session whose reply it follows, in a line
+"Session: <id>", the identifier Claude Code gives the hook.
+
+losses reads that line. Every worktree of a repository shares one memory folder, so a session that writes a note whole
+from the copy it read earlier erases what another session added in between. losses lists, from the backup's history
+of the last crew.memoryLossDays days, every commit after one session's reply that removed lines another session's
+commit had added less than crew.memoryLossHours hours before, when those lines are in no note today; the doctor warns
+about each. --meant <commit> records that a removal was meant, so that it is not reported again.
 """
 
 import argparse
 import datetime
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,6 +40,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common  # noqa: E402
 
 HOOK_MARKS = ("bowline", "push-memory")
+SESSION_LINE = "Session: "
 
 
 def git(folder, *args, capture=False):
@@ -187,12 +197,17 @@ def do_status(options):
 
 def do_push(options):
     memory = None
+    session = ""
     if options.hook:
         try:
             facts = json.load(sys.stdin)
             transcript = facts.get("transcript_path") or ""
             if transcript:
                 memory = os.path.join(os.path.dirname(transcript), "memory")
+            # The session whose reply this commit follows, so that `memory losses` can tell one session's lines from
+            # another's. Only an identifier made of letters, digits and dashes is written into a commit message.
+            session = str(facts.get("session_id") or "")
+            session = session if re.fullmatch(r"[A-Za-z0-9_-]{1,80}", session) else ""
         except Exception:
             memory = None
     if memory is None:
@@ -208,7 +223,7 @@ def do_push(options):
     committed = False
     if git(memory, "diff", "--cached", "--quiet")[0] != 0:
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        git(memory, "commit", "-q", "-m", "Memory as of " + stamp)
+        git(memory, "commit", "-q", "-m", "Memory as of " + stamp, *(["-m", SESSION_LINE + session] if session else []))
         committed = True
     if git(memory, "rev-parse", "--verify", "-q", "HEAD")[0] != 0:
         return 0
@@ -223,6 +238,120 @@ def do_push(options):
     if not options.hook:
         print(f"bowline memory: {'committed' if committed else 'nothing new'}; {'pushed' if pushed else 'nothing to push'}.")
     return 0
+
+
+def meant_path(memory):
+    """Where the removals a person said were meant are recorded: beside the memory folder, in Claude Code's project
+    folder, outside the backup."""
+    return os.path.join(os.path.dirname(os.path.normpath(memory)), "bowline", "memory-meant.json")
+
+
+def meant(memory):
+    try:
+        with open(meant_path(memory), encoding="utf-8") as handle:
+            return [str(c) for c in json.load(handle).get("meant") or []]
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def lines_today(memory):
+    """Every line the notes hold now, without its surrounding spaces, so that a line moved to another note or put
+    back is not a loss."""
+    held = set()
+    for folder, dirs, files in os.walk(memory):
+        dirs[:] = [d for d in dirs if d != ".git"]
+        for name in files:
+            if name.endswith(".md"):
+                held.update(line.strip() for line in common.read_text(os.path.join(folder, name)).splitlines())
+    return held
+
+
+def losses(memory, config, now=None):
+    """The lines one session added to a note and another session removed soon after, that no note holds today: a list
+    of {commit, note, lines, when}, the oldest first. Read from the backup's history; a commit made before bowline
+    wrote the session into its message names no session and is never part of a finding."""
+    crew = config.get("crew") or {}
+    days, hours = crew.get("memoryLossDays") or 0, crew.get("memoryLossHours") or 0
+    if not days or not hours or not os.path.isdir(os.path.join(memory, ".git")):
+        return []
+    code, out = git(memory, "-c", "core.quotepath=false", "log", f"--since={int(days)}.days.ago", "--max-count=2000",
+                    "--no-color", "--no-renames", "-p", "--unified=0", "--format=%x1e%H%x1f%ct%x1f%B%x1f", "--", "*.md",
+                    capture=True)
+    if code != 0:
+        return []
+    commits = []
+    for block in out.split("\x1e")[1:]:
+        parts = block.split("\x1f")
+        if len(parts) < 4:
+            continue
+        found = re.search(r"^" + re.escape(SESSION_LINE) + r"(\S+)\s*$", parts[2], re.MULTILINE)
+        changes, note, in_header = [], None, True
+        for line in parts[3].splitlines():
+            if line.startswith("diff --git "):
+                note, in_header = None, True
+            elif in_header:
+                if line.startswith("+++ b/") or (line.startswith("--- a/") and note is None):
+                    note = line[6:]
+                elif line.startswith("@@"):
+                    in_header = False
+            elif note and line[:1] in ("+", "-") and line[1:].strip():
+                changes.append((line[0], note, line[1:].strip()))
+        commits.append((parts[0], int(parts[1] or 0), found.group(1) if found else "", changes))
+    commits.reverse()                                   # the oldest first, as the notes were written
+    added, candidates = {}, {}
+    for commit, when, session, changes in commits:
+        for sign, note, line in changes:
+            if sign == "-":
+                first = added.get((note, line))
+                if session and first and first[1] and first[1] != session and when - first[0] <= hours * 3600:
+                    candidates.setdefault((commit, note), {"commit": commit, "note": note, "lines": [], "when": when})["lines"].append(line)
+        for sign, note, line in changes:
+            if sign == "+":
+                added[(note, line)] = (when, session)
+    if not candidates:
+        return []
+    held, said = lines_today(memory), meant(memory)
+    found = []
+    for loss in candidates.values():
+        loss["lines"] = [line for line in loss["lines"] if line not in held]
+        if loss["lines"] and not any(loss["commit"].startswith(c) for c in said if len(c) >= 7):
+            found.append(loss)
+    return found
+
+
+def do_losses(options):
+    repo = options.repo or os.getcwd()
+    checkout, memory = memory_for(repo)
+    if options.meant:
+        code, out = git(memory, "rev-parse", "--verify", "-q", options.meant + "^{commit}", capture=True)
+        if code != 0:
+            print(f"bowline memory: {options.meant} is not a commit of the memory folder {memory}.", file=sys.stderr)
+            return 2
+        path = meant_path(memory)
+        said = meant(memory)
+        if out.strip() not in said:
+            said.append(out.strip())
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump({"meant": said}, handle, indent=2)
+            handle.write("\n")
+        print(f"bowline memory: recorded that what the commit {out.strip()[:12]} removed was meant; it is not reported again.")
+        return 0
+    found = losses(memory, common.load_config(checkout))
+    print(f"memory folder: {memory}")
+    if not found:
+        print("losses: none. No commit of the last days removed lines that another session had just added.")
+        return 0
+    for loss in found:
+        stamp = datetime.datetime.fromtimestamp(loss["when"]).strftime("%Y-%m-%d %H:%M")
+        print(f"{loss['note']}: {len(loss['lines'])} line(s) that another session had added were removed by the commit "
+              f"{loss['commit'][:12]} ({stamp}) and are in no note now:")
+        for line in loss["lines"]:
+            print(f"  {line}")
+        print(f"  the whole change: git -C \"{memory}\" show {loss['commit'][:12]} -- \"{loss['note']}\"")
+    print("Put back what was lost with the Edit tool, one addition at a time; for a removal that was meant: "
+          "bowline memory losses --meant <commit>.")
+    return 1
 
 
 def main(argv=None):
@@ -240,6 +369,9 @@ def main(argv=None):
     p = sub.add_parser("push")
     p.add_argument("--repo")
     p.add_argument("--hook", action="store_true")
+    p = sub.add_parser("losses")
+    p.add_argument("--repo")
+    p.add_argument("--meant", metavar="COMMIT")
     options = parser.parse_args(argv)
     if options.command == "push":
         try:
@@ -248,6 +380,8 @@ def main(argv=None):
             return 0 if options.hook else 2
     if options.command == "status":
         return do_status(options)
+    if options.command == "losses":
+        return do_losses(options)
     words = "The notes are backed up." if options.command == "setup" else "The notes are back on this machine; start a session and type /memory to see them read."
     return do_setup(options, words)
 

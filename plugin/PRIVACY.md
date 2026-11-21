@@ -1,7 +1,7 @@
 # Privacy
 
 This page says what the bowline plugin reads, writes and sends, for anyone who installs it. It applies from bowline
-0.6.2 on.
+0.6.2 on; what the crew reads and writes was added in 0.10.0.
 
 ## Who is behind bowline, and what they receive
 
@@ -29,13 +29,22 @@ Nothing else bowline does reaches the network.
 - The staged lines of a commit, when the commit gate runs.
 - Claude Code's memory folder for the repository.
 - A private list of words never to commit, at `~/.claude/private/never-commit.txt`, when that file exists.
+- For the crew, which helps several sessions work in one repository: the list of the processes on your machine with
+  their command lines and the TCP ports they listen on, when you or Claude run `bowline crew` or `bowline crew run`;
+  the files of the repository's other worktrees that the repository names as numbered lists; and, at a session's
+  start, when the transcript files in Claude Code's project folders for the repository's worktrees were last written.
+  bowline never opens a transcript, and nothing of this is stored or sent.
 
 ## What bowline writes
 
 - The files `init` creates in a repository, when you ask it to.
 - The state of autosplit and its log, and a small record of the reminders already shown, in the repository's own git
   folder; for a folder of repositories, the record of the reminders is in Claude Code's project folder for it.
-- The commits of the memory backup, in the memory folder, once the backup is set up.
+- The commits of the memory backup, in the memory folder, once the backup is set up. From 0.10.0 each commit's message
+  also names the session whose reply it follows, by the random identifier Claude Code gives it, so that bowline can
+  tell when one session removed lines another had added; the identifier goes to your remote with the commit.
+- The crew's claims and its turn for a heavy check, in the repository's own git folder, and the list of memory
+  removals you said were meant, in Claude Code's project folder for the repository.
 - A hook entry in Claude Code's settings file, only when you run `memory setup` without the plugin.
 
 ## Personal data

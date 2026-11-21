@@ -290,3 +290,93 @@ problems first: it was asked to stay as it was.
    them, as the doctor now does.
 3. A rule or a skill written without the gate stays as it is after `git init`, because `init` never overwrites; the
    plan could say which files would read differently now that the gate can be installed.
+
+## 2026-11-21: the crew, for sessions that work side by side in one repository
+
+**The question.** The first user runs several Claude Code sessions at once on one repository, each in its own git
+worktree, each pushing to the same branch after a rebase. For two days the sessions coordinated by hand: they listed
+one another, sent messages saying which files each would touch, read the machine's process list for one another's
+test runs, checked the ports the person's own servers listen on, and waited in a loop until nobody else's tests ran.
+Three things still went wrong. One session saved an older copy of a shared memory note over the file and erased four
+notes another session had added. Two sessions took the same roadmap number. And checks crashed or timed out under
+another session's test suite. After a rebase, a build's stamp also named a commit that no longer existed. Should this
+way of working be a standard, and should bowline hold it?
+
+**The decision.** Yes, as one skill, `crew`, and one command, `bowline crew`, with checks in the doctor and hooks
+after the git commands that matter. bowline lists and records what a script can see; Claude says the rest to the other
+sessions with its own tools, `ListAgents` and `SendMessage`, and the skill says when. The pieces, each with the loss
+it answers:
+
+- **Who is here.** `bowline crew` lists every worktree with its branch, its distance from the pushed branch, its
+  uncommitted files, when a session last worked there, its processes that are heavy or listen on a port, the files
+  changed in more than one worktree, the claims and the turn. A session's start gets one line when another session
+  worked in the repository in the last half hour, and nothing when it is alone, so a session alone pays nothing.
+- **Claims.** A session takes a name, such as `roadmap:124`, before it works on the thing, and a second session is
+  refused with the holder's name. `claim <list> --new` takes one past the highest number in the pushed branch, in
+  every worktree's copy of the file, committed or not, and in every claim. Reading the other worktrees' copies is what
+  makes it hold even when a session forgot to claim: the two sessions that took the same number had each written it
+  into a file the other could have read.
+- **Shared files are edited.** What was measured on 2026-11-21: Claude Code's Write tool refuses a file that changed
+  since it was read, and its Edit tool puts its replacement into the file as it is now. So a note is lost in two ways
+  only: a whole-file write from a shell or a script, or a session that is refused, reads the file again, and sends the
+  text it already had. The skill's rule closes both. For what slips through, each commit of the memory backup now
+  names the session whose reply it follows, and the doctor warns when one session's commit removed lines another
+  session's commit had added within a day and no note holds them now.
+- **The turn.** `crew run -- <command>` waits until no process matches the repository's heavy patterns and no other
+  `crew run` holds the turn, takes it, and runs the command. The turn exists because watching processes alone has a
+  gap: two sessions that wait both see the machine go quiet at the same look and both start.
+- **After a rebase and a push.** A hook after `git rebase` and `git pull` says when a number appears twice or a stamp
+  names a commit the branch lost; a hook after `git push` says who waits on it. Both are silent otherwise.
+
+**Where the claims live.** In the repository's git folder, under `bowline/crew/`, beside the autosplit records: every
+worktree of a repository shares that folder, nothing in it is ever committed, and it needs no service. Not chosen: the
+memory folder, which every worktree also shares, because the backup would commit each claim after every reply and the
+notes are for what should outlast a session; a file in the repository, because a claim must be seen before a push,
+not after one.
+
+**Why a session is recognized by its transcript's time.** A script cannot ask Claude Code which sessions are open.
+What it can see is that each worktree has its own project folder in Claude Code's configuration, and that a session
+writes its transcript there as it works. The time the newest transcript was written says a session was there lately.
+Only the folder's listing is read, never a transcript. This is observed, not documented, and one session that had
+just started in a new worktree had no transcript there yet; the line at a session's start is a hint that points to the
+skill, and `ListAgents` is the list.
+
+**Why the doctor never quotes a lost line.** The memory-backup skill says that a note's content is shown only to a
+person who asked for it. The finding counts the lines and names the note and the commit; `bowline memory losses`,
+which a person or Claude runs on purpose, lists them.
+
+**Why a loss is a warning that can be wrong.** A commit cannot say whether a removal was a mistake. A session that
+works a note another session queued an hour ago and takes it off the queue looks the same in the history as a session
+that saved an older copy over the file. The check takes the side that loses nothing: it warns, shows where the lines
+are, and `memory losses --meant <commit>` records that a removal was meant. Lines that are moved to another note, or
+put back, are never reported, because the check asks whether any note holds the line today.
+
+**What stays the repository's.** Which processes are heavy, which ports are the person's own, which lists are
+numbered and by which pattern, which files are stamps and how each is remade: all in the repository's
+`.claude/bowline.json`, under `crew`, empty by default. The order of a repository's checks, and which may run
+together, stay its own rules; the turn adds only that one heavy command runs at a time across every session. A short
+unscoped rule for such a repository is a template the skill offers, not something `init` writes, because a repository
+where one session works at a time should not pay for it at every session's start.
+
+**What bowline does not do.** It never stops a process: the wait ends by itself or times out and names what runs. It
+never sends a message. It never writes into another worktree. A heavy pattern that matches a server a person keeps
+running would make every wait time out, which is why the patterns are each repository's to write.
+
+**Not chosen.** A hook that refuses a write to a memory note: the Write tool already refuses the stale ones, and a
+shell command's target cannot be read reliably from its text. A default list of heavy programs: a person's own
+watcher would match it and never go quiet. Measuring the processor's load instead of naming processes: a load number
+does not say whose work it is, or when it will end. Dropping a waiting claim after the push it waited for: the push
+may hold something else, so the claim stays until the session that waits gives it back.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. A git `post-rewrite` hook in the repository, installed by `init` beside the pre-commit hook, so that a rebase a
+   person makes outside Claude Code is checked at once; today the doctor finds its traces at the next session's start
+   or after the next reply.
+2. The commit gate's hook matches only the Bash tool (`"matcher": "Bash"`, `Bash(git commit*)`), so a `git commit`
+   that Claude issues through the PowerShell tool is not gated by the plugin; the crew's hooks match both tools, and
+   the gate's should.
+3. Claims across machines. The claims live in one machine's git folder; two people's sessions on two machines meet
+   only at the remote.
+4. From a folder of repositories, the line at a session's start says nothing about other sessions; it could look at
+   each repository's worktrees.

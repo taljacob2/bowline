@@ -74,6 +74,30 @@
     "model": "A model for the worker's session, or null for the person's default.",
     "args": "Extra arguments for the command, for example --plugin-dir with the plugin folder of a clone of bowline on a machine where the plugin is not installed."
   },
+  "crew": {
+    "activeMinutes": 30,
+    "base": null,
+    "heavy": [],
+    "keepPorts": [],
+    "numbers": {},
+    "stamps": [],
+    "waitMinutes": 30,
+    "waitEverySeconds": 15,
+    "memoryLossDays": 7,
+    "memoryLossHours": 24
+  },
+  "crewWhy": {
+    "activeMinutes": "A session's start says that other sessions are at work when a transcript of another worktree, or another transcript of this folder, was written within this many minutes; 0 says nothing. Half an hour covers a session that is thinking or waiting for a check, and forgets one that was closed.",
+    "base": "The branch every session pushes to, such as origin/main, which the worktrees and the numbered lists are measured against; null asks git for origin's default branch.",
+    "heavy": "Regular expressions over a process's command line, for the checks that must not run beside one another on one machine: a test suite, a browser test run, a full build. Each repository names its own, because only it knows them; with none, crew run waits for the turn alone. Name the program as it runs, such as \"dotnet(\\.exe)?\\s+test\" or \"vitest\", and never a server a person keeps running, which would never go quiet.",
+    "keepPorts": "The ports a person's own servers listen on. crew lists what listens on each and says that it must never be stopped; a session that needs a server takes another port.",
+    "numbers": "The numbered lists several sessions extend, by name: {\"roadmap\": {\"file\": \"docs/ROADMAP.md\", \"pattern\": \"^(\\\\d+)\\\\.\"}}. The pattern is a regular expression, read line by line, whose first group is the number; without one, a line that starts with a number and a dot, a parenthesis or a colon, after an optional list mark, bold mark or number sign, counts. crew claim <name> --new takes the next free number, and the doctor warns when a number appears twice.",
+    "stamps": "Files a build writes with the commit it was built from: [{\"file\": \"web/.source-commit\", \"remake\": \"npm run stamp\"}]. After a rebase every commit has a new name, so the doctor and the check after a rebase warn when a stamp names a commit the branch does not hold, and say the command that remakes it.",
+    "waitMinutes": "How long crew run waits for a quiet machine before it gives up without running the command; a full test suite of the first repository that used it takes about ten minutes, and two may be ahead.",
+    "waitEverySeconds": "How often crew run looks again. Listing every process takes about a second on Windows, so a look every quarter of a minute costs little and starts the command soon after the machine goes quiet.",
+    "memoryLossDays": "How far back in the memory backup's history the doctor looks for lines one session added and another removed; 0 turns the check off. A week is long enough to notice at the next session's start and short enough that the history is read in well under a second.",
+    "memoryLossHours": "A removed line counts as a loss when another session had added it within this many hours. A note saved whole from an older copy loses what was added since that copy was read, which is hours at most; a curation removes lines that are days or weeks old, and stays silent."
+  },
   "outsidePaths": [
     "scratchpad['`\\\\/]",
     "AppData",

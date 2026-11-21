@@ -13,7 +13,10 @@ For each finding it prints three lines: what it found, why it matters, what to d
   repository (the budget check);
 - the memory folder Claude Code keeps for this repository on this machine: its index against the cap, each note
   against the commits it names (a note that keeps finished work like a log), whether the folder is a git repository
-  with a remote, and whether the push hook is installed;
+  with a remote, whether the push hook is installed, and lines that one session added to a note and another session
+  removed soon after (the memory is one folder for every worktree, so a note saved whole from an older copy loses them);
+- for a repository that names them in its .claude/bowline.json (crew): a number that appears twice in a numbered list
+  such as a roadmap, and a stamp that names a commit the branch no longer holds, both of which a rebase leaves behind;
 - whether the root CLAUDE.md has a compaction section, whether the gate and the budget check are installed, and
   whether the repository has a .claude/bowline.json;
 - a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
@@ -21,6 +24,9 @@ For each finding it prints three lines: what it found, why it matters, what to d
 From a folder that is not a repository but holds several, as with services cloned side by side, it measures the
 folder's own CLAUDE.md and every repository directly under it, names the repository in each finding, and reads the
 one memory folder Claude Code keeps for a session started there.
+At a session's start, --brief adds one line when another Claude Code session worked in the repository in the last
+crew.activeMinutes minutes, in another worktree or in this same folder, and points to /bowline:crew; it reads only when
+the transcript files in Claude Code's project folders were written, never what they hold.
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run. The three hook modes always exit 0.
 
@@ -44,6 +50,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autosplit  # noqa: E402
 import budget  # noqa: E402
 import common  # noqa: E402
+import crew  # noqa: E402
+import memory  # noqa: E402
 
 HEADING = re.compile(r"^#{1,3} (.+)$", re.MULTILINE)
 
@@ -165,6 +173,24 @@ def memory_findings(root, config):
                 "warning", "No hook pushes the memory folder after a reply.",
                 "Without the hook the backup is only as fresh as the last push someone remembered to make.",
                 "/bowline:memory-backup setup <remote> installs it for this machine."))
+        findings.extend(loss_findings(folder, config))
+    return findings
+
+
+def loss_findings(folder, config):
+    """Lines one session added to a note and another session removed soon after, read from the backup's history. The
+    finding counts the lines and never quotes one: a note's words are shown only to a person who asks for them, which
+    `bowline memory losses` does."""
+    hours = (config.get("crew") or {}).get("memoryLossHours")
+    findings = []
+    for loss in memory.losses(folder, config):
+        findings.append(common.Finding(
+            "warning", f"The memory note {loss['note']} lost {common.count(len(loss['lines']), 'line', 'lines')} that another "
+                       f"session had added less than {hours} hours before, in the backup's commit {loss['commit'][:12]}.",
+            "Every worktree of a repository shares one memory folder, so a note written whole from an older copy erases "
+            "what another session added in between; the backup's history still holds the lines.",
+            "List them with: bowline memory losses. Put back what was lost with the Edit tool, or, for a removal that was "
+            f"meant: bowline memory losses --meant {loss['commit'][:12]}. /bowline:crew says how sessions edit a file they share."))
     return findings
 
 
@@ -316,6 +342,7 @@ def repository_findings(root, config):
     findings += budget_findings
     findings += root_claude_md_findings(root, facts)
     findings += layout_findings(root)
+    findings += crew.findings(root, config)
     autosplit.adjust(findings, root)
     return findings, facts
 
@@ -407,6 +434,47 @@ def hook_cwd(default):
     return default
 
 
+def hook_facts(wait=0.5):
+    """What a hook's JSON on standard input says, or {} when there is none within a moment. Read from the descriptor in
+    a thread of its own, so that a standard input nobody closes cannot hold a session's start."""
+    box = []
+
+    def read():
+        try:
+            data = b""
+            while True:
+                piece = os.read(0, 65536)
+                if not piece:
+                    break
+                data += piece
+            box.append(json.loads(data.decode("utf-8", "replace")))
+        except Exception:  # noqa: BLE001 - no JSON, no facts
+            pass
+
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return {}
+    except Exception:  # noqa: BLE001
+        return {}
+    thread = threading.Thread(target=read, daemon=True)
+    thread.start()
+    thread.join(wait)
+    return box[0] if box and isinstance(box[0], dict) else {}
+
+
+def others_line(root):
+    """The line a session's start gets when other sessions are at work in the repository, or None. Their names come from
+    the worktrees whose transcripts were written lately; this session's own transcript is the one the hook names."""
+    config = common.load_config(root)
+    names = crew.others_active(root, config, transcript=lambda: hook_facts().get("transcript_path"))
+    if not names:
+        return None
+    minutes = (config.get("crew") or {}).get("activeMinutes")
+    return (f"bowline: {common.count(len(names), 'other Claude Code session has', 'other Claude Code sessions have')} worked in this "
+            f"repository in the last {minutes} minutes, in {common.names(names)}. Before you take a roadmap number or a "
+            "note, edit a file the sessions share such as the memory, run a heavy check, rebase or push, follow /bowline:crew.")
+
+
 def do_watch(options):
     """The Stop hook (--watch) and the UserPromptSubmit hook (--pending). Prints nothing when there is nothing new."""
     start = hook_cwd(options.repo or os.getcwd())
@@ -472,6 +540,12 @@ def main(argv=None):
             print(f"bowline found {len(urgent)} thing(s) worth a look about {whose}; run /bowline:doctor for the report. The first:")
             for finding in urgent[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
+        try:
+            line = others_line(survey.roots[0]) if not survey.workspace else None
+        except Exception:  # noqa: BLE001 - a hook must never fail a session's start
+            line = None
+        if line:
+            print(line)
         return 0
 
     workspace, roots = common.roots_for(options.repo)

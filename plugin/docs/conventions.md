@@ -47,6 +47,22 @@ A long session is summarized again and again; a fresh one reads the index, the r
 When a piece of work is finished and pushed, that is the clean point to start again. The loss: a summary of a summary
 of a summary, each one a little further from what was said.
 
+## Working beside other sessions
+
+Several Claude Code sessions can work in one repository at once, each in its own worktree, and they share more than
+they see: one machine's processor, one memory folder, one roadmap whose numbers each of them extends, and the ports a
+person's own servers listen on. The convention is five habits, and the `crew` skill is their procedure: look at who is
+here before the first change; claim a number, a note or a file before working on it, in a place the others read, and
+say it to them; change a file the sessions share with an edit, never by saving it over whole; run a heavy check only
+when no other one runs; and after a rebase, read again what the others also write. Each habit has its loss. Two
+sessions that each add an item to the roadmap take the same number, and a rebase joins both without a conflict. A
+note saved whole from an older copy erases what another session added since, because the memory folder has no
+branches and the last writer wins. Two test suites at once crash or time out, and the failure looks real. A build's
+stamp names a commit the rebase renamed. Unlike the conventions above, part of this one is checked: `bowline crew`
+keeps the claims and the turn, and the doctor warns about a number that appears twice, a stale stamp, and memory
+lines one session added and another removed. What stays the repository's own is in its `.claude/bowline.json`: which
+processes are heavy, which ports are the person's, which lists are numbered, which files are stamps.
+
 ## Writing for a person
 
 Everything a person reads, in the code's messages, the documents and the rules, is written in full sentences, in plain

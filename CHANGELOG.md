@@ -4,6 +4,51 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## 0.10.0 (2026-11-21)
+
+The crew: several Claude Code sessions in one repository, each in its own worktree, without colliding. No Claude Code
+limit moved. Three rows of `plugin/docs/facts.md` about hooks were read in the documentation on 2026-11-21, and two
+were observed that day: the Write tool refuses a file that changed since it was read while the Edit tool keeps the
+other changes, and each worktree has its own project folder. The reasoning is in `plugin/docs/decisions.md`, "the
+crew".
+
+- A new command, `bowline crew`. Alone it lists every worktree of the repository: its branch, its distance from the
+  pushed branch, its uncommitted files, when a session last worked there, its processes that are heavy or listen on a
+  port, the person's own ports as never to be stopped, the files changed in more than one worktree, the claims and
+  the turn. It reads the machine's process list and its listening ports, and stores nothing of them.
+- `crew claim <key>` takes a note, a file or a number for this worktree and refuses one another worktree holds, naming
+  it; `crew claim <list> --new` takes one past the highest number of a numbered list in the pushed branch, in every
+  worktree's copy of the file and in every claim; a key that starts with `waits:` says this worktree waits on
+  another's push, and several may hold it; `crew release` gives claims back. The claims live in the repository's git
+  folder, shared by its worktrees, never committed. A claim of a removed worktree, and a number that reached the
+  pushed branch, are dropped.
+- `crew run -- <command>` waits until no process on the machine matches the repository's heavy patterns and no other
+  `crew run` holds the turn, runs the command and passes its exit code through; after `crew.waitMinutes` it names what
+  still runs and exits with code 3 without running it. It never stops a process.
+- `crew after-rebase` says when a number appears twice in a numbered list, when a number this worktree claimed
+  reached the pushed branch, or when a stamp names a commit the branch no longer holds; `crew after-push` says who
+  waits on this worktree. New hooks run them after a `git rebase`, `git pull` or `git push` that Claude issues, through
+  the Bash or the PowerShell tool, and say nothing when there is nothing to say.
+- The doctor warns about a number that appears twice and about a stale stamp, in a repository that names its lists and
+  stamps. At a session's start it adds one line when another session worked in the repository in the last
+  `crew.activeMinutes` minutes, in another worktree or in the same folder, from the times the transcript files were
+  written, never their content.
+- The memory backup's commits made by the hook name the session whose reply they follow ("Session: <id>"). The doctor
+  warns when one session's commit removed lines that another session's commit had added within
+  `crew.memoryLossHours` hours and no note holds them now, without quoting them; `bowline memory losses` lists them,
+  and `--meant <commit>` records a removal that was meant.
+- A new skill, `crew`, with the procedure and the three rules for a file the sessions share; a rule template for a
+  repository where several sessions work, `templates/crew/beside-other-sessions.md`, which the skill offers and `init`
+  does not write; a `crew` section in `defaults.json` with each key's reason, all of it empty or off until a
+  repository fills it: `heavy`, `keepPorts`, `numbers`, `stamps`, `base`, `activeMinutes`, `waitMinutes`,
+  `waitEverySeconds`, `memoryLossDays`, `memoryLossHours`.
+- `plugin/PRIVACY.md` says what the crew reads and writes, and that the backup's commits now carry the session's
+  identifier to your remote.
+
+Not done in this version: a git `post-rewrite` hook for rebases made outside Claude Code, the commit gate's hook for
+the PowerShell tool, claims across machines, and the session-start line from a folder of repositories (the decisions
+page has them, numbered).
+
 ## 0.9.0 (2026-11-16)
 
 A folder of many repositories: `init` installs the gate where it can and says so where it cannot, describes each

@@ -9,8 +9,8 @@ so that a first-time reader understands it without guessing.
 bowline is a Claude Code plugin and a guide that keep a project's knowledge within what Claude Code actually reads.
 The plugin, exactly as it ships, is the folder `plugin/`: `docs/facts.md` holds the limits with their sources,
 `defaults.json` the same as settings, `scripts/` the tools (`doctor`, `gate`, `budget`, `memory`, `init`, `move`,
-`autosplit`) and `run.mjs`, the Node launcher the hooks and skills start, `skills/` the procedures Claude runs them
-through, `hooks/hooks.json` the plugin's hooks, and `templates/` what `init` writes into a repository. Outside it are
+`autosplit`, `crew`) and `run.mjs`, the Node launcher the hooks and skills start, `skills/` the procedures Claude runs
+them through, `hooks/hooks.json` the plugin's hooks, and `templates/` what `init` writes into a repository. Outside it are
 what does not ship: `tests/`, the tests on scratch repositories; this folder; CI; and the marketplace file. bowline is
 its own first user: this file and `.claude/` were written by `bowline init`. Every file here is ASCII only, written for
 a stranger, Python 3.8 standard library only (and the launcher Node's built-in modules only), with no dependency and no

@@ -193,3 +193,5 @@ branch of its own, and leaves the merge to you.
 2. In a repository, `/bowline:doctor`. Read the report; each finding names the skill that fixes it.
 3. `/bowline:init` for the layout, `/bowline:memory-backup` for the backup, and `/bowline:split-instructions` when a
    `CLAUDE.md` is over the line. `/bowline:conventions` when decisions keep getting lost.
+4. `/bowline:crew` when more than one session works in the repository at once, each in its own worktree: who is here,
+   who took which roadmap number, how a shared file is changed, and when a heavy check may run.
