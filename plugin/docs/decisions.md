@@ -1063,3 +1063,29 @@ way to find an id the look does not give.
 **Not chosen.** Printing each id beside its session in the worktree's lines: an id is 42 characters, and the lines
 are read by a person too, so the ids are gathered at the end. Asking the app through its tools from the script: the
 tools are Claude's, not a program a script can start.
+
+**A session offline in the sidebar.** The same report called five worktrees safe to remove, and four of them belonged
+to sessions that were still in the person's sidebar, not archived, whose process had ended; `ListAgents` listed them
+as "Remote Control, offline". The look had put those worktrees under QUIET with "no session", while it did show the
+offline background sessions under the main checkout. The reason: `claude agents --json` lists a Claude Desktop
+session only while its process runs, and it lists a background session from the job's own record even without one,
+so only the second kind reached the look. The person approved the removal, and nothing was lost, since every commit
+was on main, but they were not told that four sessions would be left pointing at folders that were gone.
+
+**The decision.** A record of the app that is not archived, whose folder is a worktree of the repository, and that no
+session `claude agents` lists matches, is an offline session of that worktree, named by its title. The look names it
+beside its worktree, as an offline session that neither works nor waits, and says to archive it before the worktree
+is removed. `crew prune` calls such a worktree not safe, naming the session and saying "archive it first"; once the
+person archives it, the worktree is safe on the next look.
+
+**Why not safe, rather than safe with the session named.** prune's promise is that no session holds the worktree, and
+an offline session still does: the person can reopen it at any moment, and it then works in that folder. A removal
+loses no commit, but it breaks the session, and only the person can say that the session is finished, which they say
+by archiving it, one click in the sidebar. A worktree listed as safe with a note beside it is passed on as safe; that
+is how the four were removed. Making the order "archive, then remove" the only one prune allows keeps the decision with
+the person, and its reason says what to do.
+
+**The sessions left behind.** A record that is not archived and whose worktree is gone, or is being removed, is
+listed under ACROSS THE WORKTREES, for the person to archive, because reopened it would find its folder missing. On the
+day this was built the look found the four sessions of the worktrees removed that morning. An offline background
+session is now worded as offline in prune too, which is the second item left for later in the entry before this one.

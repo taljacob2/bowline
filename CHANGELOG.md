@@ -24,6 +24,15 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
   Claude Code session, the look ends with SESSION LINKS, each listed session's id and title; `crew --json` gives the
   id as each session's `desktop`. The crew skill tells the session that reads the look to link every session it
   names as `[its title](#<its id>)`.
+- A Claude Desktop session in the person's sidebar, not archived, whose process has ended is now an offline session
+  of its worktree. `claude agents` does not list such a session, so until now the look put its worktree under QUIET
+  with no session, and `crew prune` called it safe to remove: on 2026-11-22 four worktrees were removed whose
+  sessions were still in the sidebar. The look names the session beside its worktree and says to archive it before
+  the worktree is removed, and `crew prune` keeps the worktree, saying "its session ... is offline in Claude
+  Desktop's sidebar, not archived: reopened after a removal, it would find its folder gone, so archive it first".
+  Once the session is archived, the worktree is safe. An offline background session is no longer worded as "open" in
+  `crew prune`. The look lists, under ACROSS THE WORKTREES, the sidebar sessions whose worktree is gone or being
+  removed, for the person to archive; `crew --json` gives them as `gone`.
 
 ## 0.15.1 (2026-11-22)
 

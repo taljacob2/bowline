@@ -46,9 +46,14 @@ gives the same as data.
 - **A session's own command.** Claude Code calls a session idle as soon as its turn ends, even while a command it
   started in the background still runs, such as a long push. The look finds each such command below the session's
   process, names it under the session ("runs in the background: ..."), and puts the worktree under AT WORK.
-- **An offline session** is a background session that Claude Code still lists with the state it last recorded,
-  often "blocked", though no process of it runs. The look says so, and never counts it as waiting for the person or
-  as at work. It holds no memory; the person can open it to take it up again.
+- **An offline session** is a session with no process that can still be taken up again: a background session that
+  Claude Code still lists with the state it last recorded, often "blocked", or a Claude Desktop session in the
+  person's sidebar, not archived, whose process has ended (`claude agents` does not list it; the app's record of its
+  sessions does). The look names it beside its worktree, and never counts it as waiting for the person or as at
+  work. It holds no memory; the person can open it to take it up again. Its worktree is not safe to remove, because
+  the session reopened after a removal would find its folder gone: the person archives it first.
+- **A session whose worktree is gone** is one in the sidebar, not archived, whose worktree was removed or is being
+  removed. The look lists it under ACROSS THE WORKTREES; tell the person to archive it.
 - **A worktree that is broken or being removed** has lost the `.git` file in its folder, so git there answers for the
   main checkout. It is named and left out of the counts and of the files changed twice; never work in it.
 
@@ -250,7 +255,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew prune
 
 It names the worktrees that are safe to remove (every file committed, every commit on the pushed branch by content,
 no session, process, claim, lock or place in the queue, and no sign of work for `crew.pruneHours`) and why each
-other one is not. Show the list to the person. Only on their yes, run `crew prune --remove <name>...`: each is checked
+other one is not. A session offline in Claude Desktop's sidebar counts as a session until the person archives it,
+because reopened after a removal it would find its folder gone; prune names it and says to archive it first. Show the
+list to the person, with each session it names linked. Only on their yes, run `crew prune --remove <name>...`: each is checked
 again and removed with `git worktree remove`, never with `--force`, and its branch stays. Start it in the background,
 because a worktree with its own `node_modules` takes minutes to delete on Windows, and a command stopped at a time
 limit leaves git's deletion half done. Never remove a worktree the list calls not safe, and never one by hand.

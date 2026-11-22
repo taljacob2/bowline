@@ -56,7 +56,10 @@ comes next with the same files. prune names the worktrees that are safe to remov
 commit's change on the pushed branch, no session, process, claim, lock or place in the queue, and no sign of work
 for crew.pruneHours) and why each other one is not; --remove removes the ones named, each checked again, with plain
 `git worktree remove` and no time limit, which takes ignored files and refuses a change, so nothing is ever forced;
-the branch stays.
+the branch stays. A Claude Desktop session in the person's sidebar, not archived, whose process has ended is offline
+and still a session of its worktree: `claude agents` does not list it, the app's record does, and reopened after a
+removal it would find its folder gone, so prune names it and keeps the worktree until it is archived. The look lists
+such sessions whose worktree is already gone, for the person to archive.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -480,13 +483,52 @@ def sessions_by_tree(trees, rows, minutes=30, now=None, desktop=()):
             "status": "offline" if offline else status, "was": status if offline else None, "pid": pid,
             "started": started / 1000.0 if isinstance(started, (int, float)) else None, "wrote": wrote, "cwd": row["cwd"]})
     by_cli = {cli: record for record in desktop for cli in record["cli"]}
+    joined = set()
     for sessions in found.values():
         for session in sessions:
             record = by_cli.get(session["id"])
             session["desktop"] = record["desktop"] if record else None
-            if record and record["title"]:
-                session["name"] = record["title"]
+            if record:
+                joined.add(record["desktop"])
+                session["name"] = record["title"] or session["name"]
+    # A session in the app's sidebar whose process has ended: `claude agents` does not list it, though the person can
+    # reopen it at any time, in its folder. On 2026-11-22 four such sessions were in worktrees the look called quiet,
+    # with no session, and that prune called safe to remove.
+    for record in desktop:
+        folder = record["cwd"] or record["worktree"]
+        if record["desktop"] in joined or record["archived"] or not folder or not os.path.isdir(folder):
+            continue
+        tree = tree_of(folder, trees)
+        if tree is None or tree.get("broken"):
+            continue
+        cli = record["cli"][0] if record["cli"] else ""
+        try:
+            wrote = os.path.getmtime(os.path.join(common.project_folder(folder), cli + ".jsonl")) if cli else None
+        except OSError:
+            wrote = None
+        found.setdefault(same(tree["path"]), []).append({
+            "name": record["title"], "id": cli, "kind": "desktop", "status": "offline", "was": None, "pid": None,
+            "started": None, "wrote": wrote or record["at"], "cwd": folder, "desktop": record["desktop"]})
+    for sessions in found.values():
         sessions.sort(key=lambda s: (s["status"] == "offline", -(s["wrote"] or s["started"] or 0)))
+    return found
+
+
+def gone_sessions(trees, desktop):
+    """The sessions in the app's sidebar, not archived, whose folder was a worktree of this repository that is gone or
+    is being removed: reopened, each would find its folder missing. As [{"name", "desktop", "folder"}], the folder
+    named from the main checkout."""
+    main = trees[0]["path"]
+    found = []
+    for record in desktop:
+        folder = record["worktree"] or record["cwd"]
+        if record["archived"] or not folder:
+            continue
+        if os.path.isdir(folder) and not (tree_of(folder, trees) or {}).get("broken"):
+            continue
+        if same(folder).startswith(same(main) + "/"):
+            found.append({"name": record["title"], "desktop": record["desktop"],
+                          "folder": os.path.relpath(folder, main).replace("\\", "/")})
     return found
 
 
@@ -1872,6 +1914,9 @@ def session_state(session, now):
         return "blocked in the background" if session.get("kind") == "background" else "blocked"
     if status == "idle":
         return "idle" + (f" for {how_long(now - session['wrote'])}" if session.get("wrote") else "")
+    if status == "offline" and session.get("kind") == "desktop":
+        return ("offline: it is in Claude Desktop's sidebar, not archived, and no process of it runs. Archive it before "
+                "this worktree is removed: reopened after, it would find its folder gone")
     if status == "offline":
         return (f"offline: Claude Code lists it as {session.get('was') or 'blocked'} from when it last ran, and no "
                 "process of it runs now")
@@ -2047,8 +2092,22 @@ def prune_reasons(item, model, hours, queued):
         reasons.append("it is broken or being removed; `git worktree prune` clears what git keeps of it")
     if item.get("locked") is not None:
         reasons.append("git keeps it locked" + (f" ({item['locked']})" if item["locked"] else ""))
-    if item["sessions"]:
-        reasons.append("a session is open in it, " + ", ".join(session_name(s) for s in item["sessions"]))
+    live = [s for s in item["sessions"] if s["status"] != "offline"]
+    parked = [s for s in item["sessions"] if s["status"] == "offline" and s.get("kind") == "desktop"]
+    listed = [s for s in item["sessions"] if s["status"] == "offline" and s.get("kind") != "desktop"]
+    if live:
+        reasons.append("a session is open in it, " + ", ".join(session_name(s) for s in live))
+    if parked:
+        # The session still belongs to the worktree: the person can reopen it at any time, and it would then find its
+        # folder gone. Only the person can say it is finished, by archiving it.
+        reasons.append(("its session " if len(parked) == 1 else "its sessions ") + ", ".join(session_name(s) for s in parked)
+                       + (" is" if len(parked) == 1 else " are") + " offline in Claude Desktop's sidebar, not archived: "
+                       "reopened after a removal, " + ("it" if len(parked) == 1 else "each") + " would find its folder "
+                       "gone, so archive " + ("it" if len(parked) == 1 else "them") + " first")
+    if listed:
+        reasons.append("Claude Code still lists its background " + ("session " if len(listed) == 1 else "sessions ")
+                       + ", ".join(session_name(s) for s in listed) + ", offline: opened again after a removal, "
+                       + ("it" if len(listed) == 1 else "each") + " would find its folder gone")
     if item["processes"]:
         pids = ", ".join(str(process["pid"]) for process in item["processes"][:3])
         reasons.append(f"{common.count(len(item['processes']), 'process runs', 'processes run')} in it (pid {pids})")
@@ -2146,8 +2205,9 @@ def do_prune(options):
     rest = [(item, prune_reasons(item, model, hours, queued)) for item in items if item not in safe]
     if safe:
         out = lines_of(f"Safe to remove: {common.count(len(safe), 'worktree', 'worktrees')}. Each has every file "
-                       f"committed and every commit on {model['base']} by content; no session, process, claim, lock or "
-                       f"place in the push queue holds it, and it showed no sign of work for {hours} hours:")
+                       f"committed and every commit on {model['base']} by content; no session (an offline one in Claude "
+                       "Desktop's sidebar counts until it is archived), process, claim, lock or place in the push queue "
+                       f"holds it, and it showed no sign of work for {hours} hours:")
         for item in safe:
             out += lines_of(f"{item['display']}: {prune_safe_words(item, model)}", "      ", "        ")
     else:
@@ -2163,6 +2223,9 @@ def do_prune(options):
     if safe:
         out += lines_of("To remove them, with the person's yes: crew prune --remove <name> [<name>...]. Each is checked "
                         "again first and removed with git worktree remove, which never removes a change; its branch stays.")
+    if wants_links():
+        linked = link_lines([session for item in items for session in item["sessions"]])
+        out += [""] + linked if linked else []
     print("\n".join(out))
     return 0
 
@@ -2369,6 +2432,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
         "peaks": [{"command": entry["command"], "peak": most, "seconds": entry.get("seconds"), "runs": entry.get("runs"),
                    "at": entry.get("at"), "small": bool(entry.get("small"))} for most, entry in peaks[:3]],
         "unreachable": list(place.unreachable),
+        "gone": gone_sessions(place.trees, desktop),
         "dropped": [{"key": claim["key"], "holder": holder_name(claim, place.trees), "reason": reason} for claim, reason in dropped],
     }
 
@@ -2536,7 +2600,9 @@ def idle_line(item, model):
     if item["claims"]:
         extra.append("still claims " + ", ".join(claim["key"] for claim in item["claims"]))
     names = "; ".join(session_name(session) + (f" ({size(session['memory'])})" if session.get("memory") else "")
-                      + (" (offline: no process of it runs)" if session["status"] == "offline" else "")
+                      + ((" (offline in Claude Desktop's sidebar: archive it before this worktree is removed)"
+                          if session.get("kind") == "desktop" else " (offline: no process of it runs)")
+                         if session["status"] == "offline" else "")
                       for session in item["sessions"])
     if item.get("untrackedOld"):
         extra.append(f"and {changed_words(item, model['at'])}, none written in "
@@ -2665,6 +2731,12 @@ def render(model, verbose=False, links=False):
         out += lines_of(f"A heavy process in no worktree: pid {process['pid']} {shown(process['command'], 170)}")
     for claim in model["dropped"]:
         out += lines_of(f"Dropped the claim {claim['key']} of {claim['holder']}: {claim['reason']}.")
+    if model.get("gone"):
+        out += lines_of(f"In Claude Desktop's sidebar, not archived, {common.count(len(model['gone']), 'session', 'sessions')}"
+                        " whose worktree is gone or being removed: "
+                        + "; ".join(f"{session_name(s)} ({s['folder']})" for s in model["gone"])
+                        + ". Reopened, " + ("it" if len(model["gone"]) == 1 else "each") + " finds its folder missing; "
+                        "archive " + ("it" if len(model["gone"]) == 1 else "them") + " in the sidebar.")
     for turn in model["turns"]:
         out += lines_of(f"The turn for {'a small check' if turn['small'] else 'a heavy check'} is held since "
                         f"{turn['since']} by {turn['worktree']}, for: {turn['command']}")
@@ -2689,7 +2761,7 @@ def render(model, verbose=False, links=False):
                "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
     if links:
         shown_items = [item for item in model["worktrees"] if item["group"] != "quiet" or verbose]
-        linked = link_lines([session for item in shown_items for session in item["sessions"]])
+        linked = link_lines([session for item in shown_items for session in item["sessions"]] + model.get("gone", []))
         out += [""] + linked if linked else []
     return out
 

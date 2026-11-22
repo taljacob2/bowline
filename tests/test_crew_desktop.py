@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import unittest
 
 from support import SCRIPTS, ScratchRepo, git, write
@@ -14,6 +15,8 @@ import crew  # noqa: E402 - support puts the scripts on the path
 
 FAKE_CLAUDE = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")]
 PARSER = "local_11111111-2222-3333-4444-555555555555"
+PARKED = "local_22222222-3333-4444-5555-666666666666"
+GONE = "local_33333333-4444-5555-6666-777777777777"
 
 
 def flat(text):
@@ -93,6 +96,82 @@ class DesktopTests(ScratchRepo):
         model = json.loads(self.crew("--json")[1])
         session = next(item for item in model["worktrees"] if item["display"] == "other")["sessions"][0]
         self.assertEqual((session["name"], session["desktop"]), ("The parser keeps every comment and every blank l", None))
+
+    def origin(self):
+        bare = os.path.join(self.root, "origin.git")
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", bare], check=True)
+        git(self.repo, "remote", "add", "origin", bare)
+        git(self.repo, "push", "-q", "-u", "origin", "main")
+
+    def age(self, tree, hours):
+        """Makes a worktree's own git folder look last written some hours ago, as one nobody works in is."""
+        folder = os.path.join(self.repo, ".git") if tree == self.repo else \
+            os.path.join(self.repo, ".git", "worktrees", os.path.basename(tree))
+        stamp = time.time() - hours * 3600
+        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
+            if os.path.exists(os.path.join(folder, name)):
+                os.utime(os.path.join(folder, name), (stamp, stamp))
+
+    def test_a_session_offline_in_the_sidebar_keeps_its_worktree_until_it_is_archived(self):
+        # On 2026-11-22 prune called four worktrees safe to remove whose sessions were still in the person's sidebar,
+        # offline: `claude agents` lists a session of the app only while its process runs, and the look put those
+        # worktrees under QUIET, with no session.
+        self.origin()
+        self.age(self.repo, 8)
+        self.age(self.other, 8)
+        self.agents()
+        title = "#128: refuse a vault left as the template's placeholder"
+        self.record(PARKED, "cli-parked", title, self.other)
+        self.record(GONE, "cli-gone", "#129: the status-tick tests", os.path.join(self.repo, ".claude", "worktrees", "removed"))
+        code, out, err = self.crew(env={"CLAUDECODE": "1"})
+        self.assertEqual(code, 0, out + err)
+        text = flat(out)
+        self.assertIn("2 worktrees and 0 sessions (1 more listed, offline)", text)
+        self.assertIn(f"other: \"{title}\" (offline in Claude Desktop's sidebar: archive it before this worktree is "
+                      "removed)", text)
+        self.assertIn("In Claude Desktop's sidebar, not archived, 1 session whose worktree is gone or being removed: "
+                      "\"#129: the status-tick tests\" (.claude/worktrees/removed). Reopened, it finds its folder "
+                      "missing; archive it in the sidebar.", text)
+        links = text[text.index("SESSION LINKS"):]
+        self.assertIn(f'#{PARKED} "{title}"', links)
+        self.assertIn(f'#{GONE} "#129: the status-tick tests"', links)
+        model = json.loads(self.crew("--json")[1])
+        by = {item["display"]: item for item in model["worktrees"]}
+        self.assertEqual(by["other"]["group"], "idle")
+        self.assertEqual([(s["status"], s["kind"], s["desktop"]) for s in by["other"]["sessions"]],
+                         [("offline", "desktop", PARKED)])
+        self.assertEqual(by["the main checkout"]["sessions"], [])                # a gone worktree's session is not its
+        # Where the worktree's lines are written out, as when it holds work, the session's line says the same at length.
+        self.assertEqual(crew.session_state(by["other"]["sessions"][0], time.time()),
+                         "offline: it is in Claude Desktop's sidebar, not archived, and no process of it runs. Archive "
+                         "it before this worktree is removed: reopened after, it would find its folder gone")
+        # prune keeps the worktree, names the session and says what to do; --remove refuses it.
+        code, out, err = self.crew("prune")
+        self.assertEqual(code, 0, out + err)
+        text = flat(out)
+        self.assertIn("Safe to remove: none.", text)
+        self.assertIn(f"other: its session \"{title}\" is offline in Claude Desktop's sidebar, not archived: reopened "
+                      "after a removal, it would find its folder gone, so archive it first", text)
+        code, out, err = self.crew("prune", "--remove", "other")
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("other is not removed: its session", flat(out))
+        self.assertTrue(os.path.isdir(self.other))
+        # Once the person archives it, the worktree is safe.
+        self.record(PARKED, "cli-parked", title, self.other, archived=True)
+        text = flat(self.crew("prune")[1])
+        self.assertIn("Safe to remove: 1 worktree.", text)
+        self.assertIn("other: quiet for 8 hours", text)
+
+    def test_a_session_whose_worktree_is_being_removed_is_named_too(self):
+        leaving = os.path.join(self.repo, ".claude", "worktrees", "leaving")
+        git(self.repo, "worktree", "add", "-q", "-b", "leaving", leaving)
+        os.remove(os.path.join(leaving, ".git"))            # as while git removes it: the folder is there, its .git is not
+        self.agents()
+        self.record(PARKED, "cli-parked", "the leaving session", leaving)
+        text = flat(self.crew()[1])
+        self.assertIn("BROKEN OR BEING REMOVED: leaving.", text)
+        self.assertIn("1 session whose worktree is gone or being removed: \"the leaving session\" "
+                      "(.claude/worktrees/leaving).", text)
 
 
 if __name__ == "__main__":
