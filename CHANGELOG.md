@@ -4,7 +4,14 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.16.0 (2026-11-22)
+
+Seven fixes from a crew report in the first user's repository on 2026-11-22, where the look and `crew prune` misled
+the person, and where `crew prune --remove` deleted the main checkout's packages through a junction; that fix comes
+first. No Claude Code limit moved. Two settings are new, `crew.oldUntrackedHours` and `crew.desktop`, and the crew now
+reads Claude Desktop's own record of its sessions and Claude Code's own record of its running processes, which
+`PRIVACY.md` describes. The reasoning is in `plugin/docs/decisions.md`, "prune never deletes through a link" and "the
+crew reads Claude Desktop's record of its sessions".
 
 - **`crew prune --remove` no longer deletes through a link.** Git for Windows' `git worktree remove` follows a
   directory junction inside the worktree and deletes what it points to. On 2026-11-22 a worktree held
