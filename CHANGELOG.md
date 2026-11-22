@@ -6,6 +6,16 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
 
 ## Unreleased
 
+- **`crew prune --remove` no longer deletes through a link.** Git for Windows' `git worktree remove` follows a
+  directory junction inside the worktree and deletes what it points to. On 2026-11-22 a worktree held
+  `webui/node_modules` and `docs-site/node_modules` as junctions to the main checkout's real folders; prune called it
+  safe, because git ignores both, and its removal deleted 97 of the main checkout's packages and all of the second
+  folder. prune now walks a worktree that could go, without following any link, for every junction, symbolic link and
+  mount point that points outside it, and lists each with its target under "Not safe while its links stand".
+  `--remove` takes each such link away first, the link alone, checks that what it pointed to keeps every entry, and
+  runs git only on a worktree that holds none; if a link cannot be taken away, git is not run. A message about a
+  folder a removal left behind never advises deleting it while it still holds a link, and says how to take a link
+  away alone.
 - `memory losses`, and the doctor's warning that reads it, no longer count a line of a note's front matter that a
   commit gave a new value in place. Claude Code writes the front matter again on every save, with a new `modified:`
   time under `metadata:`, so the old time was reported as a line that one session had added and another had lost. A

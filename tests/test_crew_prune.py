@@ -133,6 +133,82 @@ class PruneTests(CrewCase):
         self.assertTrue(os.path.isdir(self.trees["done"]))
 
 
+def make_link(link, target):
+    """A link to a folder, as a worktree's node_modules often is: a directory junction on Windows, which needs no
+    administrator, and a symbolic link elsewhere."""
+    link, target = os.path.normpath(link), os.path.normpath(target)        # mklink takes no forward slash
+    os.makedirs(os.path.dirname(link), exist_ok=True)
+    if os.name == "nt":
+        subprocess.run(["cmd", "/c", "mklink", "/J", link, target], check=True, capture_output=True)
+    else:
+        os.symlink(target, link, target_is_directory=True)
+
+
+def contents(folder):
+    """Every file under a folder, by its path from the folder, with what it holds."""
+    found = {}
+    for top, _, files in os.walk(folder):
+        for name in files:
+            with open(os.path.join(top, name), encoding="utf-8") as handle:
+                found[os.path.relpath(os.path.join(top, name), folder)] = handle.read()
+    return found
+
+
+class LinkTests(CrewCase):
+    """On 2026-11-22 Git for Windows' `git worktree remove` followed two directory junctions inside a worktree prune had
+    called safe, webui/node_modules and docs-site/node_modules, and deleted the main checkout's packages they pointed
+    to. Here each worktree's links point to sacrificial folders outside the repository."""
+
+    def setUp(self):
+        super().setUp()
+        write(os.path.join(self.repo, ".git", "info", "exclude"), ".claude/worktrees/\nnode_modules\n")
+        self.packages = {}
+        for part in ("webui", "docs-site"):
+            folder = os.path.join(self.root, "the-main-checkouts-" + part + "-packages")
+            for name in ("@adobe/css-tools/index.js", "@reduxjs/toolkit/index.js", "vite/bin/vite.js"):
+                write(os.path.join(folder, name), f"the {part} package {name}\n")
+            self.packages[part] = folder
+        self.before = {part: contents(folder) for part, folder in self.packages.items()}
+        self.linked = self.worktree("linked")
+        for part, folder in self.packages.items():
+            make_link(os.path.join(self.linked, part, "node_modules"), folder)
+        self.age(self.linked, 8)
+        self.age(self.repo, 8)
+
+    def test_a_link_outside_is_named_and_the_worktree_is_not_called_safe(self):
+        code, out, err = self.crew("prune")
+        self.assertEqual(code, 0, out + err)
+        text = flat(out)
+        self.assertIn("Safe to remove: none.", text)
+        self.assertIn("Not safe while its links stand: 1 worktree.", text)
+        self.assertIn(f"linked: quiet for 8 hours; links: docs-site/node_modules -> {self.packages['docs-site']}, "
+                      f"webui/node_modules -> {self.packages['webui']}", text)
+        self.assertEqual({part: contents(folder) for part, folder in self.packages.items()}, self.before)
+
+    def test_remove_takes_each_link_away_alone_and_never_deletes_through_it(self):
+        code, out, err = self.crew("prune", "--remove", "linked")
+        # Every file the links pointed to is still there, as it was.
+        self.assertEqual({part: contents(folder) for part, folder in self.packages.items()}, self.before, out + err)
+        self.assertEqual(code, 0, out + err)
+        text = flat(out)
+        for part in ("docs-site", "webui"):
+            self.assertIn(f"linked: took away the link {part}/node_modules, the link alone; {self.packages[part]} keeps "
+                          "its 3 entries.", text)
+        self.assertIn("removed linked", text)
+        self.assertFalse(os.path.exists(self.linked))
+
+    def test_a_folder_left_with_a_link_is_never_to_be_deleted_whole(self):
+        words = crew.left_behind_words(self.linked)
+        self.assertIn("It still holds a link to a folder outside it", words)
+        self.assertIn("take each link away alone first, and only then delete the folder", words)
+        self.assertIn("Never delete a folder that holds a link with a command that goes into every folder", words)
+        for part in ("docs-site", "webui"):
+            os.rmdir(os.path.join(self.linked, part, "node_modules")) if os.name == "nt" else \
+                os.unlink(os.path.join(self.linked, part, "node_modules"))
+        self.assertEqual(crew.left_behind_words(self.linked), "Close what holds the files git names, then delete the folder.")
+        self.assertEqual({part: contents(folder) for part, folder in self.packages.items()}, self.before)
+
+
 class QueueTests(CrewCase):
     def setUp(self):
         super().setUp()

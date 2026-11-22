@@ -1145,3 +1145,38 @@ runs, so one left behind by an ended process says nothing. The `.key` files besi
 
 **Not chosen.** Matching a hidden process to a session by `--resume` in its command line, as the brief suggested: the
 command line of exactly these processes cannot be read. The match is still made for a process whose command line can.
+
+## 2026-11-22: prune never deletes through a link
+
+**The question.** The same morning, `crew prune --remove` (0.15.1) removed the worktree `sign-in-sea` of the first
+user's repository, which prune had called safe. It held `webui/node_modules` and `docs-site/node_modules` as
+directory junctions to the main checkout's real folders, as many worktrees do so as not to install their packages
+twice. git ignores both, so nothing in them counted as a change. Git for Windows' `git worktree remove` followed the
+junctions: it deleted every file of the main checkout's `docs-site/node_modules`, and the packages of its
+`webui/node_modules` in alphabetical order, 97 of them, until a native binary that the person's running dev server
+held open stopped it with "Invalid argument". The failure message then told the person to close what held the files
+and delete the folder, which, with a junction still in it, could have followed it again. A scratch test on this
+machine showed the same: git exited 0 and the folder a junction pointed to was empty.
+
+**The decision.** Before it calls a worktree safe, prune walks it, without following any link and skipping its
+`.git`, for every junction, symbolic link and mount point, and keeps those that point outside the worktree. A
+worktree that holds one is listed under "Not safe while its links stand", with each link and its target. `--remove`
+takes each such link away first, the link alone (`os.rmdir` on Windows, which removes a junction or a link to a
+folder without going into it, and `os.unlink` elsewhere), checks that the folder it pointed to still holds as many
+entries as before, walks the worktree again, and runs git only when no such link is left. If a link cannot be taken
+away, git is not run. A message about a folder a removal left behind looks for links again, and when one is left it
+says to take each away alone first, with `cmd /c rmdir` and no `/s`, and never to delete the folder with a command
+that goes into every folder, such as `Remove-Item -Recurse`.
+
+**Why bowline takes the link away, rather than refusing.** Both were offered. A refusal leaves the person to remove
+the link by hand, and the commands a person reaches for first, `Remove-Item -Recurse` or a delete in Explorer, are the
+ones that can follow it. Taking a link away alone is one call that cannot touch what it points to, and bowline then
+proves that by counting. The worktree is still never called safe while a link stands, so the person sees each link
+before they say yes.
+
+**Why only the worktrees that could go are walked.** A worktree with its own `node_modules` holds tens of thousands
+of files, and a walk of each in every look would be too slow for a look drawn every ten seconds. prune walks only the
+worktrees nothing else keeps, and `--remove` walks the one it removes, right before git runs.
+
+**Left for later:** the look itself does not name a link inside a worktree that points outside it, for the cost
+above; prune does, which is where it matters.

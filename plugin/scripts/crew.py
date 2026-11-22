@@ -63,7 +63,11 @@ for crew.pruneHours) and why each other one is not; --remove removes the ones na
 the branch stays. A Claude Desktop session in the person's sidebar, not archived, whose process has ended is offline
 and still a session of its worktree: `claude agents` does not list it, the app's record does, and reopened after a
 removal it would find its folder gone, so prune names it and keeps the worktree until it is archived. The look lists
-such sessions whose worktree is already gone, for the person to archive.
+such sessions whose worktree is already gone, for the person to archive. Git for Windows' `git worktree remove`
+follows a directory junction inside the worktree and deletes what it points to, so prune walks a worktree that could
+go, without following any link, for every junction, symbolic link and mount point that points outside it, never calls
+it safe while one stands, and --remove takes each away first, the link alone, checks that what it pointed to keeps
+every entry, and runs git only on a worktree that holds none.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -2441,6 +2445,145 @@ def archived_words(archived):
             + (" is archived" if len(archived) == 1 else " are archived"))
 
 
+# Links inside a worktree.
+#
+# Git for Windows' `git worktree remove` follows a directory junction inside the worktree and deletes what it points
+# to. On 2026-11-22 a worktree held webui/node_modules and docs-site/node_modules as junctions to the main checkout's
+# real folders; prune called it safe, because git ignores both, and its removal deleted 97 of the main checkout's
+# packages and every file of the second folder, until a file the person's running dev server held stopped it.
+
+REPARSE_POINT = 0x400                                   # FILE_ATTRIBUTE_REPARSE_POINT
+LINK_TAGS = (0xA0000003, 0xA000000C)                    # a junction or a mount point; a symbolic link
+
+
+def is_link(path):
+    """Whether a path is a link a recursive delete could follow: a symbolic link, or on Windows a junction or a mount
+    point. Another kind of reparse point, such as a file kept in the cloud, is not one."""
+    try:
+        if os.path.islink(path):
+            return True
+        if WINDOWS:
+            info = os.lstat(path)
+            return bool(getattr(info, "st_file_attributes", 0) & REPARSE_POINT) and \
+                getattr(info, "st_reparse_tag", 0) in LINK_TAGS
+    except OSError:
+        return False
+    return False
+
+
+def link_target(path):
+    """Where a link points, as an absolute path, or None when it cannot be read."""
+    try:
+        target = os.readlink(path)
+    except (OSError, ValueError, NotImplementedError):
+        try:
+            return os.path.realpath(path)
+        except OSError:
+            return None
+    for prefix in ("\\\\?\\", "\\??\\"):
+        if target.startswith(prefix):
+            target = target[len(prefix):]
+    return os.path.normpath(target if os.path.isabs(target) else os.path.join(os.path.dirname(path), target))
+
+
+def links_out(tree_path):
+    """Every link inside a worktree that points outside it, as [{"link": its path from the worktree's top, "path",
+    "target"}], the worktree walked without following any link, and its .git skipped. A link that points inside the
+    worktree is left out: what it points to goes with the worktree in any case."""
+    found, todo, top = [], [tree_path], same(tree_path)
+    while todo:
+        folder = todo.pop()
+        try:
+            entries = list(os.scandir(folder))
+        except OSError:
+            continue
+        for entry in entries:
+            if entry.name == ".git" and same(folder) == top:
+                continue
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            reparse = bool(getattr(info, "st_file_attributes", 0) & REPARSE_POINT)
+            if entry.is_symlink() or (reparse and is_link(entry.path)):
+                target = link_target(entry.path)
+                if not target or not (same(target) == top or same(target).startswith(top + "/")):
+                    found.append({"link": os.path.relpath(entry.path, tree_path).replace("\\", "/"), "path": entry.path,
+                                  "target": target})
+                continue
+            if not reparse and entry.is_dir(follow_symlinks=False):
+                todo.append(entry.path)
+    return sorted(found, key=lambda link: link["link"])
+
+
+def entries_of(folder):
+    """How many entries a folder holds, or None when it cannot be listed."""
+    try:
+        return len(os.listdir(folder))
+    except OSError:
+        return None
+
+
+def unlink_link(link):
+    """Takes a link away, the link alone, never what it points to: rmdir for a junction or a link to a folder, which
+    removes only the link, and unlink for a link to a file or, outside Windows, to a folder. Returns what went wrong,
+    or None."""
+    path = link["path"]
+    try:
+        if WINDOWS:
+            try:
+                os.rmdir(path)
+            except OSError:
+                os.unlink(path)
+        else:
+            os.unlink(path)
+    except OSError as problem:
+        return str(problem)
+    return "it is still there" if os.path.lexists(path) else None
+
+
+def links_words(links):
+    return ", ".join(f"{link['link']} -> {link['target'] or 'a target that cannot be read'}" for link in links)
+
+
+LINK_ADVICE = ("To take a link away by hand, remove the link alone: on Windows with cmd /c rmdir \"<the link>\", with "
+               "no /s, and elsewhere with rm \"<the link>\", with no -r. Never delete a folder that holds a link with a "
+               "command that goes into every folder, such as Remove-Item -Recurse in Windows PowerShell, which follows "
+               "a junction.")
+
+
+def left_behind_words(path):
+    """What the person does with a folder a removal left behind: take its links away first when it still holds any,
+    because a delete that goes into every folder follows them."""
+    left = links_out(path)
+    if not left:
+        return "Close what holds the files git names, then delete the folder."
+    return ("It still holds a link to a folder outside it, " + links_words(left) + ": take each link away alone first, "
+            "and only then delete the folder. " + LINK_ADVICE)
+
+
+def take_links_away(item):
+    """Before a removal: takes away every link inside the worktree that points outside it, each as a link alone, and
+    checks that what each pointed to keeps every entry it had. Returns (lines that say what was done, a problem or
+    None); with a problem nothing further may be done to the worktree."""
+    said = []
+    for link in links_out(item["path"]):
+        before = entries_of(link["target"]) if link["target"] else None
+        problem = unlink_link(link)
+        if problem:
+            return said, f"the link {link['link']} could not be taken away ({problem})"
+        after = entries_of(link["target"]) if link["target"] else None
+        if before != after:
+            return said, (f"after the link {link['link']} was taken away, {link['target']} held {after} entries where it "
+                          f"held {before}")
+        said.append(f"took away the link {link['link']}, the link alone; {link['target']} keeps its "
+                    + (common.count(after, "entry", "entries") if after is not None else "files"))
+    left = links_out(item["path"])
+    if left:
+        return said, "it still holds a link to a folder outside it: " + links_words(left)
+    return said, None
+
+
 def remove_worktree(main, path):
     """Runs `git worktree remove` from the main checkout and returns (exit code, what git said, its errors included).
     It has no time limit: git deletes the folder file by file, which on Windows took more than two minutes for a
@@ -2486,6 +2629,16 @@ def do_prune(options):
                       flush=True)
                 code = 1
                 continue
+            # git worktree remove on Windows deletes what a junction inside the worktree points to, so every link that
+            # points outside goes first, as a link alone, and git runs only on a worktree that holds none.
+            said, problem = take_links_away(item)
+            for words in said:
+                print("\n".join(lines_of(f"bowline crew: {item['display']}: {words}.", "", "  ")), flush=True)
+            if problem:
+                print("\n".join(lines_of(f"bowline crew: {item['display']} is not removed: {problem}. git was not run, "
+                                         "so nothing it points to was touched. " + LINK_ADVICE, "", "  ")), flush=True)
+                code = 1
+                continue
             print(f"bowline crew: removing {item['display']}; a worktree with its own node_modules takes minutes.", flush=True)
             status, out = remove_worktree(place.trees[0]["path"], item["path"])
             if status == 0:
@@ -2495,24 +2648,37 @@ def do_prune(options):
             words = f"bowline crew: git did not remove {item['display']}: {' '.join(out.split()) or 'it gave no reason'}."
             if os.path.isdir(item["path"]) and not os.path.exists(os.path.join(item["path"], ".git")):
                 words += (" git stopped partway, so the folder is left with no .git file and part of its files. Everything "
-                          f"in it was committed and is on {model['base']}, so nothing is lost: close what holds the "
-                          "files git names, then delete the folder.")
+                          f"in it was committed and is on {model['base']}, so nothing is lost. " + left_behind_words(item["path"]))
             print("\n".join(lines_of(words + " Nothing was forced.", "", "  ")), flush=True)
             code = 1
         return code
     print("\n".join(lines_of(f"bowline crew prune: {model['repository']}, " + (f"measured against {model['base']}"
                                                                              if model["base"] else "with no pushed branch"), "", "  ")))
-    safe = [item for item in items if not prune_reasons(item, model, hours, queued)]
-    rest = [(item, prune_reasons(item, model, hours, queued)) for item in items if item not in safe]
+    ready = [item for item in items if not prune_reasons(item, model, hours, queued)]
+    rest = [(item, prune_reasons(item, model, hours, queued)) for item in items if item not in ready]
+    # Only a worktree that could go is walked for links, since a walk of one with its own node_modules takes seconds.
+    for item in ready:
+        item["links"] = links_out(item["path"])
+    safe = [item for item in ready if not item["links"]]
+    linked = [item for item in ready if item["links"]]
     if safe:
         out = lines_of(f"Safe to remove: {common.count(len(safe), 'worktree', 'worktrees')}. Each has every file "
                        f"committed and every commit on {model['base']} by content; no session (an offline one in Claude "
-                       "Desktop's sidebar counts until it is archived), process, claim, lock or place in the push queue "
-                       f"holds it, and it showed no sign of work for {hours} hours:")
+                       "Desktop's sidebar counts until it is archived), process, claim, lock, place in the push queue or "
+                       f"link to a folder outside it holds it, and it showed no sign of work for {hours} hours:")
         for item in safe:
             out += lines_of(f"{item['display']}: {prune_safe_words(item, model)}", "      ", "        ")
     else:
         out = lines_of("Safe to remove: none.")
+    if linked:
+        out += lines_of(f"Not safe while its links stand: {common.count(len(linked), 'worktree', 'worktrees')}. All "
+                        "else is as for a safe one, but each holds a link to a folder outside it, and Git for Windows' "
+                        "git worktree remove deletes what such a link points to. crew prune --remove takes each link "
+                        "away first, the link alone, checks that what it pointed to keeps every entry, and only then "
+                        "removes the worktree:")
+        for item in linked:
+            out += lines_of(f"{item['display']}: {prune_safe_words(item, model)}; links: {links_words(item['links'])}",
+                            "      ", "        ")
     if rest:
         out += lines_of(f"Not safe: {common.count(len(rest), 'worktree', 'worktrees')}.")
         for item, reasons in rest:
@@ -2521,12 +2687,13 @@ def do_prune(options):
         out += lines_of(f"Left out: {common.count(len(model['unreachable']), 'worktree', 'worktrees')} that git lists and "
                         "this system cannot enter, never offered here, since the system that made them may use them: "
                         + common.names([os.path.basename(path) for path in model["unreachable"]]) + ".")
-    if safe:
+    if safe or linked:
         out += lines_of("To remove them, with the person's yes: crew prune --remove <name> [<name>...]. Each is checked "
-                        "again first and removed with git worktree remove, which never removes a change; its branch stays.")
+                        "again first, its links to folders outside it are taken away, and it is removed with git "
+                        "worktree remove, which never removes a change; its branch stays.")
     if wants_links():
         linked = link_lines([session for item in items for session in item["sessions"]]
-                            + [session for item in safe for session in item.get("archived", [])])
+                            + [session for item in safe + linked for session in item.get("archived", [])])
         out += [""] + linked if linked else []
     print("\n".join(out))
     return 0

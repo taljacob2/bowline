@@ -274,6 +274,15 @@ again and removed with `git worktree remove`, never with `--force`, and its bran
 because a worktree with its own `node_modules` takes minutes to delete on Windows, and a command stopped at a time
 limit leaves git's deletion half done. Never remove a worktree the list calls not safe, and never one by hand.
 
+**A link inside a worktree that points outside it** is dangerous to remove through: Git for Windows'
+`git worktree remove` follows a directory junction and deletes what it points to. On 2026-11-22 that deleted the
+main checkout's packages through a worktree's `webui/node_modules` and `docs-site/node_modules` junctions. prune
+walks a worktree that could go for every junction, symbolic link and mount point, lists each that points outside with
+its target under "Not safe while its links stand", and `--remove` takes each away first, the link alone, checks that
+what it pointed to keeps every entry, and runs git only then. Never delete a folder that holds such a link with a
+command that goes into every folder, such as `Remove-Item -Recurse`; take the link away alone first, with
+`cmd /c rmdir "<the link>"` and no `/s`.
+
 ## Setting a repository up for it
 
 The first time in a repository, ask the person and write the answers into `.claude/bowline.json` under `crew`; the
