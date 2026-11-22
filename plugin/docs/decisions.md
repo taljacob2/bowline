@@ -1179,4 +1179,49 @@ of files, and a walk of each in every look would be too slow for a look drawn ev
 worktrees nothing else keeps, and `--remove` walks the one it removes, right before git runs.
 
 **Left for later:** the look itself does not name a link inside a worktree that points outside it, for the cost
-above; prune does, which is where it matters.
+above; prune does, which is where it matters. (2026-11-22, later the same day: it was not only where it matters, and
+the look and the session's start now name such a link with a cheap scan; see the next entry.)
+
+## 2026-11-22: a link inside a worktree is named before anything removes the worktree
+
+**The question.** prune's care, in the entry above, protects only a removal that goes through bowline. The same
+day, a session saw three folders named `.ccd-trash~` followed by twelve hexadecimal digits beside the worktrees of the
+first user's repository, which is how Claude Desktop names a worktree it is removing. A worktree can be removed that way, by git run
+by hand, or by a delete in a file manager, and none of them asks bowline. The person needs to know about a link before
+any of those, not only when prune runs.
+
+**The decision.** The doctor's line at every session's start names each worktree but the main checkout that holds a
+junction, a symbolic link or a mount point to a folder outside it: the link, its kind, where it points, why it
+matters, and the command that takes it away alone on this system, with the link's own path filled in. The line comes
+before the findings about the instructions and the memory, whole, why included, and is not counted among them,
+because the brief gives only the first three of those and a warning about deleted files must never be the fourth.
+The full report gives it as a warning, and the reminder after a reply names a link made during the session. The look
+names the same links under the worktree they are in, in every group, a quiet worktree and one being removed included,
+because a quiet one is the most likely to be removed next. Both draw their words from one place in `crew.py`, so
+the session's start, the report and the look say the same.
+
+**Why two levels, and how fast.** A link that stands for another checkout's packages sits at a worktree's top level
+(`node_modules`) or one level down (`webui/node_modules`, `docs-site/node_modules`). The scan lists those two levels
+and never goes into a folder below them, so a real `node_modules` at the top is listed and none of its packages. It
+was measured before it was added: 2.0 milliseconds for the seven worktrees of bowline's repository and 3.4
+milliseconds for the ten of the first user's, and 2.7 milliseconds for a scratch worktree with 3,000 packages at two
+levels, where a full walk took 230 milliseconds, and a real `node_modules` takes seconds. That is cheap enough for the
+hook at a session's start, for the hook after every reply, and for `crew watch`, which draws the look every ten
+seconds. A link deeper than that is not named by the warnings; prune still walks a worktree whole before it removes
+it, and a link to a file, or to nothing, is left out, since a delete removes it as a link.
+
+**Why the main checkout is left out.** git never removes it, and neither does Claude Desktop's clean-up, which removes
+only the worktrees it made for its sessions.
+
+**Why a warning, and not a problem.** Nothing is broken while the link stands; the loss comes with a removal. A
+problem would also make the doctor exit with code 1 in every check that runs it.
+
+**What is known of Claude Desktop's removal.** Not tested: neither "Clean up inactive sessions" nor the removal when
+a session is archived can be run on a scratch folder alone. Its code, read in Claude Desktop 5.11492.5, takes every
+link away alone before it removes a worktree and keeps the worktree when one cannot be taken away; `facts.md` has the
+detail. The warning names Claude Desktop all the same, because the code was read and not run, and git and a delete by
+hand take no such care.
+
+**Not chosen.** A refusal by bowline of a link at the moment it is made: bowline sees no command that makes one, and a
+person may make a link on purpose. Moving a worktree with a link into WAITS FOR YOU: a link waits on no answer until
+a removal comes, and the warning already stands in every group.

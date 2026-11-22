@@ -18,6 +18,11 @@ For each finding it prints three lines: what it found, why it matters, what to d
 - for a repository that names them in its .claude/bowline.json (crew): a number that appears twice in a numbered list
   such as a roadmap, and a stamp that names a commit the branch no longer holds, both of which a rebase leaves behind;
 - as a note, a repository that has several worktrees and no rule about working beside other sessions;
+- as a warning, each worktree but the main checkout that holds, in its top level or one level down, a junction, a
+  symbolic link or a mount point to a folder outside it: where it points, why it matters (Git for Windows' git
+  worktree remove deletes what a junction points to, and Claude Desktop's own clean-up of worktrees never asks
+  bowline), and the command that takes it away alone. --brief gives it first, whole, on a line of its own, apart
+  from the findings about the instructions and the memory, for up to LINKS_SHOWN worktrees;
 - whether the root CLAUDE.md has a compaction section, whether the gate and the budget check are installed, and
   whether the repository has a .claude/bowline.json;
 - a split that autosplit prepared in the background, ready on its branch, still running or failed, and why one has
@@ -344,13 +349,15 @@ def repository_findings(root, config):
             finding.level = "note"
             finding.fix = common.left_alone_fix(root)
             finding.fix_many = common.left_alone_fix(root, "<repository>")
-        return findings, facts
+        # A link inside a worktree stays a warning: taking it away writes nothing into the repository.
+        return findings + crew.link_findings(root), facts
     findings = claude_md_findings(root, config, facts)
     findings += autosplit.findings(root, config, facts)
     findings += budget_findings
     findings += root_claude_md_findings(root, facts)
     findings += layout_findings(root)
     findings += crew.findings(root, config)
+    findings += crew.link_findings(root)
     findings += crew_edit.findings(root, config)
     autosplit.adjust(findings, root)
     return findings, facts
@@ -471,6 +478,10 @@ def hook_facts(wait=0.5):
     thread.start()
     thread.join(wait)
     return box[0] if box and isinstance(box[0], dict) else {}
+
+
+# How many worktrees with a link a session's start names one by one; the report names every one.
+LINKS_SHOWN = 3
 
 
 WITHOUT_A_RULE = (
@@ -612,10 +623,19 @@ def main(argv=None):
                        {"told": [finding_key(f) for f in urgent], "pending": [], "others": names})
         except Exception:
             return 0
-        if urgent:
+        # A link inside a worktree comes first and whole, why included, on a line of its own: a removal that follows it
+        # deletes files, and it is not about the instructions or the memory, so it must never wait behind three of those.
+        links = [f for f in urgent if f.topic == "links"]
+        rest = [f for f in urgent if f.topic != "links"]
+        for finding in links[:LINKS_SHOWN]:
+            print(f"bowline: {finding.what} {finding.why} Fix: {finding.fix}")
+        if len(links) > LINKS_SHOWN:
+            print(f"bowline: {common.count(len(links) - LINKS_SHOWN, 'more worktree holds', 'more worktrees hold')} such "
+                  "a link; /bowline:doctor lists each.")
+        if rest:
             whose = "the instructions or the memory of this folder's repositories" if survey.workspace else "this repository's instructions or memory"
-            print(f"bowline found {len(urgent)} thing(s) worth a look about {whose}; run /bowline:doctor for the report. The first:")
-            for finding in urgent[:3]:
+            print(f"bowline found {len(rest)} thing(s) worth a look about {whose}; run /bowline:doctor for the report. The first:")
+            for finding in rest[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
         if line:
             print(line)

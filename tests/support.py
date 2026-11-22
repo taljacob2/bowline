@@ -139,6 +139,27 @@ def assert_starts_hidden(test, kwargs):
         test.assertTrue(kwargs.get("start_new_session"), "a session of its own")
 
 
+def make_link(link, target):
+    """A link to a folder, as a worktree's node_modules often is: a directory junction on Windows, which needs no
+    administrator, and a symbolic link elsewhere."""
+    link, target = os.path.normpath(link), os.path.normpath(target)        # mklink takes no forward slash
+    os.makedirs(os.path.dirname(link), exist_ok=True)
+    if os.name == "nt":
+        subprocess.run(["cmd", "/c", "mklink", "/J", link, target], check=True, capture_output=True)
+    else:
+        os.symlink(target, link, target_is_directory=True)
+
+
+def contents(folder):
+    """Every file under a folder, by its path from the folder, with what it holds."""
+    found = {}
+    for top, _, files in os.walk(folder):
+        for name in files:
+            with open(os.path.join(top, name), encoding="utf-8") as handle:
+                found[os.path.relpath(os.path.join(top, name), folder)] = handle.read()
+    return found
+
+
 def assert_lines_fit(test, text, width=100):
     """Checks that every line of a printout fits in width columns. The one line allowed to be longer holds a single
     word, such as a long path, which the crew keeps whole so that a person who copies it gets the path itself."""

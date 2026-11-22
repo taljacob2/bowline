@@ -67,7 +67,12 @@ such sessions whose worktree is already gone, for the person to archive. Git for
 follows a directory junction inside the worktree and deletes what it points to, so prune walks a worktree that could
 go, without following any link, for every junction, symbolic link and mount point that points outside it, never calls
 it safe while one stands, and --remove takes each away first, the link alone, checks that what it pointed to keeps
-every entry, and runs git only on a worktree that holds none.
+every entry, and runs git only on a worktree that holds none. A worktree can also be removed by something that never
+asks bowline, such as Claude Desktop's own clean-up of worktrees, so the look names under each worktree but the main
+checkout every link to a folder outside it, with the command that takes it away alone, and the doctor's line at a
+session's start says the same. Both look only at a worktree's top level and one level down, where such a link stands
+(node_modules, webui/node_modules): a scan that took 3 milliseconds for ten worktrees, where a walk of a real
+node_modules takes seconds.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
@@ -2486,13 +2491,21 @@ def link_target(path):
     return os.path.normpath(target if os.path.isabs(target) else os.path.join(os.path.dirname(path), target))
 
 
-def links_out(tree_path):
+# How deep the warnings look for a link: the worktree's top level and one level down, where a link to another
+# checkout's packages stands (node_modules, webui/node_modules). A walk of a real node_modules takes seconds, too slow
+# for every session's start and for `crew watch`, which draws the look every ten seconds; prune walks the whole tree.
+LINK_DEPTH = 2
+
+
+def links_out(tree_path, depth=None):
     """Every link inside a worktree that points outside it, as [{"link": its path from the worktree's top, "path",
     "target"}], the worktree walked without following any link, and its .git skipped. A link that points inside the
-    worktree is left out: what it points to goes with the worktree in any case."""
-    found, todo, top = [], [tree_path], same(tree_path)
+    worktree is left out: what it points to goes with the worktree in any case. depth limits the walk to that many
+    levels of folders, 1 for the top level alone and LINK_DEPTH for the top level and one level down; None walks the
+    whole worktree."""
+    found, todo, top = [], [(tree_path, 1)], same(tree_path)
     while todo:
-        folder = todo.pop()
+        folder, level = todo.pop()
         try:
             entries = list(os.scandir(folder))
         except OSError:
@@ -2511,8 +2524,8 @@ def links_out(tree_path):
                     found.append({"link": os.path.relpath(entry.path, tree_path).replace("\\", "/"), "path": entry.path,
                                   "target": target})
                 continue
-            if not reparse and entry.is_dir(follow_symlinks=False):
-                todo.append(entry.path)
+            if not reparse and entry.is_dir(follow_symlinks=False) and (depth is None or level < depth):
+                todo.append((entry.path, level + 1))
     return sorted(found, key=lambda link: link["link"])
 
 
@@ -2546,10 +2559,108 @@ def links_words(links):
     return ", ".join(f"{link['link']} -> {link['target'] or 'a target that cannot be read'}" for link in links)
 
 
+LINK_NEVER = ("Never delete a folder that holds a link with a command that goes into every folder, such as "
+              "Remove-Item -Recurse in Windows PowerShell, which follows a junction.")
 LINK_ADVICE = ("To take a link away by hand, remove the link alone: on Windows with cmd /c rmdir \"<the link>\", with "
-               "no /s, and elsewhere with rm \"<the link>\", with no -r. Never delete a folder that holds a link with a "
-               "command that goes into every folder, such as Remove-Item -Recurse in Windows PowerShell, which follows "
-               "a junction.")
+               "no /s, and elsewhere with rm \"<the link>\", with no -r. " + LINK_NEVER)
+
+
+# The warnings before a removal. prune guards only a removal that goes through bowline; a worktree can also be removed
+# by Claude Desktop's own clean-up of worktrees, by git run by hand, or by a delete in a file manager. So the doctor's
+# line at every session's start and every look name a link to a folder outside a worktree, found with a scan cheap
+# enough for both (LINK_DEPTH), with the command that takes it away alone. The words are made here, once, for both.
+
+def link_kind(path):
+    """What kind of link a path is, in words: a symbolic link, or on Windows a directory junction or a mount point,
+    which share one reparse tag and differ in what they point to: a mount point points to a volume."""
+    if os.path.islink(path):
+        return "a symbolic link"
+    try:
+        raw = os.readlink(path)
+    except (OSError, ValueError, NotImplementedError):
+        raw = ""
+    return "a mount point" if "Volume{" in raw[:16] else "a directory junction"
+
+
+def folder_links(tree_path):
+    """The links a removal of a worktree could delete through, found by a scan of its top level and one level down
+    (LINK_DEPTH): each link there that points to a folder outside the worktree, with its kind. A link to a file, or
+    to nothing, is left out, because a delete removes it as a link."""
+    return [dict(link, kind=link_kind(link["path"])) for link in links_out(tree_path, depth=LINK_DEPTH)
+            if link["target"] and os.path.isdir(link["path"])]
+
+
+def linked_worktrees(root):
+    """Every worktree of the repository that holds such a link, as [(worktree, links)]. The main checkout is left out:
+    git never removes it, and neither does Claude Desktop's clean-up."""
+    found = []
+    for tree in worktrees(root)[1:]:
+        links = folder_links(tree["path"])
+        if links:
+            found.append((tree, links))
+    return found
+
+
+def remove_link_command(path):
+    """The command that takes one link away on this system, the link alone: rmdir with no /s on Windows, which removes a
+    junction or a link to a folder without going into it, and rm with no -r elsewhere."""
+    return f'cmd /c rmdir "{path}"' if WINDOWS else f'rm "{path}"'
+
+
+def links_held_words(links):
+    """What a worktree holds, in words: "holds a link to a folder outside it: webui/node_modules, a directory junction
+    to <its target>"."""
+    one = len(links) == 1
+    return (("holds a link to a folder outside it: " if one else f"holds {len(links)} links to folders outside it: ")
+            + "; ".join(f"{link['link']}, {link['kind']} to {link['target']}" for link in links))
+
+
+def take_away_words(links):
+    """How to take the links away, in words, with this system's command for each."""
+    return ((("take the link away alone: " if len(links) == 1 else "take each link away alone: ")
+             + " and ".join(remove_link_command(link["path"]) for link in links))
+            + (", with no /s" if WINDOWS else ", with no -r"))
+
+
+def link_why(links):
+    """Why a link inside a worktree matters, for the kinds of link it names."""
+    if any(link["kind"] != "a symbolic link" for link in links):
+        first = ("Git for Windows' git worktree remove follows a directory junction and deletes the files it points to; "
+                 "on 2026-11-22 that deleted the packages of a main checkout through a worktree's junction.")
+    else:
+        first = "git removes a symbolic link as a link, but not every way of removing a folder does."
+    return (first + " A worktree can also be removed by something that never asks bowline, such as Claude Desktop's own "
+            "clean-up of worktrees or a delete by hand, so bowline cannot take the link away for you first.")
+
+
+def link_fix(links):
+    """What the person does about a link inside a worktree: take it away alone before anything removes the worktree."""
+    return ("Before anything removes the worktree, " + take_away_words(links) + ". That removes the link and never "
+            "what it points to. " + LINK_NEVER + " If the worktree needs what the link gave it, give it its own copy, "
+            "such as its own packages from npm ci, never a link to another checkout's folder. crew prune --remove also "
+            "takes such a link away before it removes a worktree (/bowline:crew).")
+
+
+def link_findings(root):
+    """The doctor's warning for each worktree that holds a link to a folder outside it. Its topic sets it apart, so
+    that the line at a session's start gives it whole, before the findings about instructions and memory."""
+    out = []
+    for tree, links in linked_worktrees(root):
+        finding = common.Finding("warning", f"The worktree {tree['name']} {links_held_words(links)}.", link_why(links),
+                                 link_fix(links))
+        finding.topic = "links"
+        out.append(finding)
+    return out
+
+
+def link_warning(item, who="this worktree"):
+    """The look's warning about a worktree's links, as a sentence, or None when it holds none."""
+    links = item.get("links") or []
+    if not links:
+        return None
+    return (f"warning: {who} {links_held_words(links)}. A removal of the worktree can delete what "
+            + ("it points" if len(links) == 1 else "they point") + " to; before any removal, " + take_away_words(links)
+            + ".")
 
 
 def left_behind_words(path):
@@ -2849,7 +2960,9 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                            for c in claims if same(c.get("worktree") or "") == key],
                 "said": {"words": spoke.get("words"), "at": said_at(spoke)} if spoke else None,
                 "turn": any(same(held.get("worktree") or "") == key for held in holders),
-                "archived": archived.get(key, [])}
+                "archived": archived.get(key, []),
+                # The cheap scan of two levels, for every look; prune walks a worktree that could go whole.
+                "links": [] if tree["main"] else folder_links(tree["path"])}
         item["group"], item["reason"] = standing(item, minutes, now)
         items.append(item)
     order = {"asks": 0, "blocked": 1}
@@ -3032,6 +3145,8 @@ def block(item, model, verbose=False):
     now, base = model["at"], model["base"]
     out = lines_of(f"{head_of(item, model)}: {reason_words(item, model)}")
     out += lines_of("holds: " + holds(item, base, now=now), "      ", "        ")
+    if link_warning(item):
+        out += lines_of(link_warning(item), "      ", "        ")
     for session in item["sessions"]:
         held = f", {size(session['memory'])} of memory" if session.get("memory") else ""
         out += lines_of(f"session {session_name(session)}: {session_state(session, now)}{held}", "      ", "        ")
@@ -3092,7 +3207,8 @@ def idle_line(item, model):
     if item.get("untrackedOld"):
         extra.append(f"and {changed_words(item, model['at'])}, none written in "
                      f"{common.count(model['oldUntrackedHours'], 'hour', 'hours')}")
-    return lines_of(f"{head_of(item, model)}: {names}" + (", " + ", ".join(extra) if extra else ""), "  ", "      ")
+    out = lines_of(f"{head_of(item, model)}: {names}" + (", " + ", ".join(extra) if extra else ""), "  ", "      ")
+    return out + (lines_of(link_warning(item), "      ", "        ") if link_warning(item) else [])
 
 
 def quiet_line(quiet, model):
@@ -3229,11 +3345,19 @@ def render(model, verbose=False, links=False):
         for item in group["quiet"]:
             out += block(item, model, verbose) + [""]
     elif group["quiet"]:
-        out += quiet_line(group["quiet"], model) + [""]
+        out += quiet_line(group["quiet"], model)
+        # A quiet worktree is the one most likely to be removed next, so its links are named though it is folded.
+        for item in group["quiet"]:
+            if link_warning(item):
+                out += lines_of(link_warning(item, f"the quiet worktree {item['display']}"), "  ", "      ")
+        out.append("")
     for item in group["broken"]:
         out += lines_of(f"BROKEN OR BEING REMOVED: {head_of(item, model)}. Its folder has no .git file of its own, so git "
                         "asked there answers for the main checkout; it is left out of the counts and of the files "
-                        "changed in more than one worktree.", "", "  ") + [""]
+                        "changed in more than one worktree.", "", "  ")
+        if link_warning(item):
+            out += lines_of(link_warning(item, "it"), "  ", "      ")
+        out.append("")
     out.append("ACROSS THE WORKTREES")
     if model["overlaps"]:
         out.append("  Changed differently in more than one worktree, so a rebase will meet both changes:")

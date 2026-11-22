@@ -4,6 +4,30 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- **A link inside a worktree is named at every session's start, before anything removes the worktree.** 0.16.0 made
+  `crew prune --remove` take such a link away first, but that protects only a removal that goes through bowline. A
+  worktree can also be removed by Claude Desktop's own clean-up of worktrees, by git run by hand, or by a delete in a
+  file manager, none of which asks bowline. The doctor's line at a session's start now names each worktree that holds
+  a junction, a symbolic link or a mount point to a folder outside it: the link, where it points, why it matters
+  (Git for Windows' `git worktree remove` deletes what a junction points to) and the command that takes it away alone,
+  `cmd /c rmdir "<the link>"` with no `/s` on Windows or `rm "<the link>"` with no `-r` elsewhere. That line comes
+  first and whole, apart from the findings about the instructions and the memory, so it never waits behind three of
+  those. The full report gives the same warning, and the reminder after a reply names a link made during the session.
+- **The look names the same links**, under the worktree they are in, a quiet worktree and one being removed too, with
+  the same command; `crew --json` gives them as each worktree's `links`. 0.16.0 left this out because a walk of every
+  worktree on every look was too slow for `crew watch`, which draws the look every ten seconds. The warnings look only
+  at a worktree's top level and one level down, where such a link stands (`node_modules`, `webui/node_modules`): on the
+  first user's machine that took 3.4 milliseconds for ten worktrees, against 230 milliseconds for a full walk of one
+  scratch worktree with 3,000 packages. prune still walks a worktree whole before it removes it.
+- The crew skill, the rule template `beside-other-sessions.md` and the conventions page now say: never link a
+  worktree's `node_modules`, or any other folder, to another checkout's; give the worktree packages of its own, for
+  example with `npm ci`.
+- `plugin/docs/facts.md` records what is known of Claude Desktop's own removal of a worktree and a link: not tested,
+  because neither of its removals can be run on a scratch folder alone; its code, read in version 5.11492.5, takes
+  every link away alone before it removes a worktree. No Claude Code limit moved.
+
 ## 0.16.1 (2026-11-22)
 
 The release of the seven fixes listed under 0.16.0, with one more. 0.16.0 reached the default branch, but its tests

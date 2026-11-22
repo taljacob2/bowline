@@ -430,6 +430,7 @@ class Finding:
         self.bare = what        # what it found, without the repository's name in front
         self.fix_many = None    # the fix with <repository> for the name, when the fix names the repository
         self.names = None       # for a grouped finding: the repositories it is found in, as a reader takes them in
+        self.topic = None       # "links" for a link inside a worktree, which a session's start gives on its own line
 
     def lines(self):
         head = {"problem": "PROBLEM", "warning": "WARNING", "note": "NOTE"}[self.level]

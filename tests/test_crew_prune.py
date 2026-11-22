@@ -11,7 +11,7 @@ import sys
 import unittest
 from unittest import mock
 
-from support import SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, git, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, contents, git, make_link, write
 
 import crew  # noqa: E402 - support puts the scripts on the path
 
@@ -130,27 +130,6 @@ class PruneTests(CrewCase):
         self.assertNotEqual(code, 0)
         self.assertIn("locked", said)                                            # git's own words, from its errors
         self.assertTrue(os.path.isdir(self.trees["done"]))
-
-
-def make_link(link, target):
-    """A link to a folder, as a worktree's node_modules often is: a directory junction on Windows, which needs no
-    administrator, and a symbolic link elsewhere."""
-    link, target = os.path.normpath(link), os.path.normpath(target)        # mklink takes no forward slash
-    os.makedirs(os.path.dirname(link), exist_ok=True)
-    if os.name == "nt":
-        subprocess.run(["cmd", "/c", "mklink", "/J", link, target], check=True, capture_output=True)
-    else:
-        os.symlink(target, link, target_is_directory=True)
-
-
-def contents(folder):
-    """Every file under a folder, by its path from the folder, with what it holds."""
-    found = {}
-    for top, _, files in os.walk(folder):
-        for name in files:
-            with open(os.path.join(top, name), encoding="utf-8") as handle:
-                found[os.path.relpath(os.path.join(top, name), folder)] = handle.read()
-    return found
 
 
 class LinkTests(CrewCase):

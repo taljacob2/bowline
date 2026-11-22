@@ -12,6 +12,11 @@ the skill gives its full command.
   unpushed files, processes, ports and claims; `ListAgents` names the sessions you can message. Read another worktree
   freely; never write in it. Never stop a process or a server you did not start, nor one on a port
   `.claude/bowline.json` names as the person's own.
+- **Give each worktree files of its own.** Never link a worktree's `node_modules`, or any other folder, to another
+  checkout's; install the worktree's own packages, for example with `npm ci` in the worktree. Git for Windows'
+  `git worktree remove` follows a directory junction and deletes what it points to, and a worktree can be removed by
+  something that never asks bowline, such as Claude Desktop's own clean-up. bowline names such a link at every
+  session's start and in the look, with the command that takes it away alone.
 - **Split the work by files.** Two sessions never edit one file at once. When your round needs a file another
   session has changed, message it before you edit, agree who changes what, and name the agreement in your commit
   message. If you cannot reach it, wait for its push and rebase onto it. bowline warns before an edit of a file

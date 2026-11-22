@@ -63,6 +63,13 @@ conflict. A note saved whole from an older copy erases what another session adde
 has no branches and the last writer wins. Two test suites at once crash or time out, and the failure looks real. A
 build's stamp names a commit the rebase renamed.
 
+One more habit belongs to the first half: each worktree has files of its own. Never link a worktree's
+`node_modules`, or any other folder, to another checkout's; give the worktree packages of its own, for example with
+`npm ci` in the worktree. The loss is the other checkout's files: Git for Windows' `git worktree remove` follows a
+directory junction inside the worktree and deletes what it points to, and on 2026-11-22 that deleted the packages of
+a main checkout. A worktree can be removed by something that never asks bowline, such as Claude Desktop's own
+clean-up of worktrees, so bowline names such a link at every session's start and in every look.
+
 The second half moves work into a session of its own wherever the work allows it. A task of its own, such as a scope
 cut or a problem found in passing, gets its numbered slot and a session of its own instead of widening the round; the
 loss is a round that never closes and a commit that holds three subjects. Pieces of a plan that touch different files
@@ -79,8 +86,8 @@ whenever they look. The loss it answers is two sessions that build the same thin
 report that reaches its reader late, cut short, or after the answer to it was already sent.
 
 Unlike the conventions above, part of this one is checked: `bowline crew`
-keeps the claims and the turn, and the doctor warns about a number that appears twice, a stale stamp, and memory
-lines one session added and another removed. What stays the repository's own is in its `.claude/bowline.json`: which
+keeps the claims and the turn, and the doctor warns about a number that appears twice, a stale stamp, memory lines
+one session added and another removed, and a link inside a worktree to a folder outside it. What stays the repository's own is in its `.claude/bowline.json`: which
 processes are heavy, which ports are the person's, which lists are numbered, which files are stamps.
 
 ## Writing for a person

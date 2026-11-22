@@ -65,6 +65,13 @@ gives the same as data.
   one in Task Manager's Details tab, by its process id, if they do not recognize it.
 - **A worktree that is broken or being removed** has lost the `.git` file in its folder, so git there answers for the
   main checkout. It is named and left out of the counts and of the files changed twice; never work in it.
+- **A link to a folder outside a worktree** is named under the worktree it is in, a quiet one too, as "warning: this
+  worktree holds a link to a folder outside it", with where it points and the command that takes it away alone. The
+  doctor's line at every session's start says the same. Tell the person at once, before anything removes that
+  worktree, and offer to run the command it gives; never delete the worktree's folder while the link stands. The
+  look and the line look at a worktree's top level and one level down, where such links stand (`node_modules`,
+  `webui/node_modules`), because a walk of a real `node_modules` takes seconds; prune walks a worktree whole before
+  it removes it.
 
 - **A sign of work** is the newest of a session's transcript, the worktree's own git folder being written, and a
   claim. A session that was started in another folder and works here by path leaves no transcript here, so the last
@@ -281,7 +288,12 @@ walks a worktree that could go for every junction, symbolic link and mount point
 its target under "Not safe while its links stand", and `--remove` takes each away first, the link alone, checks that
 what it pointed to keeps every entry, and runs git only then. Never delete a folder that holds such a link with a
 command that goes into every folder, such as `Remove-Item -Recurse`; take the link away alone first, with
-`cmd /c rmdir "<the link>"` and no `/s`.
+`cmd /c rmdir "<the link>"` and no `/s` on Windows, or `rm "<the link>"` and no `-r` elsewhere.
+
+prune guards only a removal that goes through bowline. A worktree can also be removed by Claude Desktop's own
+clean-up of worktrees, by git run by hand, or by a delete in a file manager, none of which asks bowline. That is why
+the doctor's line at every session's start and every look name such a link as soon as it stands, so that the person
+takes it away before any removal.
 
 ## Setting a repository up for it
 
@@ -315,6 +327,9 @@ every repository: several sessions in one repository is taken as the usual case,
 
 - Do not stop, restart or "clean up" a process, a server or a worktree that another session or the person started;
   a worktree goes only through `crew prune --remove`, on the person's yes.
+- Never link a worktree's `node_modules`, or any other folder, to another checkout's, not even to save the time of an
+  install. Give the worktree packages of its own, for example with `npm ci` in the worktree. A link is what a removal
+  follows: Git for Windows' `git worktree remove` deletes what a directory junction points to.
 - Do not take a number by reading the list, and do not reuse a number that was given back.
 - Do not treat silence as agreement: a message is delivered when the other session next looks, and a session in
   another permission mode may hold it for its person.
