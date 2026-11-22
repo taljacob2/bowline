@@ -4,7 +4,10 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.16.2 (2026-11-22)
+
+A warning about a link inside a worktree, given before anything removes the worktree, where 0.16.1 gave it only when
+`crew prune` ran. No Claude Code limit moved, and no command, hook or setting is new.
 
 - **A link inside a worktree is named at every session's start, before anything removes the worktree.** 0.16.0 made
   `crew prune --remove` take such a link away first, but that protects only a removal that goes through bowline. A
@@ -26,7 +29,7 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
   example with `npm ci`.
 - `plugin/docs/facts.md` records what is known of Claude Desktop's own removal of a worktree and a link: not tested,
   because neither of its removals can be run on a scratch folder alone; its code, read in version 5.11492.5, takes
-  every link away alone before it removes a worktree. No Claude Code limit moved.
+  every link away alone before it removes a worktree.
 
 ## 0.16.1 (2026-11-22)
 
