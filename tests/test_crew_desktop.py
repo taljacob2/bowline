@@ -53,10 +53,12 @@ class DesktopTests(ScratchRepo):
     def agents(self, *rows):
         write(self.agents_file, json.dumps(list(rows)) + "\n")
 
-    def record(self, local_id, cli, title, folder, archived=False, account="account-1"):
-        """A session's record as Claude Desktop writes it, with some of the fields the crew never reads."""
+    def record(self, local_id, cli, title, folder, archived=False, account="account-1", worktree=True):
+        """A session's record as Claude Desktop writes it, with some of the fields the crew never reads. worktree
+        False is a session the app started in a folder of its own choosing, with no worktree made for it."""
         write(os.path.join(self.desktop, account, "organization-1", local_id + ".json"), json.dumps({
-            "sessionId": local_id, "cliSessionId": cli, "cwd": folder, "worktreePath": folder, "title": title,
+            "sessionId": local_id, "cliSessionId": cli, "cwd": folder, "worktreePath": folder if worktree else None,
+            "title": title,
             "isArchived": archived, "lastActivityAt": 1795313419720, "model": "a model",
             "enabledMcpTools": {"local:a-server:a-tool": True}, "remoteMcpServersConfig": [{"url": "https://example.invalid"}],
         }) + "\n")
@@ -120,6 +122,9 @@ class DesktopTests(ScratchRepo):
         title = "#128: refuse a vault left as the template's placeholder"
         self.record(PARKED, "cli-parked", title, self.other)
         self.record(GONE, "cli-gone", "#129: the status-tick tests", os.path.join(self.repo, ".claude", "worktrees", "removed"))
+        # A deleted folder of the main checkout, where a session was started with no worktree, is not a worktree gone.
+        self.record("local_55555555-6666-7777-8888-999999999999", "cli-scratch", "a scratch folder",
+                    os.path.join(self.repo, "scratch"), worktree=False)
         code, out, err = self.crew(env={"CLAUDECODE": "1"})
         self.assertEqual(code, 0, out + err)
         text = flat(out)
@@ -129,6 +134,7 @@ class DesktopTests(ScratchRepo):
         self.assertIn("In Claude Desktop's sidebar, not archived, 1 session whose worktree is gone or being removed: "
                       "\"#129: the status-tick tests\" (.claude/worktrees/removed). Reopened, it finds its folder "
                       "missing; archive it in the sidebar.", text)
+        self.assertNotIn("a scratch folder", text)
         links = text[text.index("SESSION LINKS"):]
         self.assertIn(f'#{PARKED} "{title}"', links)
         self.assertIn(f'#{GONE} "#129: the status-tick tests"', links)

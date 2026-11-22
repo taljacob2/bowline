@@ -585,14 +585,18 @@ def archived_by_tree(trees, desktop):
 def gone_sessions(trees, desktop):
     """The sessions in the app's sidebar, not archived, whose folder was a worktree of this repository that is gone or
     is being removed: reopened, each would find its folder missing. As [{"name", "desktop", "folder"}], the folder
-    named from the main checkout."""
+    named from the main checkout. A folder counts as a worktree when the app made it one for the session, or when it
+    lay beside the repository's other worktrees; a deleted folder of the main checkout is not one."""
     main = trees[0]["path"]
+    beside = {same(os.path.dirname(tree["path"])) for tree in trees if not tree["main"]}
     found = []
     for record in desktop:
         folder = record["worktree"] or record["cwd"]
         if record["archived"] or not folder:
             continue
         if os.path.isdir(folder) and not (tree_of(folder, trees) or {}).get("broken"):
+            continue
+        if not record["worktree"] and same(os.path.dirname(folder)) not in beside:
             continue
         if same(folder).startswith(same(main) + "/"):
             found.append({"name": record["title"], "desktop": record["desktop"],
