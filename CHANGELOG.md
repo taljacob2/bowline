@@ -4,6 +4,13 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- The crew no longer breaks a long path in the middle when it wraps a line. Its lines wrap at 100 columns, and a word
+  longer than a line was cut with a space, so a path such as a link's target came out as two pieces, and a person who
+  copied it got a path that does not exist. A word longer than a line now stays whole, on a line of its own. The tests
+  on GitHub's Windows and macOS machines, whose temporary folders have long paths, found it in 0.16.0.
+
 ## 0.16.0 (2026-11-22)
 
 Seven fixes from a crew report in the first user's repository on 2026-11-22, where the look and `crew prune` misled

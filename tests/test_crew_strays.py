@@ -11,7 +11,7 @@ import sys
 import time
 from unittest import mock
 
-from support import ScratchRepo, git, write
+from support import ScratchRepo, assert_lines_fit, git, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -83,8 +83,7 @@ class StrayTests(ScratchRepo):
                                                                                    "elevated": None}) for pid in pids}):
             model = crew.look(crew.Place(self.repo))
         out = "\n".join(crew.render(model))
-        for line in out.splitlines():
-            self.assertLessEqual(len(line), 100, line)
+        assert_lines_fit(self, out)
         return model, out
 
     def test_a_claude_process_no_listed_session_owns_is_named_and_counted(self):

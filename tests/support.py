@@ -139,6 +139,14 @@ def assert_starts_hidden(test, kwargs):
         test.assertTrue(kwargs.get("start_new_session"), "a session of its own")
 
 
+def assert_lines_fit(test, text, width=100):
+    """Checks that every line of a printout fits in width columns. The one line allowed to be longer holds a single
+    word, such as a long path, which the crew keeps whole so that a person who copies it gets the path itself."""
+    for line in text.splitlines():
+        if len(line) > width:
+            test.assertEqual(len(line.split()), 1, "a line over %d columns holds more than one word: %s" % (width, line))
+
+
 class ScratchRepo(unittest.TestCase):
     """A test case with a fresh git repository (one committed file) and a fresh CLAUDE_CONFIG_DIR."""
 

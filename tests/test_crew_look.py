@@ -11,7 +11,7 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, age_git_folder, git, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, git, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -81,8 +81,8 @@ class LookTests(ScratchRepo):
         self.assertIn("6 worktrees and 4 sessions: 2 wait for you, 1 at work, 1 idle, 2 quiet.", out)
         self.assertIn("holds: 1 untracked file, written less than a minute ago", out)
         self.assertIn('session "the holding session": idle', out)
+        assert_lines_fit(self, out)
         for line in out.splitlines():
-            self.assertLessEqual(len(line), 100, line)
             self.assertTrue(all(32 <= ord(ch) < 127 for ch in line), line)
         code, out, _ = self.crew("say", "--asks", cwd=self.trees["asking"], env={"CLAUDE_CODE_SESSION_ID": "sess-asking"})
         self.assertIn("Shall I push the parser?", out)

@@ -398,6 +398,21 @@ class CrewTests(ScratchRepo):
         self.assertEqual(self.brief(start), (0, "", ""))
 
 
+class WrapTests(unittest.TestCase):
+    """The crew wraps its lines at 100 columns. A path longer than a line, as the temporary folders of GitHub's
+    Windows and macOS machines make one, broke in the middle with a space in 0.16.0, so the person who copied it got a
+    path that does not exist."""
+
+    def test_a_word_longer_than_a_line_stays_whole(self):
+        path = "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\bowline-test-mspp_xek\\the-main-checkouts-docs-site-packages" \
+            "\\and-a-folder-name-long-enough-to-pass-the-width"
+        self.assertGreater(len(path), crew.WIDTH)
+        lines = crew.lines_of("linked: quiet for 8 hours; links: docs-site/node_modules -> " + path + ", and more")
+        self.assertIn(path, [line.strip().rstrip(",") for line in lines])
+        self.assertEqual(" ".join(" ".join(lines).split()),
+                         "linked: quiet for 8 hours; links: docs-site/node_modules -> " + path + ", and more")
+
+
 class MemoryLossTests(ScratchRepo):
     """Two sessions and one memory folder: the second saves a note over from the copy it read before the first added
     to it. The backup's commits name each session, so the doctor can say that lines were lost and where they are."""

@@ -11,7 +11,7 @@ import sys
 import unittest
 from unittest import mock
 
-from support import SCRIPTS, ScratchRepo, age_git_folder, git, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, git, write
 
 import crew  # noqa: E402 - support puts the scripts on the path
 
@@ -96,8 +96,7 @@ class PruneTests(CrewCase):
             self.assertIn(words, rest)
         self.assertNotIn("the main checkout:", text)
         self.assertIn("crew prune --remove", text)
-        for line in out.splitlines():
-            self.assertLessEqual(len(line), 100, line)
+        assert_lines_fit(self, out)
 
     def test_prune_removes_only_what_it_is_told_and_only_what_is_still_safe(self):
         code, out, err = self.crew("prune", "--remove", "dirty")

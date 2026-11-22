@@ -10,7 +10,7 @@ import sys
 import time
 from unittest import mock
 
-from support import ScratchRepo, git, write
+from support import ScratchRepo, assert_lines_fit, git, write
 
 import crew  # noqa: E402 - support puts the scripts on the path
 
@@ -53,8 +53,7 @@ class CommandTests(ScratchRepo):
                 mock.patch.object(crew, "listening", return_value={}):
             model = crew.look(crew.Place(self.repo))
         out = "\n".join(crew.render(model))
-        for line in out.splitlines():
-            self.assertLessEqual(len(line), 100, line)
+        assert_lines_fit(self, out)
         tree = next(item for item in model["worktrees"] if item["display"] == "other")
         return tree, " ".join(out.split())
 

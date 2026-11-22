@@ -2932,9 +2932,12 @@ def look(place, verbose=False, record=None, write=True):
 
 
 def lines_of(text, first="  ", rest=None):
-    """A sentence as lines of at most WIDTH columns; the lines after the first are indented by rest."""
+    """A sentence as lines of at most WIDTH columns; the lines after the first are indented by rest. A word longer
+    than a line, such as a long path, stays whole on a line of its own, longer than WIDTH, so that a person who copies
+    it gets the path itself."""
     rest = first + "    " if rest is None else rest
-    return textwrap.wrap(text, WIDTH, initial_indent=first, subsequent_indent=rest, break_on_hyphens=False) or [first.rstrip()]
+    return textwrap.wrap(text, WIDTH, initial_indent=first, subsequent_indent=rest, break_long_words=False,
+                         break_on_hyphens=False) or [first.rstrip()]
 
 
 def clock(stamp, now):

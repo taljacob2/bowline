@@ -9,7 +9,7 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, age_git_folder, git, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, git, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -87,8 +87,7 @@ class DesktopTests(ScratchRepo):
         self.assertIn(f'#{PARSER} "The parser keeps every comment and every blank line it reads"', links)
         self.assertNotIn("a session in a terminal", links)                       # the app has no record of it
         self.assertNotIn("enabledMcpTools", out)
-        for line in out.splitlines():
-            self.assertLessEqual(len(line), 100, line)
+        assert_lines_fit(self, out)
         # A person's own terminal, and crew watch, go without the links; --json always has them.
         self.assertNotIn("SESSION LINKS", self.crew()[1])
         model = json.loads(self.crew("--json")[1])
