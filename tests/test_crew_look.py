@@ -38,8 +38,12 @@ class LookTests(ScratchRepo):
         self.age(self.trees["quiet"], 120)
         write(os.path.join(self.trees["holding"], "src", "half.py"), "half = 1\n")
         now = int(time.time() * 1000)
+        # Process ids no system hands out (Linux stops at 4,194,304, macOS at 99,999), so that no real process of the
+        # machine stands in for a session. With 1000 to 1003, GitHub's macOS machine once had real processes of those
+        # ids, the look measured their memory, and a line came out as 'done: "the done session" (20 MB), ...'.
         self.agents(*[{"sessionId": "sess-" + name, "cwd": os.path.realpath(self.trees[name]), "kind": "interactive",
-                       "name": "the " + name + " session", "pid": 1000 + i, "status": "busy" if name == "busy" else "idle",
+                       "name": "the " + name + " session", "pid": 2000000000 + i,
+                       "status": "busy" if name == "busy" else "idle",
                        "startedAt": now} for i, name in enumerate(("asking", "busy", "holding", "done"))])
 
     def configure(self, settings):
