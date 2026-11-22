@@ -4,7 +4,11 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.16.1 (2026-11-22)
+
+The release of the seven fixes listed under 0.16.0, with one more. 0.16.0 reached the default branch, but its tests
+failed on GitHub's Windows and macOS machines, so it was never tagged; this version carries all of it. No Claude Code
+limit moved.
 
 - The crew no longer breaks a long path in the middle when it wraps a line. Its lines wrap at 100 columns, and a word
   longer than a line was cut with a space, so a path such as a link's target came out as two pieces, and a person who
