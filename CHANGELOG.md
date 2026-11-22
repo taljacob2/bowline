@@ -17,6 +17,13 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
   from October put a main checkout first in the look, as "idle, with work not committed". `crew prune` still calls
   such a worktree not safe, because `git worktree remove` refuses untracked files, and says so. `crew --json` gains
   each worktree's `untracked`, `untrackedAt` and `untrackedOld`.
+- The crew reads Claude Desktop's own record of each of its Code sessions (the new setting `crew.desktop`; `false`
+  turns it off), of which it reads only the ids, the title, whether it is archived, its folders and its last
+  activity; `PRIVACY.md` says so. A session the app records is named by its full title, where `claude agents` cuts it
+  at 50 characters, and comes with the app's id, `local_<uuid>`, by which a reply in the app links it. Run inside a
+  Claude Code session, the look ends with SESSION LINKS, each listed session's id and title; `crew --json` gives the
+  id as each session's `desktop`. The crew skill tells the session that reads the look to link every session it
+  names as `[its title](#<its id>)`.
 
 ## 0.15.1 (2026-11-22)
 

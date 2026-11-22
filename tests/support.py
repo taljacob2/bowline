@@ -140,6 +140,12 @@ class ScratchRepo(unittest.TestCase):
         os.environ.pop("HOME", None)
         os.environ["HOME"] = self.root
         os.environ["USERPROFILE"] = self.root
+        # Claude Desktop's records of its sessions are found under these on Windows and Linux (under HOME on macOS),
+        # so a test never reads the sessions of the machine it runs on.
+        os.environ["APPDATA"] = os.path.join(self.root, "AppData", "Roaming")
+        os.environ["XDG_CONFIG_HOME"] = os.path.join(self.root, ".config")
+        # A test run from inside a Claude Code session inherits its CLAUDECODE; each test starts without it, as in CI.
+        os.environ.pop("CLAUDECODE", None)
 
     def restore_environment(self):
         os.environ.clear()

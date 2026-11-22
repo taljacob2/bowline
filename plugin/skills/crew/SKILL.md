@@ -65,6 +65,13 @@ gives the same as data.
 
 Before you pass the look on to the person, read it as a measurement, not as the answer:
 
+- **Link every session you name.** In Claude Desktop, a reply links a session as `[its title](#<its id>)`, where the
+  id is the app's own and starts with `local_`. Run inside a session, the look ends with SESSION LINKS: each listed
+  session's id and title, read from the app's record of its sessions. `crew --json` gives the same id as each
+  session's `desktop`. The short refs that `ListAgents` gives are not links. For a session the look does not list,
+  such as one in another repository, `mcp__ccd_session_mgmt__list_sessions` gives its id, with
+  `include_archived: true` for an archived one.
+
 - **Check a session itself before you say "idle, with work ..."**: read its transcript, or ask it with `SendMessage`,
   for a background command or a push still on its way. The look sees only the processes on this machine, and a
   command whose process has lost its parent can escape it.

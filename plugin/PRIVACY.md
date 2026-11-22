@@ -40,6 +40,10 @@ Nothing else bowline does reaches the network.
   the session's title, from the last 256 KB of the file, to name a session when that list cannot be had; never the
   conversation. It keeps the names of the worktrees it has named to a session, in the repository's git folder, so
   that it names each one once; nothing of this is sent.
+- From 0.16.0, when you or Claude run `bowline crew`, Claude Desktop's record of each of its Code sessions on your
+  machine, every account's. Of each record bowline reads only the session's id in the app and in Claude Code, its
+  title, whether it is archived, its folder, its worktree and when it was last active; never its settings, its
+  tools or its conversation. It keeps none of it, and `crew.desktop: false` turns this off.
 - After each reply, the reply's text that Claude Code gives the hook, to see whether it ends with a question to you;
   only that last question is kept, and `crew.asksFromReply: false` turns this off. Before each prompt, which session
   it is, to take that question back.

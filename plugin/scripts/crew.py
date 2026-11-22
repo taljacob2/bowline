@@ -27,7 +27,11 @@ holds the turn for a heavy check. The sessions are the ones `claude agents --jso
 each joined to the worktree its folder is in, with whether it is busy, idle or blocked, or offline: a background
 session listed with no process, which neither works nor waits; what claude listed is kept in the repository's git
 folder (sessions.json) for the hooks, which never start claude. Where claude cannot be asked, a
-transcript written lately stands for a session, named by the title line at its end. A process belongs to the worktree
+transcript written lately stands for a session, named by the title line at its end. Claude Desktop keeps a record of
+each of its Code sessions (crew.desktop says where, or false for none); a session it records is named by the app's
+full title and given the app's id, and the printout, run inside a Claude Code session, ends with those ids, by which a
+reply in the app links each session. Of a record only the ids, the title, whether it is archived, its folders and its
+last activity are read. A process belongs to the worktree
 of its session, else to the one its command line names, else to that of its children when all of them agree, else to
 that of its nearest parent with one. A worktree whose folder has no .git file of its own, as while it is being
 removed, is named as broken and left out, because git asked there answers for the main checkout. Each session comes
@@ -377,12 +381,72 @@ def tree_of(folder, trees):
     return best
 
 
-def sessions_by_tree(trees, rows, minutes=30, now=None):
+def desktop_folder(config):
+    """Where Claude Desktop keeps its record of each of its Code sessions: the folder crew.desktop names, else the
+    app's own folder on this system; None when crew.desktop is false, which turns the records off."""
+    named = settings(config).get("desktop")
+    if named is False:
+        return None
+    if named:
+        return os.path.expanduser(str(named))
+    home = os.path.expanduser("~")
+    if WINDOWS:
+        base = os.environ.get("APPDATA") or os.path.join(home, "AppData", "Roaming")
+    elif sys.platform == "darwin":
+        base = os.path.join(home, "Library", "Application Support")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+    return os.path.join(base, "Claude", "claude-code-sessions")
+
+
+DESKTOP_RECORD_BYTES = 4 * 1024 * 1024
+
+
+def desktop_sessions(config):
+    """Claude Desktop's own record of each of its Code sessions on this machine, every account's, as [{"desktop": the
+    session's id in the app, which a reply in the app links as [its title](#<id>), "cli": the ids Claude Code gave
+    it, "title", "archived", "cwd", "worktree": the worktree the app made for it, "at": its last activity}]. The app
+    writes one file per session, `<account>/<organization>/local_<id>.json` in desktop_folder; of each, only these
+    fields are read, and the rest (its settings, its tools) never. An empty list when the app is not installed, the
+    setting turns it off, or the files are not what this reads."""
+    folder = desktop_folder(config)
+    found = []
+    if not folder or not os.path.isdir(folder):
+        return found
+    for top, dirs, files in os.walk(folder):
+        if len(os.path.relpath(top, folder).split(os.sep)) >= 2:
+            dirs[:] = []                                    # the records lie two folders down; nothing deeper is read
+        for name in files:
+            if not (name.startswith("local_") and name.endswith(".json")):
+                continue
+            path = os.path.join(top, name)
+            try:
+                if os.path.getsize(path) > DESKTOP_RECORD_BYTES:
+                    continue
+                with open(path, encoding="utf-8") as handle:
+                    record = json.load(handle)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(record, dict) or not str(record.get("sessionId") or "").startswith("local_"):
+                continue
+            cli = [str(record[key]) for key in ("cliSessionId", "lastAssistantCliSessionId") if record.get(key)]
+            at = record.get("lastActivityAt")
+            found.append({"desktop": record["sessionId"], "cli": sorted(set(cli)),
+                          "title": " ".join(str(record.get("title") or "").split()) or None,
+                          "archived": record.get("isArchived") is True, "cwd": str(record.get("cwd") or "") or None,
+                          "worktree": str(record.get("worktreePath") or "") or None,
+                          "at": at / 1000.0 if isinstance(at, (int, float)) else None})
+    return found
+
+
+def sessions_by_tree(trees, rows, minutes=30, now=None, desktop=()):
     """The sessions in each worktree, as {same(worktree's path): [session]}, newest first. A session is {"name", "id",
-    "kind", "status", "was", "pid", "started", "wrote", "cwd"}: status is busy, idle or blocked as Claude Code says, or
-    offline, and wrote is when its transcript was last written. rows are what `claude agents --json` listed; None means
-    it could not be asked, and then each transcript written in the last `minutes` stands for a session, named by its
-    title, with the status unknown.
+    "kind", "status", "was", "pid", "started", "wrote", "cwd", "desktop"}: status is busy, idle or blocked as Claude
+    Code says, or offline, wrote is when its transcript was last written, and desktop is its id in Claude Desktop, or
+    None. rows are what `claude agents --json` listed; None means it could not be asked, and then each transcript
+    written in the last `minutes` stands for a session, named by its title, with the status unknown. desktop is what
+    desktop_sessions read: a session the app records gets the app's id, by which a reply links it, and the app's
+    title, which `claude agents` cuts at 50 characters.
 
     A background session listed without a process id is offline, and was is the state it last recorded. Claude Code
     builds such a row from the background job's own record when no process of the job runs, and keeps it in the list
@@ -415,7 +479,13 @@ def sessions_by_tree(trees, rows, minutes=30, now=None):
             "name": " ".join(str(row.get("name") or "").split()) or None, "id": sid, "kind": row.get("kind"),
             "status": "offline" if offline else status, "was": status if offline else None, "pid": pid,
             "started": started / 1000.0 if isinstance(started, (int, float)) else None, "wrote": wrote, "cwd": row["cwd"]})
+    by_cli = {cli: record for record in desktop for cli in record["cli"]}
     for sessions in found.values():
+        for session in sessions:
+            record = by_cli.get(session["id"])
+            session["desktop"] = record["desktop"] if record else None
+            if record and record["title"]:
+                session["name"] = record["title"]
         sessions.sort(key=lambda s: (s["status"] == "offline", -(s["wrote"] or s["started"] or 0)))
     return found
 
@@ -2175,13 +2245,14 @@ def newest(item):
     return max(stamps)
 
 
-def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, now, verbose=False):
+def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, now, verbose=False, desktop=()):
     """The model of a look, from what was measured: the worktrees in the order the printout shows them, each with its
-    group, its sessions, its processes, its claims and what it said; then what concerns more than one worktree."""
+    group, its sessions, its processes, its claims and what it said; then what concerns more than one worktree.
+    desktop is Claude Desktop's record of its sessions (desktop_sessions)."""
     crew = settings(place.config)
     minutes = crew.get("activeMinutes") or 30
     old_hours = crew.get("oldUntrackedHours") or 24
-    by_tree = sessions_by_tree(place.trees, rows, minutes, now)
+    by_tree = sessions_by_tree(place.trees, rows, minutes, now, desktop)
     patterns = heavy_patterns(place.config)
     heavy = {p["pid"] for p in heavy_now(snapshot, patterns)}
     whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
@@ -2316,7 +2387,8 @@ def look(place, verbose=False, record=None, write=True):
     rows = fetch_sessions(place.root, place.config)
     snapshot = processes()
     ports = listening()
-    return gather(place, record, rows, snapshot, ports, claims, dropped, spoken, load_asks(place.root), now, verbose)
+    return gather(place, record, rows, snapshot, ports, claims, dropped, spoken, load_asks(place.root), now, verbose,
+                  desktop_sessions(place.config))
 
 
 def lines_of(text, first="  ", rest=None):
@@ -2494,9 +2566,28 @@ def quiet_line(quiet, model):
     return lines_of(words + "--verbose lists them.", "", "  ")
 
 
-def render(model, verbose=False):
+def link_lines(sessions):
+    """The lines that give each session's id in Claude Desktop, for a reply there to link it as [its title](#<id>):
+    one line per session, the id first; nothing when no session has one."""
+    out, seen = [], set()
+    for session in sessions:
+        if session.get("desktop") and session["desktop"] not in seen:
+            seen.add(session["desktop"])
+            out += lines_of(f"#{session['desktop']} {session_name(session)}", "  ", "      ")
+    return ["SESSION LINKS: in a reply in Claude Desktop, link a session as [its title](#<its id>)"] + out if out else []
+
+
+def wants_links():
+    """Whether the printout gives the sessions' links: when it runs inside a Claude Code session, which sets CLAUDECODE
+    for its tools' shells, because only a reply in Claude Desktop turns them into links; a person's own terminal and
+    crew watch go without them."""
+    return os.environ.get("CLAUDECODE") == "1"
+
+
+def render(model, verbose=False, links=False):
     """The printout of a look, as lines: what waits for the person first, then the worktrees at work, the idle ones a
-    line each, the quiet ones in one line, and then what concerns more than one worktree."""
+    line each, the quiet ones in one line, and then what concerns more than one worktree. links adds each session's
+    id in Claude Desktop at the end."""
     now, base, counts = model["at"], model["base"], model["counts"]
     out = lines_of(f"bowline crew: {model['repository']}, " + (f"measured against {base}" if base else
                    "with no pushed branch to measure against") + time.strftime(", %H:%M", time.localtime(now)), "", "  ")
@@ -2596,6 +2687,10 @@ def render(model, verbose=False):
         out += lines_of(words + ".")
     out.append("  To tell a session what you take: SendMessage." if model["sessionsListed"] else
                "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
+    if links:
+        shown_items = [item for item in model["worktrees"] if item["group"] != "quiet" or verbose]
+        linked = link_lines([session for item in shown_items for session in item["sessions"]])
+        out += [""] + linked if linked else []
     return out
 
 
@@ -2604,7 +2699,7 @@ def do_look(options):
     if options.json:
         print(json.dumps(model, indent=2))
     else:
-        print("\n".join(render(model, options.verbose)))
+        print("\n".join(render(model, options.verbose, links=wants_links())))
     return 0
 
 

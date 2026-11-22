@@ -1034,3 +1034,32 @@ though it last ran six days before.
    command line. None was seen.
 2. `crew prune` names an offline session as "a session is open in it", which keeps its worktree, as it should, since
    the session can be taken up again; the words should say that it is offline.
+
+## 2026-11-22: the crew reads Claude Desktop's record of its sessions
+
+**The question.** On 2026-11-22 a crew report in the first user's repository named sessions by the short refs that
+`ListAgents` gives, and the person asked why the reply did not link the sessions it named, as a reply in Claude
+Desktop can. A reply there links a session as `[its title](#local_<uuid>)`, by the app's own id. `claude agents
+--json` gives only Claude Code's id for a session, which is another id, and a title cut at 50 characters.
+
+**The decision.** The crew reads Claude Desktop's own record of each Code session: one JSON file per session, in
+`claude-code-sessions` under the app's folder, for every account on the machine. From each it takes only the app's
+id, Claude Code's ids, the title, whether the session is archived, its folder, its worktree and its last activity,
+and it joins a record to the session `claude agents` lists by Claude Code's id. A session the app records is then
+named by its full title and carries the app's id. The printout, when it runs inside a Claude Code session, ends with
+SESSION LINKS: one line per listed session with its id first, so that the session reading the look can link each one.
+`crew --json` gives the id as each session's `desktop`. A person's own terminal and `crew watch` go without the links,
+because only a reply in the app turns them into links. `crew.desktop` names another folder, or `false` reads none.
+
+**Why this file, after the decision above not to read the job's record.** The entry before this one chose not to read
+`~/.claude/jobs/<id>/state.json`, Claude Code's internal file, because what it would have added (when a session
+blocked, what it asked) was a convenience that `claude agents` already approached. The app's record is different in
+kind: it is the only place on the machine that holds the id by which a session is linked, and, as the next rounds
+show, the only one that knows a session still in the person's sidebar whose process has ended, which decides whether
+a worktree is safe to remove. The dependency is kept small: a record that cannot be read, or that lacks the fields,
+is skipped, and the crew then says what it said before. The skill keeps `mcp__ccd_session_mgmt__list_sessions` as the
+way to find an id the look does not give.
+
+**Not chosen.** Printing each id beside its session in the worktree's lines: an id is 42 characters, and the lines
+are read by a person too, so the ids are gathered at the end. Asking the app through its tools from the script: the
+tools are Claude's, not a program a script can start.
