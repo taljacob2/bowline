@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.15.1 (2026-11-22)
 
 The crew sees a session's background command, and says when a session it lists is not running. No Claude Code limit
 moved. The reasoning is in `plugin/docs/decisions.md`, "a session's own command is work, and a session with no process
