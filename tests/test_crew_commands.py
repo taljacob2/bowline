@@ -69,7 +69,7 @@ class CommandTests(ScratchRepo):
         self.assertIn("AT WORK other: a background command runs, its session idle", out)
         self.assertIn('session "the push": idle', out)
         self.assertIn("runs in the background: git push origin main", out)
-        self.assertIn("holds: 1 file not committed", out)                   # what it holds is still said
+        self.assertIn("holds: 1 untracked file, written less than a minute ago", out)  # what it holds is still said
         self.assertIn("WAITS FOR YOU: nothing.", out)
 
     def test_a_command_of_the_powershell_tool_is_named_by_what_runs_below_it(self):

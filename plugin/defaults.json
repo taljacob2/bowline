@@ -94,7 +94,8 @@
     "asksFromReply": true,
     "watchSeconds": 10,
     "pruneHours": 6,
-    "slots": 1
+    "slots": 1,
+    "oldUntrackedHours": 24
   },
   "crewWhy": {
     "activeMinutes": "How far back a sign of work counts: a session's start names another session when a transcript of another worktree, or another transcript of this folder, was written within this many minutes, and a running session is told before a prompt when one appears; 0 says nothing at all. It is not a wait: the look happens at once, and half an hour only decides who still counts as at work, which covers a session that is thinking or waiting for a check and forgets one that was closed.",
@@ -116,7 +117,8 @@
     "asksFromReply": "true, the default: when a session's reply ends with a question, the Stop hook records that the session waits for the person, and every look shows it first until the person's next prompt in that session. Claude Code lists such a session as plain idle, the same as one that is done; on the day this was built three of them were waiting for the person unseen. Only the reply's last sentence is kept, in the repository's git folder, from the hook's last_assistant_message. false leaves it to the sessions to say so with crew say --asks.",
     "watchSeconds": "How often crew watch draws the look again. The sessions and the processes are asked anew at each drawing, which takes a second or two; the worktrees are measured in the background, one measuring after another, because a large repository's take a minute.",
     "pruneHours": "How long a worktree must have shown no sign of work before crew prune calls it safe to remove, with everything else it asks: nothing not committed, every commit's change on the pushed branch, no session, process, claim, lock or place in the push queue. A session that thinks over a long check for an hour still counts as there; six hours is past a working morning or afternoon.",
-    "slots": "How many full checks crew run lets run at once, across every session. A heavy process that no crew run started takes a slot too, so with 1 the turn waits for a quiet machine. Memory decides, more than processors: crew run records the most memory each command took, and the look shows the largest, so choose 2 only when twice the largest is less than what is free while no check runs. A small check (crew run --small) runs beside them whatever this says, one at a time, and every check beside another waits until its own peak is free."
+    "slots": "How many full checks crew run lets run at once, across every session. A heavy process that no crew run started takes a slot too, so with 1 the turn waits for a quiet machine. Memory decides, more than processors: crew run records the most memory each command took, and the look shows the largest, so choose 2 only when twice the largest is less than what is free while no check runs. A small check (crew run --small) runs beside them whatever this says, one at a time, and every check beside another waits until its own peak is free.",
+    "oldUntrackedHours": "How long untracked files must have gone unwritten before they stop putting a worktree whose sessions are idle under WAITS FOR YOU. A tool's cache or an editor's settings that git does not ignore stay untracked for weeks, and on 2026-11-22 three such files from October put the first user's main checkout first in the look, as idle with work not committed. Such a worktree is listed under IDLE with how many untracked files it holds and the date of the newest. A change to a tracked file, or an untracked file written within this many hours, is still work that waits. crew prune still refuses every untracked file, because git worktree remove does."
   },
   "outsidePaths": [
     "scratchpad['`\\\\/]",

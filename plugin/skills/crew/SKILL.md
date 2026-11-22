@@ -19,7 +19,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew
 ```
 
 It puts what matters first, each worktree once: **WAITS FOR YOU** (a session asks the person a question or is
-blocked, or its sessions are idle while it holds files not committed or commits not on the pushed branch), **AT
+blocked, or its sessions are idle while it holds files not committed or commits not on the pushed branch; untracked
+files that nobody has written for a day, such as a tool's old cache, do not count, and are listed under IDLE with
+the date of the newest), **AT
 WORK** (a session is busy, a heavy check runs, or a command a session started still runs after its turn ended),
 **IDLE** (a line each), and **QUIET** (one line, saying whether any of them holds work). Each worktree shows its
 sessions by name, what it holds, its heavy and listening processes, its claims and what its session said; then come

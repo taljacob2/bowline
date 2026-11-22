@@ -95,7 +95,8 @@ class PruneTests(CrewCase):
         self.assertIn("Safe to remove: 2 worktrees", safe)
         self.assertIn("done: quiet for 8 hours; its 1 commit is on origin/main by content", safe)
         self.assertIn("ignored: quiet for 8 hours", safe)
-        for words in ("dirty: 1 file not committed", "ahead: 1 commit not on origin/main",
+        for words in ("dirty: 1 untracked file, written less than a minute ago (git worktree remove refuses untracked "
+                      "files too: commit or delete them first)", "ahead: 1 commit not on origin/main",
                       "claimed: it holds the claim file:src/x.py", "locked: git keeps it locked (kept on purpose)",
                       'open: a session is open in it, "the open session"', "fresh: a sign of work less than a minute ago"):
             self.assertIn(words, rest)
@@ -107,7 +108,7 @@ class PruneTests(CrewCase):
     def test_prune_removes_only_what_it_is_told_and_only_what_is_still_safe(self):
         code, out, err = self.crew("prune", "--remove", "dirty")
         self.assertEqual(code, 1, out + err)
-        self.assertIn("dirty is not removed: 1 file not committed", flat(out))
+        self.assertIn("dirty is not removed: 1 untracked file, written less than a minute ago", flat(out))
         self.assertTrue(os.path.isdir(self.trees["dirty"]))
         code, out, err = self.crew("prune", "--remove", "nothing-of-that-name")
         self.assertEqual(code, 2, out + err)

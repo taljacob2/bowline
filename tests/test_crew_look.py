@@ -84,7 +84,7 @@ class LookTests(ScratchRepo):
         self.assertNotIn(-1, places, out)
         self.assertEqual(places, sorted(places), out)
         self.assertIn("6 worktrees and 4 sessions: 2 wait for you, 1 at work, 1 idle, 2 quiet.", out)
-        self.assertIn("holds: 1 file not committed", out)
+        self.assertIn("holds: 1 untracked file, written less than a minute ago", out)
         self.assertIn('session "the holding session": idle', out)
         for line in out.splitlines():
             self.assertLessEqual(len(line), 100, line)
@@ -163,6 +163,43 @@ class LookTests(ScratchRepo):
         self.age(self.trees["quiet"], 120)
         code, out, _ = self.crew()
         self.assertIn("1 holds work that is not on origin/main: quiet (1 commit not on origin/main).", " ".join(out.split()))
+
+    def test_untracked_files_nobody_has_written_for_a_day_do_not_wait_for_the_person(self):
+        # On 2026-11-22 the look put the main checkout of the first user's repository under WAITS FOR YOU, "idle, with
+        # work not committed", for a Vite cache and an editor's settings, untracked, that nobody had written for weeks.
+        done = self.trees["done"]
+        old = time.time() - 29 * 24 * 3600
+        for path in (".vite/deps/package.json", ".vite/deps/_metadata.json", ".vscode/settings.json"):
+            write(os.path.join(done, path), "{}\n")
+            os.utime(os.path.join(done, path), (old - 3600, old - 3600) if "vscode" in path else (old, old))
+        day = time.localtime(old)
+        months = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+                  "November", "December")
+        when = f"from {day.tm_mday} {months[day.tm_mon - 1]}" + (
+            f" {day.tm_year}" if day.tm_year != time.localtime().tm_year else "")
+        code, out, err = self.crew()
+        self.assertEqual(code, 0, out + err)
+        text = " ".join(out.split())
+        self.assertIn("IDLE, HOLDING NOTHING: nothing to commit but untracked files nobody has written in 24 hours", text)
+        self.assertIn(f'done: "the done session", and 3 untracked files, the newest {when}, none written in 24 hours',
+                      text)
+        self.assertNotIn("done: idle, with work not committed", text)
+        model = json.loads(self.crew("--json")[1])
+        tree = next(item for item in model["worktrees"] if item["display"] == "done")
+        self.assertEqual((tree["group"], tree["uncommitted"], tree["untracked"], tree["untrackedOld"]), ("idle", 3, 3, True))
+        self.assertAlmostEqual(tree["untrackedAt"], old, delta=2)
+        # A change to a tracked file is work in hand, whatever the untracked files' age.
+        write(os.path.join(done, "README.md"), "# changed\n")
+        text = " ".join(self.crew()[1].split())
+        self.assertIn("done: idle, with work not committed", text)
+        self.assertIn(f"holds: 1 file not committed, 3 untracked files, the newest {when}", text)
+        # So is an untracked file written today.
+        git(done, "checkout", "-q", "--", "README.md")
+        write(os.path.join(done, "src", "new.py"), "new = 1\n")
+        text = " ".join(self.crew()[1].split())
+        self.assertIn("done: idle, with work not committed", text)
+        self.assertIn("holds: 4 untracked files, the newest written less than a minute ago", text)
+        self.assertIn("holds: 1 untracked file, written less than a minute ago", text)          # the holding worktree
 
     def test_watch_redraws_until_it_is_stopped(self):
         code, out, err = self.crew("watch", "--every", "0.5", "--times", "2")

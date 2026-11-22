@@ -34,7 +34,8 @@ removed, is named as broken and left out, because git asked there answers for th
 with the memory its process and every process below it hold, and the look says how much of the machine's is in use.
 
 The printout puts what matters first, each worktree once: WAITS FOR YOU (a session asks the person a question or is
-blocked, or its sessions are idle and it holds files not committed or commits not on the pushed branch), AT WORK (a
+blocked, or its sessions are idle and it holds files not committed or commits not on the pushed branch, untracked
+files that nobody has written for crew.oldUntrackedHours left out and shown with their age instead), AT WORK (a
 session is busy, a heavy check runs, or a command a session started still runs after its turn ended, each such command
 named under its session), IDLE (sessions idle, nothing held) a line each, and QUIET (no session, no sign
 of work) folded into one line that says whether any of them holds work; a commit counts as held only when its change
@@ -1678,8 +1679,8 @@ def survey_tree(tree, base):
     if tree.get("broken"):
         # git asked there would answer for the main checkout; nothing it said would be this worktree's.
         return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": False, "head": tree.get("head"),
-                "ahead": None, "behind": None, "notOnBase": None, "uncommitted": 0, "files": [], "blobs": {}, "dirty": [],
-                "broken": True}
+                "ahead": None, "behind": None, "notOnBase": None, "uncommitted": 0, "untracked": 0, "untrackedAt": None,
+                "files": [], "blobs": {}, "dirty": [], "broken": True}
     if base:
         code, out = git(path, "rev-list", "--left-right", "--count", f"{base}...HEAD")
         if code == 0 and len(out.split()) == 2:
@@ -1699,14 +1700,33 @@ def survey_tree(tree, base):
             if line.startswith(":") and name and len(facts.split()) >= 4:
                 blobs[name.strip('"')] = facts.split()[3]
     code, out = git(path, "status", "--porcelain", "--untracked-files=all")
-    dirty = []
+    dirty, untracked = [], []
     for line in out.splitlines() if code == 0 else []:
         if len(line) > 3:
             dirty.append(line[3:].split(" -> ")[-1].strip('"'))
             blobs.setdefault(dirty[-1], None)                           # changed here, in no commit yet
+            if line.startswith("??"):
+                untracked.append(dirty[-1])
     return {"path": path, "name": tree["name"], "branch": tree["branch"], "main": tree["main"],
             "head": tree.get("head"), "ahead": ahead, "behind": behind, "notOnBase": not_on_base,
-            "uncommitted": len(dirty), "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty), "broken": False}
+            "uncommitted": len(dirty), "untracked": len(untracked), "untrackedAt": newest_written(path, untracked),
+            "files": sorted(blobs), "blobs": blobs, "dirty": sorted(dirty), "broken": False}
+
+
+UNTRACKED_STATS = 2000
+
+
+def newest_written(folder, paths):
+    """When the newest of some files in a folder was last written, or None. Only the first UNTRACKED_STATS are asked,
+    because a folder of thousands that git does not ignore, such as a dependency cache, would make every look slow."""
+    newest = None
+    for path in paths[:UNTRACKED_STATS]:
+        try:
+            stamp = os.path.getmtime(os.path.join(folder, path))
+        except OSError:
+            continue
+        newest = stamp if newest is None or stamp > newest else newest
+    return newest
 
 
 def collisions(trees):
@@ -1747,8 +1767,9 @@ def cached_survey(root):
     """What the last look or `crew refresh` measured, without starting git, or None when nothing was measured yet:
     {"at": seconds since 1970, "base": the pushed branch or None, "trees": [{"path", "name", "branch", "main", "head":
     the commit the worktree is at, "ahead", "behind", "notOnBase": how many of the commits ahead hold a change the
-    pushed branch does not (git cherry), "broken": its folder has no .git file and nothing was measured, "uncommitted",
-    "files": every file the worktree changed, committed or not, by its path from the
+    pushed branch does not (git cherry), "broken": its folder has no .git file and nothing was measured, "uncommitted":
+    how many files hold a change not committed, "untracked": how many of those git does not track yet, "untrackedAt":
+    when the newest of those was last written, "files": every file the worktree changed, committed or not, by its path from the
     repository's top, "blobs": {each of those files: the id of the content its commits end in, or None when no commit
     of the worktree changed it}, "dirty": the files with a change that is not committed}]}. collisions(record["trees"]) gives the files two worktrees changed differently. Measuring a large repository's worktrees cold took over two minutes on the first one that
     was tried, so a hook that runs before every edit reads this and lets `crew refresh` measure in the background."""
@@ -1967,7 +1988,11 @@ def prune_reasons(item, model, hours, queued):
     if same(item["path"]) in queued:
         reasons.append("it has a place in the push queue")
     if item["uncommitted"]:
-        reasons.append(common.count(item["uncommitted"], "file", "files") + " not committed")
+        words = changed_words(item, now)
+        if item.get("untracked"):
+            # git worktree remove refuses an untracked file as it refuses a change, so the person decides first.
+            words += " (git worktree remove refuses untracked files too: commit or delete them first)"
+        reasons.append(words)
     if not base:
         reasons.append("there is no pushed branch to compare its commits with")
     elif item["notOnBase"]:
@@ -2113,7 +2138,9 @@ def standing(item, minutes, now):
     idle because its turn has ended (work); its sessions are idle and it holds files not committed or commits not on
     the pushed branch (waits); its sessions are idle and it holds nothing (idle); no session, but a sign of work
     lately, as from a session that works here by path (work); nothing (quiet). An offline session neither asks, works
-    nor waits: no process of it runs, so it counts only as a session that is not at work."""
+    nor waits: no process of it runs, so it counts only as a session that is not at work. Untracked files that none of
+    has been written for crew.oldUntrackedHours, such as a tool's old cache, are not work that waits for the person:
+    they are shown with their age, and the worktree is idle."""
     if item["broken"]:
         return "broken", "broken"
     sessions = item["sessions"]
@@ -2130,8 +2157,9 @@ def standing(item, minutes, now):
         return "work", "wrote"
     if any(session.get("commands") for session in live):
         return "work", "command"
-    if sessions and (item["uncommitted"] or item["notOnBase"]):
-        return "waits", "idle-uncommitted" if item["uncommitted"] else "idle-unpushed"
+    fresh = item["uncommitted"] - (item.get("untracked") or 0) or (item.get("untracked") and not item.get("untrackedOld"))
+    if sessions and (fresh or item["notOnBase"]):
+        return "waits", "idle-uncommitted" if fresh else "idle-unpushed"
     if sessions:
         return "idle", "idle"
     if item["lastSign"] and now - item["lastSign"]["at"] <= minutes * 60:
@@ -2152,6 +2180,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     group, its sessions, its processes, its claims and what it said; then what concerns more than one worktree."""
     crew = settings(place.config)
     minutes = crew.get("activeMinutes") or 30
+    old_hours = crew.get("oldUntrackedHours") or 24
     by_tree = sessions_by_tree(place.trees, rows, minutes, now)
     patterns = heavy_patterns(place.config)
     heavy = {p["pid"] for p in heavy_now(snapshot, patterns)}
@@ -2200,11 +2229,15 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
         stamp, what = last_sign(tree["path"], claims, spoken)
         spoke = said_by(tree["path"], spoken)
         ahead = m.get("ahead")
+        untracked, untracked_at = m.get("untracked") or 0, m.get("untrackedAt")
         item = {"name": tree["name"], "display": names[key], "path": tree["path"], "branch": tree["branch"],
                 "main": tree["main"], "this": tree is place.here, "broken": bool(tree.get("broken")),
                 "locked": tree.get("locked"), "ahead": ahead, "behind": m.get("behind"),
                 "notOnBase": m.get("notOnBase") if m.get("notOnBase") is not None else ahead,
-                "uncommitted": m.get("uncommitted") or 0, "lastSign": {"at": stamp, "what": what} if stamp else None,
+                "uncommitted": m.get("uncommitted") or 0, "untracked": untracked, "untrackedAt": untracked_at,
+                # Untracked files that nobody has written for a while, such as a tool's cache, are not work in hand.
+                "untrackedOld": bool(untracked and untracked_at and now - untracked_at > old_hours * 3600),
+                "lastSign": {"at": stamp, "what": what} if stamp else None,
                 "sessions": sessions, "asks": loose, "processes": named, "otherProcesses": len(own) - len(named),
                 "claims": [{"key": c["key"], "since": c.get("since"), "why": c.get("why") or ""}
                            for c in claims if same(c.get("worktree") or "") == key],
@@ -2246,7 +2279,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
         "activeMinutes": minutes, "sessionsListed": rows is not None, "claude": claude_command(place.config),
         "processesListed": bool(snapshot), "portsListed": ports is not None, "heavyPatterns": bool(patterns),
         "worktreesFolder": trees_folder.pop() if len(trees_folder) == 1 and "" not in trees_folder else None,
-        "counts": counts, "worktrees": items,
+        "oldUntrackedHours": old_hours, "counts": counts, "worktrees": items,
         "overlaps": [{"worktrees": list(held), "quiet": [name for name in held if name in quiet], "files": paths}
                      for held, paths in sorted(groups.items(), key=lambda pair: (-len(pair[1]), pair[0]))],
         "shared": [{"file": path, "worktrees": [by_name.get(name, name) for name in held],
@@ -2298,11 +2331,39 @@ def clock(stamp, now):
     return text[11:] if text[:10] == time.strftime("%Y-%m-%d", time.localtime(now)) else text
 
 
-def holds(item, base, short=False):
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December")
+
+
+def written_words(stamp, now):
+    """When a file was last written, as a person reads it: "written 5 hours ago" within two days, else "from 24
+    October", with the year when it is not this year's."""
+    if now - stamp < 48 * 3600:
+        return "written " + ago(stamp, now)
+    day, today = time.localtime(stamp), time.localtime(now)
+    return f"from {day.tm_mday} {MONTHS[day.tm_mon - 1]}" + (f" {day.tm_year}" if day.tm_year != today.tm_year else "")
+
+
+def changed_words(item, now):
+    """The files of a worktree not committed, in words, the untracked ones apart with the age of the newest: "2 files
+    not committed, 3 untracked files, the newest from 24 October"; empty when there are none."""
+    untracked = item.get("untracked") or 0
+    parts = []
+    if item["uncommitted"] - untracked:
+        parts.append(common.count(item["uncommitted"] - untracked, "file", "files") + " not committed")
+    if untracked:
+        words = common.count(untracked, "untracked file", "untracked files")
+        if item.get("untrackedAt"):
+            words += (", " if untracked == 1 else ", the newest ") + written_words(item["untrackedAt"], now)
+        parts.append(words)
+    return ", ".join(parts)
+
+
+def holds(item, base, short=False, now=None):
     """What a worktree holds that is not on the pushed branch, in words; short leaves out how far behind it is."""
     parts = []
     if item["uncommitted"]:
-        parts.append(common.count(item["uncommitted"], "file", "files") + " not committed")
+        parts.append(changed_words(item, time.time() if now is None else now))
     if item["notOnBase"]:
         parts.append(common.count(item["notOnBase"], "commit", "commits") + f" not on {base}")
     elif item["ahead"] and not short:
@@ -2355,7 +2416,7 @@ def block(item, model, verbose=False):
     """One worktree's lines in the printout."""
     now, base = model["at"], model["base"]
     out = lines_of(f"{head_of(item, model)}: {reason_words(item, model)}")
-    out += lines_of("holds: " + holds(item, base), "      ", "        ")
+    out += lines_of("holds: " + holds(item, base, now=now), "      ", "        ")
     for session in item["sessions"]:
         held = f", {size(session['memory'])} of memory" if session.get("memory") else ""
         out += lines_of(f"session {session_name(session)}: {session_state(session, now)}{held}", "      ", "        ")
@@ -2405,6 +2466,9 @@ def idle_line(item, model):
     names = "; ".join(session_name(session) + (f" ({size(session['memory'])})" if session.get("memory") else "")
                       + (" (offline: no process of it runs)" if session["status"] == "offline" else "")
                       for session in item["sessions"])
+    if item.get("untrackedOld"):
+        extra.append(f"and {changed_words(item, model['at'])}, none written in "
+                     f"{common.count(model['oldUntrackedHours'], 'hour', 'hours')}")
     return lines_of(f"{head_of(item, model)}: {names}" + (", " + ", ".join(extra) if extra else ""), "  ", "      ")
 
 
@@ -2415,7 +2479,7 @@ def quiet_line(quiet, model):
     held = [item for item in quiet if item["uncommitted"] or item["notOnBase"]]
     if held:
         words += (f"{len(held)} {'holds' if len(held) == 1 else 'hold'} work that is not on {base or 'a pushed branch'}: "
-                  + ", ".join(f"{item['display']} ({holds(item, base, short=True)})" for item in held) + ". ")
+                  + ", ".join(f"{item['display']} ({holds(item, base, short=True, now=model['at'])})" for item in held) + ". ")
     else:
         words += f"None holds work that is not on {base}. " if base else "None holds files not committed. "
     content = [item for item in quiet if item["ahead"] and not item["notOnBase"]]
@@ -2466,7 +2530,10 @@ def render(model, verbose=False):
     if not group["work"]:
         out.append("")
     if group["idle"]:
-        out.append("IDLE, HOLDING NOTHING: nothing to commit" + (f", and every commit is on {base}" if base else ""))
+        old = any(item.get("untrackedOld") for item in group["idle"])
+        out += lines_of("IDLE, HOLDING NOTHING: nothing to commit" + (" but untracked files nobody has written in "
+                        f"{common.count(model['oldUntrackedHours'], 'hour', 'hours')}" if old else "")
+                        + (f", and every commit is on {base}" if base else ""), "", "  ")
         for item in group["idle"]:
             out += idle_line(item, model)
         out.append("")
