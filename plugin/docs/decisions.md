@@ -1089,3 +1089,28 @@ the person, and its reason says what to do.
 listed under ACROSS THE WORKTREES, for the person to archive, because reopened it would find its folder missing. On the
 day this was built the look found the four sessions of the worktrees removed that morning. An offline background
 session is now worded as offline in prune too, which is the second item left for later in the entry before this one.
+
+**Archiving is not work.** When the person archived the session "Bowline crew" at about 03:42, the app detached the
+HEAD of its worktree at the commit it was on: it wrote the index, then HEAD, and an entry in the log of HEAD whose old
+and new commit are the same, with no message. The look put the worktree under AT WORK, "a sign of work less than a
+minute ago (its git folder), and no session listed here", and prune called it not safe. Three more worktrees did the
+same within the hour, as their sessions were archived; there the index was written 12 seconds before HEAD, and the
+session's transcript a minute or two before that.
+
+**The decision.** When the newest entry of a worktree's log of HEAD moved it to no other commit, the git folder's sign
+of work is the newest entry that did move it, or the index when it was written more than two minutes apart from that
+entry. Otherwise the sign is the newest of the index, HEAD and its log, as before. The transcript of a session the
+app records as archived is no sign of work. A worktree that no other session holds names its archived sessions, in the
+look and beside it when prune calls it safe, so that the person sees whose worktree it was.
+
+**Why these rules.** A commit, a reset or a checkout of another commit moves HEAD, and staging a file writes the index
+on its own; each is work. A HEAD written at the commit it already names, with the index rewritten beside it, is the
+app's bookkeeping, or a person switching between two branches of one commit, and changes nothing a session left. The
+two minutes are wide because a margin costs nothing: a file staged in those minutes is still a change not committed,
+which the look and prune see on their own. A session the person archived is one they called finished, so what the app
+writes into its transcript as it archives it says nothing about work; when the person takes the session up again, it
+is no longer archived and counts at once.
+
+**Not chosen.** Reading the message of the log's entry: the app's entry had none, and `git checkout --detach` writes
+one, so the commits themselves, old and new, are what can be trusted. Ignoring every write of HEAD: a commit on a
+detached HEAD writes only HEAD and its log, and is work.

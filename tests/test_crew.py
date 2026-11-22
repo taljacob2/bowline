@@ -9,7 +9,7 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, git, read, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, git, read, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -319,11 +319,7 @@ class CrewTests(ScratchRepo):
 
     def quiet_git_folder(self, tree, minutes_ago):
         """Makes a worktree's own git folder look last written some time ago, as one nobody commits in is."""
-        folder = os.path.join(self.repo, ".git", "worktrees", os.path.basename(tree))
-        stamp = time.time() - minutes_ago * 60
-        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
-            if os.path.exists(os.path.join(folder, name)):
-                os.utime(os.path.join(folder, name), (stamp, stamp))
+        age_git_folder(self.repo, tree, minutes_ago * 60)
 
     def test_a_sessions_start_says_when_another_session_is_at_work(self):
         mine = self.transcript(self.repo, "mine")

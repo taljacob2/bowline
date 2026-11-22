@@ -59,7 +59,10 @@ gives the same as data.
 
 - **A sign of work** is the newest of a session's transcript, the worktree's own git folder being written, and a
   claim. A session that was started in another folder and works here by path leaves no transcript here, so the last
-  two are how it is seen; take a claim early when you work that way yourself.
+  two are how it is seen; take a claim early when you work that way yourself. A write of HEAD that moves it to no
+  other commit is not work: Claude Desktop detaches the HEAD of a session's worktree, at the same commit, when it
+  archives the session. Nor is the transcript of an archived session. The look names the archived session of a
+  worktree that no other session holds.
 - **A file changed differently in more than one worktree** is one a rebase will meet twice. Tell the other session
   which lines you change, or wait for its push. A worktree marked quiet has shown no sign of work for a day or more,
   and its changes may be abandoned; ask the person before counting on that.

@@ -8,10 +8,9 @@ import os
 import re
 import subprocess
 import sys
-import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, git, read, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, git, read, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -91,11 +90,7 @@ class SayTests(ScratchRepo):
         self.assertEqual([entry["words"] for entry in crew.load_said(self.repo)], ["Mine again."])
 
     def test_saying_something_is_a_sign_of_work(self):
-        folder = os.path.join(self.repo, ".git", "worktrees", os.path.basename(self.other))
-        long_ago = time.time() - 3 * 3600
-        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
-            if os.path.exists(os.path.join(folder, name)):
-                os.utime(os.path.join(folder, name), (long_ago, long_ago))
+        age_git_folder(self.repo, self.other, 3 * 3600)
         config = common.load_config(self.repo)
         self.assertEqual(crew.others_active(self.repo, config), [])
         self.crew("say", "Here, by path, with no transcript in this folder.", cwd=self.other)

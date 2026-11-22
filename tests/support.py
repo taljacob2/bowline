@@ -36,6 +36,33 @@ def load_json(path):
         return json.load(handle)
 
 
+def age_git_folder(repo, tree, seconds):
+    """Makes a worktree's own git folder look last written some seconds ago, as one nobody has worked in since: its
+    index, its HEAD and the log of its HEAD are given that time, and so is every entry of the log, which bowline reads
+    when the newest entry moved no commit (`git worktree add` ends the log with such an entry, "reset: moving to
+    HEAD"). tree is the main checkout's path or a worktree's."""
+    folder = os.path.join(repo, ".git") if os.path.normcase(tree) == os.path.normcase(repo) else \
+        os.path.join(repo, ".git", "worktrees", os.path.basename(tree))
+    stamp = time.time() - seconds
+    log = os.path.join(folder, "logs", "HEAD")
+    if os.path.exists(log):
+        with open(log, encoding="utf-8", newline="") as handle:
+            lines = handle.read().split("\n")
+        # An entry is "<old> <new> <who> <seconds> <zone>\t<message>"; the seconds are the second word from the end of
+        # the part before the tab.
+        for index, line in enumerate(lines):
+            head, tab, message = line.partition("\t")
+            words = head.split(" ")
+            if len(words) >= 4 and words[-2].isdigit():
+                words[-2] = str(int(stamp))
+                lines[index] = " ".join(words) + tab + message
+        with open(log, "w", encoding="utf-8", newline="") as handle:
+            handle.write("\n".join(lines))
+    for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
+        if os.path.exists(os.path.join(folder, name)):
+            os.utime(os.path.join(folder, name), (stamp, stamp))
+
+
 def wait_for_split(test, state_file, seconds=120):
     """Waits until autosplit's background worker has recorded how the split ended, and returns that record. The worker
     needs about a second with the stand-in for claude, so a wait of two minutes that runs out is a worker that stalled

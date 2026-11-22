@@ -63,7 +63,10 @@ such sessions whose worktree is already gone, for the person to archive.
 A sign of work is the newest of three times: when a transcript file in Claude Code's project folder for the worktree
 was written (never what the file holds), when the worktree's own git folder was written (a commit, a staged file), and
 when it took a claim. The last two matter because a session started in another folder can work in a worktree by its
-path, and then leaves no transcript there. Every git question is asked with --no-optional-locks, so that looking at
+path, and then leaves no transcript there. A write of HEAD that moved it to no other commit, with the index git
+rewrites beside it, is not work, and neither is the transcript of an archived session: Claude Desktop does both when
+it archives a session. The look names the archived sessions of a worktree no other session holds, and prune names
+them beside a worktree that is safe to remove. Every git question is asked with --no-optional-locks, so that looking at
 another session's worktree never takes the lock its own git commands need. What the look measured is kept in the
 repository's git folder (changed.json), for a hook that must answer at once; `crew refresh` measures again and prints
 nothing.
@@ -244,14 +247,51 @@ def transcripts(tree_path):
     return found
 
 
-def last_session(tree_path):
-    """When a session started in a worktree last worked: the time its newest transcript file was written, or None."""
-    return max((stamp for _, stamp in transcripts(tree_path)), default=None)
+def last_session(tree_path, skip=()):
+    """When a session started in a worktree last worked: the time its newest transcript file was written, or None.
+    skip names the sessions, by Claude Code's id, whose transcripts do not count, such as those of archived sessions:
+    the app writes to a session's transcript as it archives it."""
+    return max((stamp for path, stamp in transcripts(tree_path)
+                if os.path.basename(path)[:-len(".jsonl")] not in skip), default=None)
+
+
+REFLOG_LINE = re.compile(r"^([0-9a-f]{40,64}) ([0-9a-f]{40,64}) .*? (\d+) [+-]\d{4}(?:\t|$)")
+REFLOG_TAIL = 16 * 1024
+# How close to a HEAD write that moved no commit the index's own write must be to count as part of it. When Claude
+# Desktop archived sessions on 2026-11-22, it wrote the index 2 seconds before the HEAD in a small repository and 12
+# seconds before it in a large one. A wide margin costs nothing: a file staged in those minutes is still a change not
+# committed, which the look and prune see on their own.
+STILL_SECONDS = 120
+
+
+def head_entries(folder):
+    """The last entries of a git folder's log of HEAD, oldest first, as (time, whether HEAD moved to another commit),
+    read from the end of the file only; None when there is no log."""
+    try:
+        with open(os.path.join(folder, "logs", "HEAD"), "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - REFLOG_TAIL))
+            data = handle.read()
+    except OSError:
+        return None
+    entries = []
+    for line in data.decode("utf-8", "replace").splitlines():
+        found = REFLOG_LINE.match(line)
+        if found:
+            entries.append((int(found.group(3)), found.group(1) != found.group(2)))
+    return entries
 
 
 def git_written(tree_path):
-    """When a worktree's own git folder was last written: its index, its HEAD or its log, whichever is newest, or None.
-    A commit, a staged file or a checkout writes one of them. Read from the file system, without starting git."""
+    """When a worktree's own git folder was last written for work: its index, its HEAD or its log, whichever is newest,
+    or None. A commit, a staged file or a checkout of another commit writes one of them. Read from the file system,
+    without starting git.
+
+    A write of HEAD that moved it to no other commit is not work. When Claude Desktop archives a session, it detaches
+    the HEAD of the session's worktree at the commit it was on, which writes HEAD, its log (an entry whose old and new
+    commit are the same) and the index; on 2026-11-22 that put an archived session's worktree under AT WORK, "a sign of
+    work less than a minute ago (its git folder)". When the newest entry of the log moved no commit, the sign is the
+    newest entry that did, or the index when it was written apart from that entry."""
     dot = os.path.join(tree_path, ".git")
     folder = dot
     if os.path.isfile(dot):
@@ -263,6 +303,17 @@ def git_written(tree_path):
             return None
         folder = words[len("gitdir:"):].strip()
         folder = folder if os.path.isabs(folder) else os.path.join(tree_path, folder)
+    entries = head_entries(folder)
+    if entries and not entries[-1][1]:
+        still = entries[-1][0]
+        signs = [stamp for stamp, moved in entries if moved]
+        try:
+            index = os.path.getmtime(os.path.join(folder, "index"))
+        except OSError:
+            index = None
+        if index is not None and abs(index - still) > STILL_SECONDS:
+            signs.append(index)
+        return max(signs) if signs else None
     newest = None
     for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
         try:
@@ -287,12 +338,13 @@ def claimed_at(tree_path, claims):
     return newest
 
 
-def last_sign(tree_path, claims, said=()):
+def last_sign(tree_path, claims, said=(), archived=()):
     """The last sign of work in a worktree, as (time, what it was), or (None, None): a session's transcript, the
     worktree's git folder, a claim, or what its session said of itself. A session started in another folder that
-    works here by path leaves no transcript here."""
+    works here by path leaves no transcript here. archived names the archived sessions, by Claude Code's id, whose
+    transcripts are no sign of work."""
     spoke = said_by(tree_path, said)
-    signs = [(last_session(tree_path), "a session's transcript"), (git_written(tree_path), "its git folder"),
+    signs = [(last_session(tree_path, archived), "a session's transcript"), (git_written(tree_path), "its git folder"),
              (claimed_at(tree_path, claims), "a claim"), (said_at(spoke) if spoke else None, "what it said")]
     signs = [sign for sign in signs if sign[0] is not None]
     return max(signs) if signs else (None, None)
@@ -511,6 +563,22 @@ def sessions_by_tree(trees, rows, minutes=30, now=None, desktop=()):
             "started": None, "wrote": wrote or record["at"], "cwd": folder, "desktop": record["desktop"]})
     for sessions in found.values():
         sessions.sort(key=lambda s: (s["status"] == "offline", -(s["wrote"] or s["started"] or 0)))
+    return found
+
+
+def archived_by_tree(trees, desktop):
+    """The archived sessions of the app in each worktree, as {same(worktree's path): [{"name", "desktop"}]}, the
+    newest first: what explains a worktree that no session holds any more, such as one whose HEAD the app detached
+    when it archived the session."""
+    found = {}
+    for record in sorted(desktop, key=lambda r: -(r["at"] or 0)):
+        folder = record["cwd"] or record["worktree"]
+        if not record["archived"] or not folder or not os.path.isdir(folder):
+            continue
+        tree = tree_of(folder, trees)
+        if tree is not None and not tree.get("broken"):
+            found.setdefault(same(tree["path"]), []).append({"name": record["title"], "desktop": record["desktop"],
+                                                             "cli": record["cli"]})
     return found
 
 
@@ -2137,7 +2205,15 @@ def prune_safe_words(item, model):
     words = f"quiet for {how_long(now - sign['at'])}" if sign else "no sign of work on this machine"
     if item["ahead"]:
         words += f"; its {common.count(item['ahead'], 'commit is', 'commits are')} on {base} by content"
+    if item.get("archived"):
+        words += "; " + archived_words(item["archived"])
     return words
+
+
+def archived_words(archived):
+    """The archived sessions of a worktree, in words: 'its session "X" is archived'."""
+    return (("its session " if len(archived) == 1 else "its sessions ") + ", ".join(session_name(s) for s in archived)
+            + (" is archived" if len(archived) == 1 else " are archived"))
 
 
 def remove_worktree(main, path):
@@ -2224,7 +2300,8 @@ def do_prune(options):
         out += lines_of("To remove them, with the person's yes: crew prune --remove <name> [<name>...]. Each is checked "
                         "again first and removed with git worktree remove, which never removes a change; its branch stays.")
     if wants_links():
-        linked = link_lines([session for item in items for session in item["sessions"]])
+        linked = link_lines([session for item in items for session in item["sessions"]]
+                            + [session for item in safe for session in item.get("archived", [])])
         out += [""] + linked if linked else []
     print("\n".join(out))
     return 0
@@ -2316,6 +2393,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     minutes = crew.get("activeMinutes") or 30
     old_hours = crew.get("oldUntrackedHours") or 24
     by_tree = sessions_by_tree(place.trees, rows, minutes, now, desktop)
+    archived = archived_by_tree(place.trees, desktop)
     patterns = heavy_patterns(place.config)
     heavy = {p["pid"] for p in heavy_now(snapshot, patterns)}
     whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
@@ -2360,7 +2438,8 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                 named.append({"pid": process["pid"], "command": shown(process["command"], 300),
                               "shown": plain_command(process["command"], tree["path"]), "heavy": process["pid"] in heavy,
                               "ports": listens, "keep": [port for port in listens if port in keep]})
-        stamp, what = last_sign(tree["path"], claims, spoken)
+        stamp, what = last_sign(tree["path"], claims, spoken,
+                                {cli for session in archived.get(key, []) for cli in session["cli"]})
         spoke = said_by(tree["path"], spoken)
         ahead = m.get("ahead")
         untracked, untracked_at = m.get("untracked") or 0, m.get("untrackedAt")
@@ -2376,7 +2455,8 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                 "claims": [{"key": c["key"], "since": c.get("since"), "why": c.get("why") or ""}
                            for c in claims if same(c.get("worktree") or "") == key],
                 "said": {"words": spoke.get("words"), "at": said_at(spoke)} if spoke else None,
-                "turn": any(same(held.get("worktree") or "") == key for held in holders)}
+                "turn": any(same(held.get("worktree") or "") == key for held in holders),
+                "archived": archived.get(key, [])}
         item["group"], item["reason"] = standing(item, minutes, now)
         items.append(item)
     order = {"asks": 0, "blocked": 1}
@@ -2574,6 +2654,9 @@ def block(item, model, verbose=False):
         sign = item["lastSign"]
         out += lines_of("last sign of work: " + (f"{ago(sign['at'], now)}, {sign['what']}" if sign else "none on this machine"),
                         "      ", "        ")
+    if not item["sessions"] and item.get("archived"):
+        out += lines_of(archived_words(item["archived"]) + " in Claude Desktop, so no session is open here", "      ",
+                        "        ")
     for process in item["processes"]:
         marks = (["heavy"] if process["heavy"] else []) + [
             f"listens on {port}" + (", the person's own" if port in process["keep"] else "") for port in process["ports"]]
@@ -2761,7 +2844,9 @@ def render(model, verbose=False, links=False):
                "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")
     if links:
         shown_items = [item for item in model["worktrees"] if item["group"] != "quiet" or verbose]
-        linked = link_lines([session for item in shown_items for session in item["sessions"]] + model.get("gone", []))
+        linked = link_lines([session for item in shown_items for session in item["sessions"]]
+                            + [session for item in shown_items if not item["sessions"] for session in item.get("archived", [])]
+                            + model.get("gone", []))
         out += [""] + linked if linked else []
     return out
 

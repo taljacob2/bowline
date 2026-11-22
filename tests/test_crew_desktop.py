@@ -9,14 +9,16 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, git, write
+from support import SCRIPTS, ScratchRepo, age_git_folder, git, write
 
-import crew  # noqa: E402 - support puts the scripts on the path
+import common  # noqa: E402 - support puts the scripts on the path
+import crew  # noqa: E402
 
 FAKE_CLAUDE = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_claude.py")]
 PARSER = "local_11111111-2222-3333-4444-555555555555"
 PARKED = "local_22222222-3333-4444-5555-666666666666"
 GONE = "local_33333333-4444-5555-6666-777777777777"
+ARCHIVED = "local_44444444-5555-6666-7777-888888888888"
 
 
 def flat(text):
@@ -105,12 +107,7 @@ class DesktopTests(ScratchRepo):
 
     def age(self, tree, hours):
         """Makes a worktree's own git folder look last written some hours ago, as one nobody works in is."""
-        folder = os.path.join(self.repo, ".git") if tree == self.repo else \
-            os.path.join(self.repo, ".git", "worktrees", os.path.basename(tree))
-        stamp = time.time() - hours * 3600
-        for name in ("index", "HEAD", os.path.join("logs", "HEAD")):
-            if os.path.exists(os.path.join(folder, name)):
-                os.utime(os.path.join(folder, name), (stamp, stamp))
+        age_git_folder(self.repo, tree, hours * 3600)
 
     def test_a_session_offline_in_the_sidebar_keeps_its_worktree_until_it_is_archived(self):
         # On 2026-11-22 prune called four worktrees safe to remove whose sessions were still in the person's sidebar,
@@ -161,6 +158,51 @@ class DesktopTests(ScratchRepo):
         text = flat(self.crew("prune")[1])
         self.assertIn("Safe to remove: 1 worktree.", text)
         self.assertIn("other: quiet for 8 hours", text)
+
+    def test_a_head_detached_at_its_own_commit_is_no_work_and_the_archived_session_is_named(self):
+        # On 2026-11-22 the app archived the session "Bowline crew" and detached the HEAD of its worktree at the
+        # commit it was on. The look put the worktree under AT WORK, "a sign of work less than a minute ago (its git
+        # folder), and no session listed here", and prune called it not safe for the same reason.
+        self.origin()
+        done = os.path.join(self.repo, ".claude", "worktrees", "done")
+        old = int(time.time()) - 8 * 3600
+        os.environ["GIT_COMMITTER_DATE"] = f"{old} +0000"     # the log of its HEAD says it last moved 8 hours ago
+        try:
+            git(self.repo, "worktree", "add", "-q", "-b", "done", done)
+            write(os.path.join(done, "src", "fix.py"), "fixed = 1\n")
+            git(done, "add", "src/fix.py")
+            git(done, "commit", "-q", "-m", "a fix")
+        finally:
+            del os.environ["GIT_COMMITTER_DATE"]
+        git(done, "push", "-q", "origin", "done:main")
+        git(self.repo, "fetch", "-q", "origin")
+        self.age(done, 8)
+        # What the app does when it archives the session: it detaches the HEAD at its own commit, and it writes to the
+        # session's transcript.
+        git(done, "checkout", "-q", "--detach")
+        write(os.path.join(common.project_folder(done), "cli-archived.jsonl"), '{"type":"system"}\n')
+        self.agents()
+        self.record(ARCHIVED, "cli-archived", "Bowline crew", done, archived=True)
+        model = json.loads(self.crew("--json")[1])
+        tree = next(item for item in model["worktrees"] if item["display"] == "done")
+        self.assertAlmostEqual(tree["lastSign"]["at"], old, delta=60)
+        self.assertEqual((tree["group"], tree["sessions"], tree["archived"]),
+                         ("quiet", [], [{"name": "Bowline crew", "desktop": ARCHIVED, "cli": ["cli-archived"]}]))
+        code, out, err = self.crew("--verbose", env={"CLAUDECODE": "1"})
+        self.assertEqual(code, 0, out + err)
+        text = flat(out)
+        self.assertNotIn("done (branch no branch): a sign of work", text)
+        self.assertIn('done (branch no branch): quiet holds: nothing that is not on origin/main last sign of work: 8 '
+                      'hours ago, its git folder its session "Bowline crew" is archived in Claude Desktop, so no session '
+                      'is open here', text)
+        self.assertIn(f'#{ARCHIVED} "Bowline crew"', text[text.index("SESSION LINKS"):])
+        text = flat(self.crew("prune")[1])
+        self.assertIn('Safe to remove: 1 worktree.', text)
+        self.assertIn('done: quiet for 8 hours; its session "Bowline crew" is archived', text)
+        # A commit is work, detached or not.
+        git(done, "commit", "-q", "--allow-empty", "-m", "more")
+        text = flat(self.crew("prune")[1])
+        self.assertIn("done: 1 commit not on origin/main; a sign of work less than a minute ago (its git folder)", text)
 
     def test_a_session_whose_worktree_is_being_removed_is_named_too(self):
         leaving = os.path.join(self.repo, ".claude", "worktrees", "leaving")

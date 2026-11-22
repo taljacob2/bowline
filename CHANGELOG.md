@@ -33,6 +33,14 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
   Once the session is archived, the worktree is safe. An offline background session is no longer worded as "open" in
   `crew prune`. The look lists, under ACROSS THE WORKTREES, the sidebar sessions whose worktree is gone or being
   removed, for the person to archive; `crew --json` gives them as `gone`.
+- Archiving a session is no longer a sign of work. When Claude Desktop archives a session, it detaches the HEAD of the
+  session's worktree at the commit it was on, rewrites the index and writes to the session's transcript; the look then
+  put the worktree under AT WORK, "a sign of work less than a minute ago (its git folder), and no session listed
+  here", and `crew prune` called it not safe for six hours. A write of HEAD that moves it to no other commit, with
+  the index written beside it, and the transcript of an archived session no longer count. The look names the archived
+  session of a worktree that no other session holds ("its session ... is archived in Claude Desktop, so no session is
+  open here"), and `crew prune` names it beside a worktree that is safe to remove; `crew --json` gives each
+  worktree's `archived`.
 
 ## 0.15.1 (2026-11-22)
 
