@@ -4,6 +4,13 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- `memory losses`, and the doctor's warning that reads it, no longer count a line of a note's front matter that a
+  commit gave a new value in place. Claude Code writes the front matter again on every save, with a new `modified:`
+  time under `metadata:`, so the old time was reported as a line that one session had added and another had lost. A
+  field removed with no new value, and a line of the note's body, are still losses.
+
 ## 0.15.1 (2026-11-22)
 
 The crew sees a session's background command, and says when a session it lists is not running. No Claude Code limit

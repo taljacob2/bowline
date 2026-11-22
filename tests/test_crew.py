@@ -490,6 +490,35 @@ class MemoryLossTests(ScratchRepo):
         self.assertEqual(code, 0, out)
         self.assertIn("losses: none", out)
 
+    def test_a_front_matter_field_given_a_new_value_is_not_a_loss(self):
+        # Claude Code writes a note's front matter again on every save, with a new `modified:` under `metadata:`. On
+        # 2026-11-22 the doctor reported the old value as a line lost, because another session had written it.
+        note = os.path.join(self.memory, "feedback_git.md")
+
+        def save(modified, body, extra=""):
+            write(note, "---\nname: feedback_git\ndescription: How git is used\nmetadata:\n  type: feedback\n"
+                        f"{extra}  modified: {modified}\n---\n\n{body}Status: open\n")
+
+        save("2026-11-21T02:11:05.819Z", "- push fast-forward only\n", extra="  originSessionId: one\n")
+        self.reply_ends("session-one")
+        save("2026-11-21T07:39:54.608Z", "- push fast-forward only\n- the HTTPS fallback\n", extra="  originSessionId: one\n")
+        self.reply_ends("session-two")
+        code, out, _ = self.memory_cmd("losses")
+        self.assertEqual(code, 0, out)
+        self.assertIn("losses: none", out)
+        code, out, _ = self.run_script("doctor")
+        self.assertNotIn("feedback_git.md lost", out)
+        # A field removed with no new value, a line of the note's body that only looks like a field, and a line of the
+        # body itself are still losses when a third session takes them out.
+        write(note, read(note).replace("  originSessionId: one\n", "").replace("Status: open", "Status: closed")
+              .replace("- the HTTPS fallback\n", ""))
+        self.reply_ends("session-three")
+        code, out, _ = self.memory_cmd("losses")
+        self.assertEqual(code, 1, out)
+        self.assertIn("feedback_git.md: 3 line(s) that another session had added", out)
+        for line in ("originSessionId: one", "Status: open", "- the HTTPS fallback"):
+            self.assertIn("\n  " + line + "\n", out)
+
 
 if __name__ == "__main__":
     unittest.main()

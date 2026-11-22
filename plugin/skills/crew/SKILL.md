@@ -140,7 +140,8 @@ there, such as a notes queue. Outside the repository there are no branches and n
 
 The doctor watches the memory's backup for this: it warns when one session's commit removed lines that another
 session had added within the last day. `node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" memory losses` lists the lines
-and the commit; put back what was lost with Edit. For a removal that was meant, such as a worked note another session
+and the commit; put back what was lost with Edit. A line of a note's front matter that a save gave a new value, such
+as the `modified:` time Claude Code writes on every save, is not counted as lost. For a removal that was meant, such as a worked note another session
 took off the queue, `memory losses --meant <commit>` records it so that it is not reported again. Show the lines to
 the person before deciding which it was.
 

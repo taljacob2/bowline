@@ -24,7 +24,9 @@ losses reads that line. Every worktree of a repository shares one memory folder,
 from the copy it read earlier erases what another session added in between. losses lists, from the backup's history
 of the last crew.memoryLossDays days, every commit after one session's reply that removed lines another session's
 commit had added less than crew.memoryLossHours hours before, when those lines are in no note today; the doctor warns
-about each. --meant <commit> records that a removal was meant, so that it is not reported again.
+about each. A line of a note's front matter that the commit gave a new value in place, such as the `modified:` time
+Claude Code writes again on every save, is not a loss. --meant <commit> records that a removal was meant, so that it
+is not reported again.
 """
 
 import argparse
@@ -266,10 +268,46 @@ def lines_today(memory):
     return held
 
 
+FIELD = re.compile(r"^(\s*)([A-Za-z_][\w.-]*)\s*:")
+
+
+def front_matter(text):
+    """The lines of a note's front matter: those between a first line `---` and the next `---`, as written. A note
+    without one, or whose front matter is never closed, has none."""
+    lines = (text or "").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return []
+    for index, line in enumerate(lines[1:], 1):
+        if line.strip() == "---":
+            return lines[1:index]
+    return []
+
+
+def given_new_values(memory, commit, note):
+    """The front-matter lines of a note that a commit gave a new value in place, without their surrounding spaces: a
+    line `modified: <time>` of the note before the commit, where the note after it holds the same field, at the same
+    depth, with another value. Claude Code writes a note's front matter again on every save, so such a line is
+    bookkeeping that changed, not a line that was lost."""
+    fields = {}
+    code, after = git(memory, "show", f"{commit}:{note}", capture=True)
+    for line in front_matter(after) if code == 0 else []:
+        found = FIELD.match(line)
+        if found:
+            fields.setdefault((found.group(1), found.group(2)), set()).add(line.strip())
+    code, before = git(memory, "show", f"{commit}^:{note}", capture=True)
+    replaced = set()
+    for line in front_matter(before) if code == 0 else []:
+        found = FIELD.match(line)
+        if found and fields.get((found.group(1), found.group(2)), set()) - {line.strip()}:
+            replaced.add(line.strip())
+    return replaced
+
+
 def losses(memory, config, now=None):
     """The lines one session added to a note and another session removed soon after, that no note holds today: a list
     of {commit, note, lines, when}, the oldest first. Read from the backup's history; a commit made before bowline
-    wrote the session into its message names no session and is never part of a finding."""
+    wrote the session into its message names no session and is never part of a finding. A front-matter field that the
+    commit gave a new value in place, such as `modified:`, is not a loss."""
     crew = config.get("crew") or {}
     days, hours = crew.get("memoryLossDays") or 0, crew.get("memoryLossHours") or 0
     if not days or not hours or not os.path.isdir(os.path.join(memory, ".git")):
@@ -316,6 +354,9 @@ def losses(memory, config, now=None):
     found = []
     for loss in candidates.values():
         loss["lines"] = [line for line in loss["lines"] if line not in held]
+        if loss["lines"] and any(FIELD.match(line) for line in loss["lines"]):
+            renewed = given_new_values(memory, loss["commit"], loss["note"])
+            loss["lines"] = [line for line in loss["lines"] if line not in renewed]
         if loss["lines"] and not any(loss["commit"].startswith(c) for c in said if len(c) >= 7):
             found.append(loss)
     return found
