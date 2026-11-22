@@ -158,7 +158,9 @@ class SessionTests(ScratchRepo):
              "name": "the docs", "status": "busy", "startedAt": now},
             {"sessionId": "sess-release", "cwd": self.main["path"], "kind": "interactive", "name": "the release",
              "status": "idle", "startedAt": now},
-            {"sessionId": "sess-nightly", "cwd": self.main["path"], "kind": "background", "name": "nightly", "state": "blocked"},
+            # A background session whose process runs is listed with its pid; without one it is offline.
+            {"sessionId": "sess-nightly", "cwd": self.main["path"], "kind": "background", "name": "nightly", "pid": 4343,
+             "state": "blocked"},
             {"sessionId": "sess-elsewhere", "cwd": self.root, "kind": "interactive", "name": "elsewhere", "status": "busy"})
         self.transcript(self.main["path"], "sess-release", minutes_ago=5)
         code, out, err = self.crew()

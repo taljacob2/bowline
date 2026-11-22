@@ -24,8 +24,9 @@ With no word after it, crew lists every worktree of the repository: its branch, 
 session pushes to, its changed files, the last sign of work there, the sessions at work in it, its processes that
 count as heavy or that listen on a port, the claims it holds, the files changed in more than one worktree, and who
 holds the turn for a heavy check. The sessions are the ones `claude agents --json` lists, Claude Desktop's included,
-each joined to the worktree its folder is in, with whether it is busy, idle or blocked; what claude listed is kept in
-the repository's git folder (sessions.json) for the hooks, which never start claude. Where claude cannot be asked, a
+each joined to the worktree its folder is in, with whether it is busy, idle or blocked, or offline: a background
+session listed with no process, which neither works nor waits; what claude listed is kept in the repository's git
+folder (sessions.json) for the hooks, which never start claude. Where claude cannot be asked, a
 transcript written lately stands for a session, named by the title line at its end. A process belongs to the worktree
 of its session, else to the one its command line names, else to that of its children when all of them agree, else to
 that of its nearest parent with one. A worktree whose folder has no .git file of its own, as while it is being
@@ -34,7 +35,8 @@ with the memory its process and every process below it hold, and the look says h
 
 The printout puts what matters first, each worktree once: WAITS FOR YOU (a session asks the person a question or is
 blocked, or its sessions are idle and it holds files not committed or commits not on the pushed branch), AT WORK (a
-session is busy or a heavy check runs), IDLE (sessions idle, nothing held) a line each, and QUIET (no session, no sign
+session is busy, a heavy check runs, or a command a session started still runs after its turn ended, each such command
+named under its session), IDLE (sessions idle, nothing held) a line each, and QUIET (no session, no sign
 of work) folded into one line that says whether any of them holds work; a commit counts as held only when its change
 is not on the pushed branch (git cherry), because a rebased commit reaches it under another hash. Then what concerns
 more than one worktree. Every line is plain ASCII within 100 columns. --json prints the model the printout is drawn
@@ -376,10 +378,15 @@ def tree_of(folder, trees):
 
 def sessions_by_tree(trees, rows, minutes=30, now=None):
     """The sessions in each worktree, as {same(worktree's path): [session]}, newest first. A session is {"name", "id",
-    "kind", "status", "pid", "started", "wrote", "cwd"}: status is busy, idle or blocked as Claude Code says, and wrote
-    is when its transcript was last written. rows are what `claude agents --json` listed; None means it could not be
-    asked, and then each transcript written in the last `minutes` stands for a session, named by its title, with the
-    status unknown."""
+    "kind", "status", "was", "pid", "started", "wrote", "cwd"}: status is busy, idle or blocked as Claude Code says, or
+    offline, and wrote is when its transcript was last written. rows are what `claude agents --json` listed; None means
+    it could not be asked, and then each transcript written in the last `minutes` stands for a session, named by its
+    title, with the status unknown.
+
+    A background session listed without a process id is offline, and was is the state it last recorded. Claude Code
+    builds such a row from the background job's own record when no process of the job runs, and keeps it in the list
+    while that record says "working" or "blocked"; on 2026-11-22 the list held five, the oldest started 112 days
+    before and none with a process, each shown as blocked and waiting for the person."""
     now = time.time() if now is None else now
     found = {}
     if rows is None:
@@ -388,7 +395,8 @@ def sessions_by_tree(trees, rows, minutes=30, now=None):
                 if now - stamp <= minutes * 60:
                     found.setdefault(same(tree["path"]), []).append({
                         "name": session_title(path), "id": os.path.basename(path)[:-len(".jsonl")], "kind": None,
-                        "status": "unknown", "pid": None, "started": None, "wrote": stamp, "cwd": tree["path"]})
+                        "status": "unknown", "was": None, "pid": None, "started": None, "wrote": stamp,
+                        "cwd": tree["path"]})
     for row in rows or []:
         tree = tree_of(str(row.get("cwd") or ""), trees) if row.get("cwd") else None
         if tree is None or tree.get("broken"):
@@ -399,13 +407,15 @@ def sessions_by_tree(trees, rows, minutes=30, now=None):
         except OSError:
             wrote = None
         started = row.get("startedAt")
+        pid = row.get("pid") if isinstance(row.get("pid"), int) else None
+        status = "blocked" if row.get("state") == "blocked" else str(row.get("status") or row.get("state") or "unknown")
+        offline = row.get("kind") == "background" and pid is None
         found.setdefault(same(tree["path"]), []).append({
             "name": " ".join(str(row.get("name") or "").split()) or None, "id": sid, "kind": row.get("kind"),
-            "status": "blocked" if row.get("state") == "blocked" else str(row.get("status") or row.get("state") or "unknown"),
-            "pid": row.get("pid") if isinstance(row.get("pid"), int) else None,
+            "status": "offline" if offline else status, "was": status if offline else None, "pid": pid,
             "started": started / 1000.0 if isinstance(started, (int, float)) else None, "wrote": wrote, "cwd": row["cwd"]})
     for sessions in found.values():
-        sessions.sort(key=lambda s: -(s["wrote"] or s["started"] or 0))
+        sessions.sort(key=lambda s: (s["status"] == "offline", -(s["wrote"] or s["started"] or 0)))
     return found
 
 
@@ -741,19 +751,24 @@ def heavy_patterns(config):
 CREW_PROCESS = re.compile(r"(?:bowline\.py|run\.mjs|crew\.py)\S*[\"']?\s+(?:crew\b|run\b)")
 
 
-def crew_chain(snapshot):
-    """The processes that are a bowline crew command or one of its parents, this one included. A waiting
-    `crew run -- <a heavy command>` names the heavy command in its own command line, and so does the shell that started
-    it; neither is the heavy process, and two waiting sessions must not wait for each other."""
+def ancestors(starts, snapshot):
+    """The processes given and every parent of each, up to the first that is not listed, as a set of pids."""
     parents = {process["pid"]: process["ppid"] for process in snapshot}
     chain = set()
-    starts = [os.getpid()] + [p["pid"] for p in snapshot
-                              if CREW_PROCESS.search(p["command"]) and re.search(r"\bcrew\b", p["command"])]
     for pid in starts:
         while pid and pid not in chain:
             chain.add(pid)
             pid = parents.get(pid)
     return chain
+
+
+def crew_chain(snapshot):
+    """The processes that are a bowline crew command or one of its parents, this one included. A waiting
+    `crew run -- <a heavy command>` names the heavy command in its own command line, and so does the shell that started
+    it; neither is the heavy process, and two waiting sessions must not wait for each other."""
+    return ancestors([os.getpid()] + [p["pid"] for p in snapshot
+                                      if CREW_PROCESS.search(p["command"]) and re.search(r"\bcrew\b", p["command"])],
+                     snapshot)
 
 
 def heavy_now(snapshot, patterns):
@@ -767,6 +782,60 @@ def heavy_now(snapshot, patterns):
 def shown(command, width=100):
     command = " ".join(command.split())
     return command if len(command) <= width else command[:width - 3] + "..."
+
+
+# A session's own commands. Claude Code runs a command of its Bash tool in a shell that sources the session's shell
+# snapshot and then runs `eval '<the command>' < /dev/null && pwd -P >| <a file>`, the file being where the shell's
+# folder is kept for the next command; a command of its PowerShell tool runs in cmd.exe or PowerShell started with its
+# script in the variable below, so the command line never shows the script. Its MCP servers, its hooks, its console
+# host and the shell's startup, which writes the snapshot, are started otherwise. So a shell of that shape below a
+# session's claude process is a command the session runs, and one that runs after the session's turn has ended is a
+# background command: on 2026-11-21 a background `git push` of 21 MB ran for 45 minutes after its session went idle.
+SHELL_EVAL = re.compile(r"\beval '((?:[^']|'\\'')*)'")
+POWERSHELL_TOOL = "CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT"
+WRAPPERS = {"cmd.exe", "conhost.exe", "chcp.com", "powershell.exe", "pwsh.exe", "pwsh"}
+
+
+def tool_shell(command):
+    """Whether a command line is a shell Claude Code started for a command of its Bash or PowerShell tool."""
+    return "pwd -P >|" in command or POWERSHELL_TOOL in command
+
+
+def tool_command(process, by_pid, children, tree_path=None):
+    """What a tool's shell runs, as a person reads it: the Bash tool's command as the shell evaluates it; for the
+    PowerShell tool, the first process below its shell that is not a shell or a console, else only that a PowerShell
+    command runs."""
+    found = SHELL_EVAL.search(process["command"])
+    if found:
+        return plain_command(found.group(1).replace("'\\''", "'").replace('\\"', '"'), tree_path)
+    todo, seen = list(children.get(process["pid"], [])), set()
+    while todo:
+        pid = todo.pop(0)
+        if pid in seen or pid not in by_pid:
+            continue
+        seen.add(pid)
+        if by_pid[pid]["name"].lower() not in WRAPPERS:
+            return plain_command(by_pid[pid]["command"], tree_path)
+        todo.extend(children.get(pid, []))
+    return "a PowerShell command" if POWERSHELL_TOOL in process["command"] else "a shell command"
+
+
+def live_commands(pid, by_pid, children, skip=(), tree_path=None):
+    """The commands a session's own Bash and PowerShell tools run now, as [{"pid", "command"}]: each tool's shell below
+    the session's claude process, the outermost of a chain, since Git Bash starts a second bash below the first. A
+    shell in skip, such as the one that runs this look, is left out."""
+    found, todo, seen = [], list(children.get(pid, [])), {pid}
+    while todo:
+        kid = todo.pop(0)
+        if kid in seen or kid not in by_pid:
+            continue
+        seen.add(kid)
+        if tool_shell(by_pid[kid]["command"]):
+            if kid not in skip:
+                found.append({"pid": kid, "command": tool_command(by_pid[kid], by_pid, children, tree_path)})
+            continue                                # what runs below it is the command itself
+        todo.extend(children.get(kid, []))
+    return found
 
 
 # The claims.
@@ -1712,6 +1781,9 @@ def session_state(session, now):
         return "blocked in the background" if session.get("kind") == "background" else "blocked"
     if status == "idle":
         return "idle" + (f" for {how_long(now - session['wrote'])}" if session.get("wrote") else "")
+    if status == "offline":
+        return (f"offline: Claude Code lists it as {session.get('was') or 'blocked'} from when it last ran, and no "
+                "process of it runs now")
     return f"last wrote {ago(session['wrote'], now)}" if session.get("wrote") else f"{status}"
 
 
@@ -2022,12 +2094,14 @@ def display_names(trees):
 
 def plain_command(command, tree_path=None):
     """What a process runs, as a person reads it: a Claude Code shell by the command it evaluates, the worktree's own
-    path left out, quotation marks dropped, and node_modules/.bin/.. folded into node_modules."""
-    found = re.search(r"\beval '((?:[^']|'\\'')*)'", command)
+    path left out, a first `cd` into it dropped, quotation marks dropped, and node_modules/.bin/.. folded into
+    node_modules."""
+    found = SHELL_EVAL.search(command)
     if found and "shell-snapshots" in command:
         command = "a shell: " + found.group(1).replace("'\\''", "'").replace('\\"', '"')
     text = " ".join(command.replace('"', "").split())
     for path in sorted({tree_path, tree_path.replace("\\", "/")} if tree_path else (), key=len, reverse=True):
+        text = re.sub(r"^(a shell: )?cd " + re.escape(path) + r"[\\/]*\s*&&\s*", r"\1", text, flags=re.IGNORECASE)
         text = re.sub(re.escape(path) + r"[\\/]+", "", text, flags=re.IGNORECASE)
     return re.sub(r"node_modules([\\/])\.bin[\\/]+\.\.[\\/]+", r"node_modules\1", text)
 
@@ -2035,22 +2109,27 @@ def plain_command(command, tree_path=None):
 def standing(item, minutes, now):
     """The group a worktree goes in and why, as (group, reason). The first that fits: a session asks the person a
     question or is blocked (waits); a session is busy, or a heavy check runs (work); a session's state is not known
-    but its transcript was written lately (work); its sessions are idle and it holds files not committed or commits
-    not on the pushed branch (waits); its sessions are idle and it holds nothing (idle); no session, but a sign of work
-    lately, as from a session that works here by path (work); nothing (quiet)."""
+    but its transcript was written lately (work); a session's own command runs, though Claude Code calls the session
+    idle because its turn has ended (work); its sessions are idle and it holds files not committed or commits not on
+    the pushed branch (waits); its sessions are idle and it holds nothing (idle); no session, but a sign of work
+    lately, as from a session that works here by path (work); nothing (quiet). An offline session neither asks, works
+    nor waits: no process of it runs, so it counts only as a session that is not at work."""
     if item["broken"]:
         return "broken", "broken"
     sessions = item["sessions"]
-    if item["asks"] or any(session.get("asks") for session in sessions):
+    live = [session for session in sessions if session["status"] != "offline"]
+    if item["asks"] or any(session.get("asks") for session in live):
         return "waits", "asks"
-    if any(session["status"] == "blocked" for session in sessions):
+    if any(session["status"] == "blocked" for session in live):
         return "waits", "blocked"
-    if any(session["status"] == "busy" for session in sessions):
+    if any(session["status"] == "busy" for session in live):
         return "work", "busy"
     if item["turn"] or any(process["heavy"] for process in item["processes"]):
         return "work", "heavy"
-    if any(session["status"] == "unknown" for session in sessions):
+    if any(session["status"] == "unknown" for session in live):
         return "work", "wrote"
+    if any(session.get("commands") for session in live):
+        return "work", "command"
     if sessions and (item["uncommitted"] or item["notOnBase"]):
         return "waits", "idle-uncommitted" if item["uncommitted"] else "idle-unpushed"
     if sessions:
@@ -2081,6 +2160,8 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     turn = holders[0] if holders else None
     children = children_of(snapshot)
     listed_pids = {p["pid"] for p in snapshot}
+    by_pid = {p["pid"]: p for p in snapshot}
+    this_look = ancestors([os.getpid()], snapshot)        # the shell that runs this look is not a command to report
     names = display_names(place.trees)
     measured = {same(tree["path"]): tree for tree in record["trees"]}
     keep = [int(p) for p in crew.get("keepPorts") or [] if str(p).isdigit()]
@@ -2094,6 +2175,8 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
             # The session's own process and every process below it: what closing the session gives back.
             pid = session.get("pid")
             session["memory"] = memory_of(below([pid], snapshot, children), snapshot) if pid in listed_pids else None
+            session["commands"] = (live_commands(pid, by_pid, children, this_look, tree["path"])
+                                   if pid in listed_pids else [])
         loose = []
         for question in asks:
             if same(question["worktree"]) != key:
@@ -2139,7 +2222,6 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     for path, held in both:
         if (path, held) not in shared:
             groups.setdefault(tuple(by_name.get(name, name) for name in held), []).append(path)
-    by_pid = {p["pid"]: p for p in snapshot}
     port_owner = {port: pid for pid, found in (ports or {}).items() for port in found}
     keep_rows = []
     for port in keep:
@@ -2149,7 +2231,8 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
                           "command": shown(by_pid[pid]["command"], 300) if pid in by_pid else None})
     counts = {group: sum(1 for item in items if item["group"] == group) for group in GROUPS}
     counts["worktrees"] = len(items) - counts["broken"]
-    counts["sessions"] = sum(len(item["sessions"]) for item in items)
+    counts["sessions"] = sum(1 for item in items for s in item["sessions"] if s["status"] != "offline")
+    counts["offline"] = sum(1 for item in items for s in item["sessions"] if s["status"] == "offline")
     trees_folder = {os.path.dirname(tree["name"]) for tree in place.trees if not tree["main"]}
     session_pids_listed = [s["pid"] for item in items for s in item["sessions"] if s.get("pid") in listed_pids]
     machine = machine_memory()
@@ -2237,14 +2320,20 @@ def reason_words(item, model):
     if reason == "blocked":
         blocked = sum(1 for session in sessions if session["status"] == "blocked")
         return "a session is blocked" if blocked == 1 else f"{blocked} sessions are blocked"
+    idle = "offline" if sessions and all(session["status"] == "offline" for session in sessions) else "idle"
     if reason == "idle-uncommitted":
-        return "idle, with work not committed"
+        return f"{idle}, with work not committed"
     if reason == "idle-unpushed":
-        return f"idle, with work not on {model['base']}"
+        return f"{idle}, with work not on {model['base']}"
     if reason == "busy":
         return common.count(sum(1 for session in sessions if session["status"] == "busy"), "session", "sessions") + " busy"
     if reason == "heavy":
         return "a heavy check runs" + (", its sessions idle" if sessions else "")
+    if reason == "command":
+        running = sum(len(session.get("commands") or []) for session in sessions)
+        live = sum(1 for session in sessions if session["status"] != "offline")
+        return ("a background command runs" if running == 1 else f"{running} background commands run") + (
+            ", its session idle" if live == 1 else ", its sessions idle")
     if reason == "wrote":
         wrote = max([session.get("wrote") or 0 for session in sessions] or [0])
         return "a session wrote " + ago(wrote, now) if wrote else "a session at work"
@@ -2270,6 +2359,10 @@ def block(item, model, verbose=False):
     for session in item["sessions"]:
         held = f", {size(session['memory'])} of memory" if session.get("memory") else ""
         out += lines_of(f"session {session_name(session)}: {session_state(session, now)}{held}", "      ", "        ")
+        for command in session.get("commands") or []:
+            # The session's turn may have ended long ago: Claude Code calls it idle while its command still runs.
+            where = "runs" if session["status"] == "busy" else "runs in the background"
+            out += lines_of(f"{where}: {shown(command['command'], 170)}", "        ", "          ")
         if session.get("asks"):
             asked = session["asks"]
             out += lines_of(f"asks, {ago(asked['at'], now) if asked.get('at') else 'lately'}: {quoted(asked['words'])}",
@@ -2310,6 +2403,7 @@ def idle_line(item, model):
     if item["claims"]:
         extra.append("still claims " + ", ".join(claim["key"] for claim in item["claims"]))
     names = "; ".join(session_name(session) + (f" ({size(session['memory'])})" if session.get("memory") else "")
+                      + (" (offline: no process of it runs)" if session["status"] == "offline" else "")
                       for session in item["sessions"])
     return lines_of(f"{head_of(item, model)}: {names}" + (", " + ", ".join(extra) if extra else ""), "  ", "      ")
 
@@ -2342,8 +2436,9 @@ def render(model, verbose=False):
     now, base, counts = model["at"], model["base"], model["counts"]
     out = lines_of(f"bowline crew: {model['repository']}, " + (f"measured against {base}" if base else
                    "with no pushed branch to measure against") + time.strftime(", %H:%M", time.localtime(now)), "", "  ")
+    offline = f" ({counts['offline']} more listed, offline)" if counts.get("offline") else ""
     out += lines_of(f"{common.count(counts['worktrees'], 'worktree', 'worktrees')} and "
-                    f"{common.count(counts['sessions'], 'session', 'sessions')}: {counts['waits']} wait for you, "
+                    f"{common.count(counts['sessions'], 'session', 'sessions')}{offline}: {counts['waits']} wait for you, "
                     f"{counts['work']} at work, {counts['idle']} idle, {counts['quiet']} quiet"
                     + (f", {counts['broken']} broken" if counts["broken"] else "") + "."
                     + (f" A worktree is named by its folder in {model['worktreesFolder']}." if model["worktreesFolder"] else ""))

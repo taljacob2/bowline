@@ -113,8 +113,8 @@ class LookTests(ScratchRepo):
         self.assertEqual(by["asking"]["sessions"][0]["asks"]["words"], "Which name?")
         self.assertEqual(by["busy"]["sessions"][0]["status"], "busy")
         self.assertEqual(by["holding"]["uncommitted"], 1)
-        self.assertEqual(model["counts"], {"worktrees": 6, "sessions": 4, "waits": 2, "work": 1, "idle": 1, "quiet": 2,
-                                           "broken": 0})
+        self.assertEqual(model["counts"], {"worktrees": 6, "sessions": 4, "offline": 0, "waits": 2, "work": 1, "idle": 1,
+                                           "quiet": 2, "broken": 0})
         self.assertTrue(model["sessionsListed"])
 
     def test_a_reply_that_ends_with_a_question_waits_for_the_person_until_the_next_prompt(self):

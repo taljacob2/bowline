@@ -20,13 +20,14 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" crew
 
 It puts what matters first, each worktree once: **WAITS FOR YOU** (a session asks the person a question or is
 blocked, or its sessions are idle while it holds files not committed or commits not on the pushed branch), **AT
-WORK** (a session is busy, or a heavy check runs), **IDLE** (a line each), and **QUIET** (one line, saying whether
-any of them holds work). Each worktree shows its sessions by name, what it holds, its heavy and listening processes,
-its claims and what its session said; then come the files changed differently in more than one worktree, grouped by
-the worktrees that share them, the person's ports and the turn. The sessions come from `claude agents --json`; when
-the look says that list could not be asked, call `ListAgents` for who is busy. Look before the first change of a
-session that was told at its start that others are at work, and again before a push. `SendMessage` reaches a session
-by the name `ListAgents` gives it. `crew --json` gives the same as data.
+WORK** (a session is busy, a heavy check runs, or a command a session started still runs after its turn ended),
+**IDLE** (a line each), and **QUIET** (one line, saying whether any of them holds work). Each worktree shows its
+sessions by name, what it holds, its heavy and listening processes, its claims and what its session said; then come
+the files changed differently in more than one worktree, grouped by the worktrees that share them, the person's ports
+and the turn. The sessions come from `claude agents --json`; when the look says that list could not be asked, call
+`ListAgents` for who is busy. Look before the first change of a session that was told at its start that others are
+at work, and again before a push. `SendMessage` reaches a session by the name `ListAgents` gives it. `crew --json`
+gives the same as data.
 
 - **When you wait for the person's answer**, say so: `crew say --asks "<the question>"`. Claude Code lists a session
   that ended its reply with a question as plain idle, the same as one that is done. The hook after a reply sets it
@@ -39,9 +40,13 @@ by the name `ListAgents` gives it. `crew --json` gives the same as data.
 
 - **Two sessions in one worktree** are both listed, with a warning when both are busy: they may change the same
   files. Ask the person which of them keeps the worktree.
-- **Each session's memory** is beside its name: its own process and every process it started. When the machine is
-  short of memory, the idle sessions that hold nothing are what the person can close to get it back; say which, and
-  never close one yourself.
+- **Each session's memory** is beside its name: its own process and every process it started.
+- **A session's own command.** Claude Code calls a session idle as soon as its turn ends, even while a command it
+  started in the background still runs, such as a long push. The look finds each such command below the session's
+  process, names it under the session ("runs in the background: ..."), and puts the worktree under AT WORK.
+- **An offline session** is a background session that Claude Code still lists with the state it last recorded,
+  often "blocked", though no process of it runs. The look says so, and never counts it as waiting for the person or
+  as at work. It holds no memory; the person can open it to take it up again.
 - **A worktree that is broken or being removed** has lost the `.git` file in its folder, so git there answers for the
   main checkout. It is named and left out of the counts and of the files changed twice; never work in it.
 
@@ -55,6 +60,21 @@ by the name `ListAgents` gives it. `crew --json` gives the same as data.
   session adds to it by rule.
 - **A worktree this system cannot enter**, such as one made from another system's view of the same disk, is named
   and left out; a session may still be at work in it.
+
+Before you pass the look on to the person, read it as a measurement, not as the answer:
+
+- **Check a session itself before you say "idle, with work ..."**: read its transcript, or ask it with `SendMessage`,
+  for a background command or a push still on its way. The look sees only the processes on this machine, and a
+  command whose process has lost its parent can escape it.
+- **Put the work that is moving first**: a busy session, a background command or a heavy check comes before what is
+  idle or quiet, and the session that does the most is never the one you mention least.
+- **List a side session under the session it belongs to.** A fork, a "btw" question or a session started from
+  another works in that session's folder and often holds nothing of its own. Name it under the session it came from,
+  not as one more session working on its own.
+- **When the person needs memory back**, go through every idle session that holds nothing of its own, one by one,
+  including one in a worktree whose other session holds work. The IDLE, HOLDING NOTHING group is decided per
+  worktree, so a side session idle beside work is not in it, and closing it gives its memory back too. Say which
+  sessions and how much each holds, and never close one yourself.
 
 Never stop a process you did not start. The ports the repository names as the person's own (`crew.keepPorts`) are
 listed with what listens on them and are never to be stopped; a server of your own takes a port nothing listens on.

@@ -974,3 +974,63 @@ would not say, the turn does not wait for memory.
 
 1. A check could record its peak under the repository's own name for it (a key in `crew.heavy`), so that `vitest run`
    and `vitest run --coverage` are told apart without being two unrelated commands.
+
+## 2026-11-22: a session's own command is work, and a session with no process is offline
+
+**The question.** On 2026-11-21 at 23:13, a session in the first user's repository started a background Bash command
+that pushed 21 MB of pictures to main in six parts, and ended its turn two seconds later. The push ran until 23:45,
+and retries of one part until 23:58. At 23:14 the look put that worktree under WAITS FOR YOU as "idle, with work not on
+origin/main", its session "idle for less than a minute", because `claude agents` calls a session whose turn has ended
+idle, and the look counted as work only a busy session or a heavy process. The session that read the look to the
+person passed the label on, and the person had to ask why the most active session in the repository was barely
+mentioned. In the same look the main checkout showed three sessions "blocked in the background", which `ListAgents`
+called offline or did not list at all. The person asked for both to be fixed, in the script and in the skill.
+
+**The decision, for a session's own command.** A command that a session itself runs counts as work, even after its
+turn has ended. Claude Code runs a command of its Bash tool in a shell whose command line ends with
+`eval '<the command>' < /dev/null && pwd -P >| <a file>`, and a command of its PowerShell tool in cmd.exe or PowerShell
+started with its script in the variable `CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT`; this was read from the processes of
+Claude Code 2.1.325 on Windows and from the code of 2.1.330 that builds the Bash tool's command. A shell of either
+shape below a session's claude process is a command of that session, the outermost of a chain, since Git Bash starts a
+second bash below the first; the shell that runs the look itself is left out. Such a worktree goes under AT WORK, after
+a busy session, a heavy check and a session whose state is not known, and before "idle, with work": "a background
+command runs, its session idle". Each command is named in one line under its session: the Bash tool's by the command
+the shell evaluates, the PowerShell tool's by the first program below it, else as "a PowerShell command", because its
+script is never on its command line.
+
+**Why by its shape, not by leaving out the MCP servers.** The brief said to count a process below the session's claude
+process other than its MCP servers and its shell's startup. An MCP server's command is whatever the person configured,
+so it cannot be told apart by what it is; every command of the session, though, is started in one of the two ways
+above, and an MCP server, a hook, the console host and the shell's startup, which writes the snapshot, in neither. So
+the same processes are left out, and nothing has to be known about the person's servers. On this machine the idle
+Claude Desktop sessions had only their console host below them.
+
+**The decision, for a session with no process.** `claude agents --json` (2.1.330) builds a background session's row
+from its job's own record when no process of the job runs, and keeps that row in the list while the record says
+"working" or "blocked"; such a row has no process id and no status. On 2026-11-22 it listed five, started between 6 and
+112 days before, and Claude Code's daemon ran no worker for any of them. So a background session listed without a
+process id is offline: the look says "offline: Claude Code lists it as blocked from when it last ran, and no process of
+it runs now", lists it after the live sessions, and counts it apart in its first line. It never makes its worktree wait
+for the person or count as at work. A worktree whose only sessions are offline and that holds work is still shown, as
+"offline, with work not committed", because a parked session's work is still the person's to finish.
+
+**The skill.** The session that reads the look to the person now checks a session itself before it passes "idle, with
+work" on, puts the work that is moving first, lists a side session under the session it belongs to, and, when the
+person needs memory back, goes through every idle session that holds nothing of its own, one by one. The last is there
+because IDLE, HOLDING NOTHING is decided per worktree, and on 2026-11-21 a "btw" question that was a fork in the
+pushing session's worktree, holding nothing, was left out of the sessions the person could close.
+
+**Not chosen.** Checking an interactive session's process id against the list of processes: Claude Code lists those
+from processes that run, and no stale one was seen. Reading the job's record (`~/.claude/jobs/<id>/state.json`) for
+when it blocked and what it asked: it is Claude Code's internal file, not an interface it documents, and bowline reads
+only what `claude agents` lists and when a transcript was written. Saying how long ago an offline session last wrote:
+Remote Control writes its own bookkeeping into the transcript, so one of the five showed as written an hour before
+though it last ran six days before.
+
+**Left for later**, each a concrete piece of work this round did not do:
+
+1. A program that outlives the shell that started it, as one started with `nohup` or with `start` on Windows, is below
+   no session's process, so it is not named as the session's command; the look may still give it a worktree by its
+   command line. None was seen.
+2. `crew prune` names an offline session as "a session is open in it", which keeps its worktree, as it should, since
+   the session can be taken up again; the words should say that it is offline.

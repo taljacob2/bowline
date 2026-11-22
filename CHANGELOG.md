@@ -4,6 +4,28 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+The crew sees a session's background command, and says when a session it lists is not running. No Claude Code limit
+moved. The reasoning is in `plugin/docs/decisions.md`, "a session's own command is work, and a session with no process
+is offline".
+
+- A session that Claude Code calls idle, because its turn has ended, while a command it started still runs puts its
+  worktree under AT WORK: "a background command runs, its session idle". The command is named under the session, in
+  one line ("runs in the background: git push origin main"). A command is a shell that Claude Code started for its
+  Bash or PowerShell tool, found below the session's own process; its MCP servers, hooks and the shell's startup are
+  not commands. Until now such a worktree with commits not pushed was shown under WAITS FOR YOU as "idle, with work not
+  on origin/main", while a 21 MB push ran there for 45 minutes.
+- A background session that `claude agents --json` lists with no process is offline. Claude Code keeps such a session
+  in its list with the state it last recorded, often "blocked", and the look showed it as blocked and waiting for the
+  person; on this machine five were listed, started between 6 and 112 days ago. The look now says that no process of it
+  runs, never puts its worktree under WAITS FOR YOU for it, and counts it apart in the first line. `crew --json` gains
+  each session's `commands` and `was`, the status `offline`, and `counts.offline`.
+- The crew skill tells the session that reads the look to check a session itself before passing "idle, with work" on,
+  to put the work that is moving first, to list a side session under the session it belongs to, and, when the person
+  needs memory back, to go through every idle session that holds nothing of its own, including one beside a session
+  that holds work.
+
 ## 0.15.0 (2026-11-21)
 
 The turn makes room by memory, and a removal of a worktree is never stopped halfway. It comes in two parts,
