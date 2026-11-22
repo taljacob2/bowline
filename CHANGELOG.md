@@ -41,6 +41,15 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
   session of a worktree that no other session holds ("its session ... is archived in Claude Desktop, so no session is
   open here"), and `crew prune` names it beside a worktree that is safe to remove; `crew --json` gives each
   worktree's `archived`.
+- The look names the Claude Code processes that no listed session owns. On 2026-11-22 ten `claude.exe` processes,
+  2.3 GB together, ran as administrator; `claude agents` listed none of them, Windows hid their command lines from
+  the look, and the look never mentioned them. Now, where Claude Code's own record of a running process names a
+  session in a worktree, that session is shown there ("not in Claude Code's list"), and prune keeps the worktree; a
+  background session listed with no process gets the process its record names. Every other one is listed under
+  ACROSS THE WORKTREES with its process id, when it started, its memory and its program, what is known of its owner,
+  and whether it runs as administrator; their memory is added to the memory line. bowline never stops them, and says
+  that the person can end one in Task Manager's Details tab. `crew --json` gives them as `strays`. `PRIVACY.md` says
+  what is read.
 
 ## 0.15.1 (2026-11-22)
 

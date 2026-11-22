@@ -44,6 +44,11 @@ Nothing else bowline does reaches the network.
   machine, every account's. Of each record bowline reads only the session's id in the app and in Claude Code, its
   title, whether it is archived, its folder, its worktree and when it was last active; never its settings, its
   tools or its conversation. It keeps none of it, and `crew.desktop: false` turns this off.
+- From 0.16.0, when you or Claude run `bowline crew`, Claude Code's own record of each process it runs, the files
+  `sessions/<process id>.json` in Claude Code's configuration folder, of which bowline reads only the session's id,
+  title, folder, kind, state and start; the files beside them whose names end in `.key` are never opened. For a
+  Claude Code process that no listed session owns, it also asks Windows for the path of its program, when it started
+  and whether it runs as administrator, which Windows gives to any program of the same user. It keeps none of it.
 - After each reply, the reply's text that Claude Code gives the hook, to see whether it ends with a question to you;
   only that last question is kept, and `crew.asksFromReply: false` turns this off. Before each prompt, which session
   it is, to take that question back.

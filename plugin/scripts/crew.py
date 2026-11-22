@@ -36,6 +36,10 @@ of its session, else to the one its command line names, else to that of its chil
 that of its nearest parent with one. A worktree whose folder has no .git file of its own, as while it is being
 removed, is named as broken and left out, because git asked there answers for the main checkout. Each session comes
 with the memory its process and every process below it hold, and the look says how much of the machine's is in use.
+A Claude Code process that no listed session owns is a session of its worktree when Claude Code's own record of the
+running process (<config>/sessions/<pid>.json) names one there; every other one is named with its start, its memory,
+its program and whether it runs as administrator, which hides its command line, and its memory is added to the line
+about the machine's. bowline never stops one.
 
 The printout puts what matters first, each worktree once: WAITS FOR YOU (a session asks the person a question or is
 blocked, or its sessions are idle and it holds files not committed or commits not on the pushed branch, untracked
@@ -425,6 +429,19 @@ def session_title(path):
     return title
 
 
+def worktree_of(folder, trees):
+    """The worktree a folder is in, as tree_of finds it, but None for a folder among the repository's worktrees that is
+    not one of them any more. tree_of gives such a folder to the main checkout, which holds it only as a path; on
+    2026-11-22 a worktree was removed while a session still ran in it, and git left the folder that process held."""
+    tree = tree_of(folder, trees)
+    if tree is None or not tree["main"] or same(folder) == same(tree["path"]):
+        return tree
+    places = {same(os.path.dirname(t["path"])) for t in trees if not t["main"]}
+    places.add(same(os.path.join(tree["path"], ".claude", "worktrees")))
+    here = same(folder)
+    return None if any(here.startswith(place + "/") for place in places) else tree
+
+
 def tree_of(folder, trees):
     """The worktree a folder is in: the one that is the folder or holds it, the deepest when one holds another."""
     here = same(folder)
@@ -550,7 +567,7 @@ def sessions_by_tree(trees, rows, minutes=30, now=None, desktop=()):
         folder = record["cwd"] or record["worktree"]
         if record["desktop"] in joined or record["archived"] or not folder or not os.path.isdir(folder):
             continue
-        tree = tree_of(folder, trees)
+        tree = worktree_of(folder, trees)
         if tree is None or tree.get("broken"):
             continue
         cli = record["cli"][0] if record["cli"] else ""
@@ -575,7 +592,7 @@ def archived_by_tree(trees, desktop):
         folder = record["cwd"] or record["worktree"]
         if not record["archived"] or not folder or not os.path.isdir(folder):
             continue
-        tree = tree_of(folder, trees)
+        tree = worktree_of(folder, trees)
         if tree is not None and not tree.get("broken"):
             found.setdefault(same(tree["path"]), []).append({"name": record["title"], "desktop": record["desktop"],
                                                              "cli": record["cli"]})
@@ -594,7 +611,8 @@ def gone_sessions(trees, desktop):
         folder = record["worktree"] or record["cwd"]
         if record["archived"] or not folder:
             continue
-        if os.path.isdir(folder) and not (tree_of(folder, trees) or {}).get("broken"):
+        held = worktree_of(folder, trees) if os.path.isdir(folder) else None
+        if held is not None and not held.get("broken"):
             continue
         if not record["worktree"] and same(os.path.dirname(folder)) not in beside:
             continue
@@ -602,6 +620,198 @@ def gone_sessions(trees, desktop):
             found.append({"name": record["title"], "desktop": record["desktop"],
                           "folder": os.path.relpath(folder, main).replace("\\", "/")})
     return found
+
+
+# Claude Code processes that no listed session owns.
+#
+# On 2026-11-22 ten claude.exe processes, 2.3 GB together, belonged to no session that `claude agents --json`, the
+# app's list or ListAgents knew, and the look never named them, because it counts memory only below a session. They
+# ran as administrator, so a program that is not, such as this one, was refused the access that reads a command line,
+# and WMI and PowerShell gave an empty one. Seven of them had Claude Code's own record of a running session.
+
+CLAUDE_NAMES = ("claude", "claude.exe")
+# How Claude Desktop's own processes show: its installed folder, or the helper processes Electron starts.
+DESKTOP_APP_MARKS = ("/windowsapps/claude_", "/anthropicclaude/", "/claude.app/", " --type=")
+RECORD_BYTES = 1024 * 1024
+
+
+def running_sessions():
+    """Claude Code's own record of each session process it ran on this machine, as {pid: {"id", "name", "cwd",
+    "kind", "status", "started"}}: the files <config>/sessions/<pid>.json, which each Claude Code process writes for
+    itself. A record outlives its process, so it is read only for a process that runs. The files beside them whose
+    names end in .key are never opened."""
+    folder = os.path.join(common.config_dir(), "sessions")
+    found = {}
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return found
+    for name in names:
+        if not re.match(r"^\d+\.json$", name):
+            continue
+        path = os.path.join(folder, name)
+        try:
+            if os.path.getsize(path) > RECORD_BYTES:
+                continue
+            with open(path, encoding="utf-8") as handle:
+                record = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        pid = record.get("pid") if isinstance(record.get("pid"), int) else int(name[:-len(".json")])
+        started = record.get("startedAt")
+        found[pid] = {"id": str(record.get("sessionId") or ""), "name": " ".join(str(record.get("name") or "").split()) or None,
+                      "cwd": str(record.get("cwd") or "") or None, "kind": record.get("kind"),
+                      "status": record.get("status"), "started": started / 1000.0 if isinstance(started, (int, float)) else None}
+    return found
+
+
+def process_details(pids):
+    """What the least access tells about each process, as {pid: {"started", "image", "elevated"}}: when it started, in
+    seconds since 1970, the full path of its program, and whether it runs as administrator. On Windows a program that
+    is not elevated is refused the access that reads an elevated process's command line, so WMI and PowerShell give an
+    empty one; these three come with the least access Windows grants for any process of the same user. Elsewhere only
+    the start comes, from ps. A fact that cannot be had is None."""
+    found = {pid: {"started": None, "image": None, "elevated": None} for pid in pids}
+    if not pids:
+        return found
+    try:
+        if WINDOWS:
+            import ctypes
+            from ctypes import wintypes
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+            kernel.OpenProcess.restype = wintypes.HANDLE
+            kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                                                          ctypes.POINTER(wintypes.DWORD)]
+            kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+            advapi.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+            advapi.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                                   ctypes.POINTER(wintypes.DWORD)]
+            for pid in pids:
+                handle = kernel.OpenProcess(0x1000, False, pid)              # PROCESS_QUERY_LIMITED_INFORMATION
+                if not handle:
+                    continue
+                try:
+                    size, path = wintypes.DWORD(32768), ctypes.create_unicode_buffer(32768)
+                    if kernel.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)):
+                        found[pid]["image"] = path.value
+                    times = [wintypes.FILETIME() for _ in range(4)]
+                    if kernel.GetProcessTimes(handle, *[ctypes.byref(stamp) for stamp in times]):
+                        ticks = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+                        found[pid]["started"] = ticks / 1e7 - 11644473600            # from 1601 to 1970
+                    token = wintypes.HANDLE()
+                    if advapi.OpenProcessToken(handle, 0x0008, ctypes.byref(token)):  # TOKEN_QUERY
+                        elevated, size = wintypes.DWORD(), wintypes.DWORD()
+                        if advapi.GetTokenInformation(token, 20, ctypes.byref(elevated), 4, ctypes.byref(size)):
+                            found[pid]["elevated"] = bool(elevated.value)          # 20 is TokenElevation
+                        kernel.CloseHandle(token)
+                finally:
+                    kernel.CloseHandle(handle)
+        else:
+            result = subprocess.run(["ps", "-o", "pid=,lstart=", "-p", ",".join(str(pid) for pid in pids)],
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                                    timeout=30, env=dict(os.environ, LC_ALL="C"))
+            for line in result.stdout.decode("utf-8", "replace").splitlines():
+                parts = line.split(None, 1)
+                if len(parts) == 2 and parts[0].isdigit() and int(parts[0]) in found:
+                    try:
+                        found[int(parts[0])]["started"] = time.mktime(time.strptime(" ".join(parts[1].split()),
+                                                                                    "%a %b %d %H:%M:%S %Y"))
+                    except ValueError:
+                        pass
+    except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired):
+        pass
+    return found
+
+
+def desktop_app(process, image=None):
+    """Whether a process is Claude Desktop itself or one of its helpers, rather than Claude Code."""
+    text = ((process.get("command") or "") + " " + (image or "")).lower().replace("\\", "/")
+    return any(mark in text for mark in DESKTOP_APP_MARKS)
+
+
+def record_status(status):
+    """The state Claude Code's record of a running process gives, in the look's words; the process writes it itself."""
+    return status if status in ("busy", "idle", "blocked") else "idle"
+
+
+def claude_strays(snapshot, rows, records, trees, by_tree, desktop=()):
+    """The Claude Code processes that no session Claude Code lists owns: none is a listed session's process, none was
+    started below one or below Claude Desktop, and none names a listed session in its command line. A stray with
+    Claude Code's own record of a running session in one of this repository's worktrees becomes that worktree's
+    session in by_tree (kind "unlisted"), or gives a listed background session its process; the rest are returned, as
+    [{"pid", "ppid", "started", "memory", "image", "elevated", "command", "record"}], record being Claude Code's
+    record of it when one names another place. Nothing is said when the sessions could not be listed, since then
+    every process would look unowned."""
+    if rows is None:
+        return []
+    listed_ids = {str(row.get("sessionId")) for row in rows if row.get("sessionId")}
+    owners = {row["pid"] for row in rows if isinstance(row.get("pid"), int)}
+    owners |= {session["pid"] for sessions in by_tree.values() for session in sessions if session.get("pid")}
+    claude = [p for p in snapshot if str(p.get("name") or "").lower() in CLAUDE_NAMES]
+    hidden = [p["pid"] for p in claude if (p.get("command") or "").strip().lower() in CLAUDE_NAMES]
+    details = process_details(hidden)
+    owners |= {p["pid"] for p in claude if desktop_app(p, (details.get(p["pid"]) or {}).get("image"))}
+    parents = {p["pid"]: p["ppid"] for p in snapshot}
+    resumed = re.compile(r"--(?:resume|session-id)[= ]\"?(?:" + "|".join(map(re.escape, sorted(listed_ids))) + r")")
+    found = []
+    for process in claude:
+        pid = process["pid"]
+        if pid in owners or pid == os.getpid():
+            continue
+        chain, up = set(), parents.get(pid)
+        while up and up not in chain and up not in owners:
+            chain.add(up)
+            up = parents.get(up)
+        command = process.get("command") or ""
+        if up and up in owners:
+            continue                                        # started below a listed session, or below the app
+        if listed_ids and resumed.search(command):
+            continue                                        # a process of a listed session, resumed
+        if re.search(r"(?:^|\s)agents(?:\s|$)", command):
+            continue                                        # a list of the sessions, asked right now
+        found.append(process)
+    facts = process_details([p["pid"] for p in found if p["pid"] not in details])
+    facts.update(details)
+    joined = {session["id"]: session for sessions in by_tree.values() for session in sessions}
+    strays = []
+    for process in found:
+        pid, fact = process["pid"], facts.get(process["pid"]) or {}
+        record = records.get(pid)
+        tree = worktree_of(record["cwd"], trees) if record and record.get("cwd") and os.path.isdir(record["cwd"]) else None
+        if record and tree is not None and not tree.get("broken"):
+            known = joined.get(record["id"])
+            if known is not None and known.get("pid") is None:
+                # A background session listed with no process, as offline, whose process does run.
+                known.update(pid=pid, status=record_status(record["status"]), was=None, elevated=fact.get("elevated"),
+                             byRecord=True)
+                continue
+            try:
+                wrote = os.path.getmtime(os.path.join(common.project_folder(record["cwd"]), record["id"] + ".jsonl"))
+            except OSError:
+                wrote = None
+            app = next((d["desktop"] for d in desktop if record["id"] in d["cli"]), None)
+            by_tree.setdefault(same(tree["path"]), []).append({
+                "name": record["name"], "id": record["id"], "kind": "unlisted",
+                "status": record_status(record["status"]), "was": None, "pid": pid,
+                "started": record["started"], "wrote": wrote, "cwd": record["cwd"], "desktop": app,
+                "elevated": fact.get("elevated"), "byRecord": True})
+            continue
+        command = process.get("command") or ""
+        main = trees[0]["path"]
+        # A record whose folder lies among this repository's worktrees but is none of them: its worktree was removed
+        # while the session still ran there.
+        removed = bool(record and record.get("cwd") and same(record["cwd"]).startswith(same(main) + "/")
+                       and (worktree_of(record["cwd"], trees) is None or (tree or {}).get("broken")))
+        strays.append({"pid": pid, "ppid": process.get("ppid"), "started": fact.get("started"),
+                       "memory": process.get("memory"), "image": fact.get("image"), "elevated": fact.get("elevated"),
+                       "command": None if command.strip().lower() in CLAUDE_NAMES else shown(command, 300),
+                       "record": {"name": record["name"], "cwd": record["cwd"], "removed": removed} if record else None})
+    return strays
 
 
 def quoted(name):
@@ -1978,7 +2188,18 @@ def session_pids(trees, by_tree):
 
 
 def session_state(session, now):
-    """How a session stands, in a few words: busy, idle for how long, blocked, or when it last wrote."""
+    """How a session stands, in a few words: busy, idle for how long, blocked, or when it last wrote. A session whose
+    process was found only by Claude Code's own record of it says so."""
+    words = plain_state(session, now)
+    if session.get("byRecord"):
+        words += ("; Claude Code's list of sessions leaves it out" if session.get("kind") == "unlisted" else
+                  "; Claude Code lists it with no process") + ", and its own record of the running process names it"
+        if session.get("elevated"):
+            words += "; it runs as administrator"
+    return words
+
+
+def plain_state(session, now):
     status = session["status"]
     if status == "busy":
         return "busy"
@@ -2398,6 +2619,7 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
     old_hours = crew.get("oldUntrackedHours") or 24
     by_tree = sessions_by_tree(place.trees, rows, minutes, now, desktop)
     archived = archived_by_tree(place.trees, desktop)
+    strays = claude_strays(snapshot, rows, running_sessions(), place.trees, by_tree, desktop)
     patterns = heavy_patterns(place.config)
     heavy = {p["pid"] for p in heavy_now(snapshot, patterns)}
     whose = owners(snapshot, place.trees, session_pids(place.trees, by_tree))
@@ -2512,11 +2734,14 @@ def gather(place, record, rows, snapshot, ports, claims, dropped, spoken, asks, 
         "turns": turns,
         "slots": max(1, int(slots)) if str(slots or "").isdigit() else 1,
         "memory": dict(machine, sessions=memory_of(below(session_pids_listed, snapshot, children), snapshot)
-                       if session_pids_listed else None) if machine else None,
+                       if session_pids_listed else None,
+                       strays=memory_of(below([s["pid"] for s in strays], snapshot, children), snapshot)
+                       if strays else None) if machine else None,
         "peaks": [{"command": entry["command"], "peak": most, "seconds": entry.get("seconds"), "runs": entry.get("runs"),
                    "at": entry.get("at"), "small": bool(entry.get("small"))} for most, entry in peaks[:3]],
         "unreachable": list(place.unreachable),
         "gone": gone_sessions(place.trees, desktop),
+        "strays": strays,
         "dropped": [{"key": claim["key"], "holder": holder_name(claim, place.trees), "reason": reason} for claim, reason in dropped],
     }
 
@@ -2690,6 +2915,9 @@ def idle_line(item, model):
                       + ((" (offline in Claude Desktop's sidebar: archive it before this worktree is removed)"
                           if session.get("kind") == "desktop" else " (offline: no process of it runs)")
                          if session["status"] == "offline" else "")
+                      + ((" (" + ("not in Claude Code's list" if session.get("kind") == "unlisted" else
+                                  "listed with no process, found by its record")
+                          + ("; runs as administrator)" if session.get("elevated") else ")")) if session.get("byRecord") else "")
                       for session in item["sessions"])
     if item.get("untrackedOld"):
         extra.append(f"and {changed_words(item, model['at'])}, none written in "
@@ -2717,6 +2945,51 @@ def quiet_line(quiet, model):
             for port in process["ports"]:
                 words += f"A process listens on {port} in {item['display']}. "
     return lines_of(words + "--verbose lists them.", "", "  ")
+
+
+def started_words(stamp, now):
+    """When a process started, as a person reads it: "today at 04:59", or "16 November 04:59", with the year when it is
+    not this year."""
+    day, today = time.localtime(stamp), time.localtime(now)
+    hour = time.strftime("%H:%M", day)
+    if day[:3] == today[:3]:
+        return "today at " + hour
+    return f"{day.tm_mday} {MONTHS[day.tm_mon - 1]}" + (f" {day.tm_year}" if day.tm_year != today.tm_year else "") + " " + hour
+
+
+def stray_lines(model):
+    """The Claude Code processes that no listed session owns, in words: what each is, as far as can be found, and how
+    the person ends one, since bowline never does."""
+    strays, now = model.get("strays") or [], model["at"]
+    if not strays:
+        return []
+    where = ("in Task Manager's Details tab, by its process id" if WINDOWS else
+             "in Activity Monitor, by its process id" if sys.platform == "darwin" else "with kill and its process id")
+    out = lines_of(f"Claude processes that no listed session owns: {len(strays)}. No session that Claude Code or Claude "
+                   "Desktop lists is one of them or started them. bowline never stops them; if you do not recognize "
+                   f"one, end it {where}.")
+    pids = {stray["pid"] for stray in strays}
+    for stray in strays:
+        facts = [f"pid {stray['pid']}"]
+        if stray.get("started"):
+            facts.append("started " + started_words(stray["started"], now))
+        if stray.get("memory"):
+            facts.append(size(stray["memory"]))
+        words = ", ".join(facts) + ": " + shown(stray.get("command") or stray.get("image") or "claude", 170) + "."
+        if stray.get("ppid") in pids:
+            words += f" It was started by pid {stray['ppid']}, above."
+        if stray.get("record"):
+            words += (f" Claude Code's own record names it {quoted(stray['record']['name'] or 'with no title')}, in "
+                      f"{stray['record']['cwd']}, though its list of sessions leaves it out.")
+            if stray["record"].get("removed"):
+                words += (" That folder's worktree was removed while this session still ran in it, so git left the "
+                          "folder behind.")
+        elif stray.get("ppid") not in pids:
+            words += " Its owner could not be found."
+        if stray.get("elevated") and not stray.get("command"):
+            words += " It runs as administrator, so its command line cannot be read from here."
+        out += lines_of(words, "      ", "        ")
+    return out
 
 
 def link_lines(sessions):
@@ -2837,12 +3110,16 @@ def render(model, verbose=False, links=False):
         out += lines_of("The most memory the checks run through the turn took: " + "; ".join(
             f"{shown(entry['command'], 60)}, {size(entry['peak'])}" + (f" in {how_long(entry['seconds'])}" if entry.get("seconds") else "")
             + (" (small)" if entry["small"] else "") for entry in model["peaks"]) + ".")
+    out += stray_lines(model)
     memory = model["memory"]
     if memory:
         words = f"Memory: {size(memory['total'] - memory['available'])} of {size(memory['total'])} in use"
         if memory.get("sessions"):
             words += (f"; the sessions listed and the processes they started hold {size(memory['sessions'])} of it, "
                       "each one's beside its name")
+        if memory.get("strays"):
+            words += (f"; the Claude processes that no listed session owns, above, hold {size(memory['strays'])} "
+                      "more")
         out += lines_of(words + ".")
     out.append("  To tell a session what you take: SendMessage." if model["sessionsListed"] else
                "  The sessions themselves, and which are busy: ListAgents. To tell one what you take: SendMessage.")

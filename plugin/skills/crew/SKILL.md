@@ -54,6 +54,15 @@ gives the same as data.
   the session reopened after a removal would find its folder gone: the person archives it first.
 - **A session whose worktree is gone** is one in the sidebar, not archived, whose worktree was removed or is being
   removed. The look lists it under ACROSS THE WORKTREES; tell the person to archive it.
+- **A session left out of Claude Code's list.** `claude agents` leaves out some sessions whose process runs, such as
+  one started from a terminal run as administrator. When Claude Code's own record of a running process names a
+  session in a worktree, the look shows that session there ("not in Claude Code's list"), and prune keeps the
+  worktree.
+- **A Claude process that no listed session owns** is a Claude Code process that no listed session is or started.
+  The look lists each under ACROSS THE WORKTREES, with its process id, when it started, its memory and its program,
+  says what is known of its owner, and adds their memory to the memory line. One that runs as administrator hides its
+  command line from a program that does not. Never stop one: tell the person which they are, and that they can end
+  one in Task Manager's Details tab, by its process id, if they do not recognize it.
 - **A worktree that is broken or being removed** has lost the `.git` file in its folder, so git there answers for the
   main checkout. It is named and left out of the counts and of the files changed twice; never work in it.
 

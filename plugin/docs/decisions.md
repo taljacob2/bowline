@@ -1114,3 +1114,34 @@ is no longer archived and counts at once.
 **Not chosen.** Reading the message of the log's entry: the app's entry had none, and `git checkout --detach` writes
 one, so the commits themselves, old and new, are what can be trusted. Ignoring every write of HEAD: a commit on a
 detached HEAD writes only HEAD and its log, and is work.
+
+**Claude processes that no listed session owns.** After eight sessions were archived the same morning, the person
+still saw many Claude processes and asked whether the memory had come back. It had, but ten other `claude.exe`
+processes, 2.3 GB together, belonged to no session that `claude agents`, `ListAgents` or the app's list knew, and the
+look never named them, because it counts memory only below a session. Every one of them ran as administrator, started
+from a terminal run that way between 8 and 21 November. Windows refuses a program that is not elevated the access that
+reads such a process's command line, so WMI and PowerShell gave an empty one, and its modules and path too. It does
+grant the least access, with which the program's path, the start and the elevation can be read. Of sixteen Claude Code
+processes, `claude agents` listed every one that was not elevated and none of the ten; why is not known, though a
+Node test of a process answers "not permitted" for an elevated one. Seven of the ten had Claude Code's own record of
+the process, `sessions/<pid>.json` in its configuration folder, naming the session and its folder; one of those was
+the session "Morgana redesign", still running in the folder of a worktree that had been removed that morning.
+
+**The decision.** A Claude Code process (the program named `claude`, not Claude Desktop or its helpers) is owned when
+it is a listed session's process, when it was started below one or below the app, when its command line resumes a
+listed session, or when it is a list of the sessions being asked. Of the rest, one whose record names a session in a
+worktree of the repository is that worktree's session, shown as "not in Claude Code's list", so that prune keeps the
+worktree as it keeps any other with a session; a background session listed with no process gets the process its
+record names, and is no longer offline. Every other one is listed under ACROSS THE WORKTREES, with its process id,
+start, memory and program, what its record says of it or that its owner could not be found, whether it runs as
+administrator, and which of the others started it. Their memory, with what they started, is added to the memory
+line. bowline never stops one; the look says that the person can end one in Task Manager's Details tab. When the
+sessions cannot be listed at all, nothing is said of such processes, since every one would look unowned.
+
+**Why the record, after declining the job's record.** As with the app's record of its sessions, Claude Code's record
+of its running processes is the only place that names the session of a process whose command line is hidden, and it
+decides whether a worktree with a running session is called safe to remove; a record is read only for a process that
+runs, so one left behind by an ended process says nothing. The `.key` files beside the records are never opened.
+
+**Not chosen.** Matching a hidden process to a session by `--resume` in its command line, as the brief suggested: the
+command line of exactly these processes cannot be read. The match is still made for a process whose command line can.
