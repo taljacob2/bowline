@@ -4,7 +4,10 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.16.3 (2026-11-23)
+
+The memory backup, put right for sessions that run in a worktree, where it did nothing in silence. No Claude Code
+limit moved, and no command, hook or setting is new.
 
 - **The memory backup works for a session in a worktree.** The hook after a reply looked for the notes beside the
   session's transcript. A session in a worktree has its transcript in the worktree's own project folder, while the
