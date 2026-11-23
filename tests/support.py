@@ -16,6 +16,13 @@ if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
 
 
+# The process id of a made-up session, for a test whose look lists the machine's real processes; add a small number
+# for each further session. It is far above what Linux (4,194,304) and macOS (99,999) hand out, and Windows names no
+# limit but gives small ids, so no real process stands in for the session. With 1000 to 1003, GitHub's macOS machine
+# once had real processes of those ids, and the look printed their memory: 'done: "the done session" (20 MB), ...'.
+NO_PROCESS = 2000000000
+
+
 def git(cwd, *args):
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 

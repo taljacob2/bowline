@@ -9,7 +9,7 @@ import sys
 import time
 import unittest
 
-from support import SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, git, write
+from support import NO_PROCESS, SCRIPTS, ScratchRepo, age_git_folder, assert_lines_fit, git, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -72,9 +72,9 @@ class DesktopTests(ScratchRepo):
     def test_a_session_the_app_records_has_its_full_title_and_its_link(self):
         # `claude agents` gives a session's Claude Code id and its title cut at 50 characters; a reply in Claude Desktop
         # links a session by the app's own id, which only the app's record holds.
-        self.agents({"sessionId": "cli-parser", "cwd": self.other, "kind": "interactive", "pid": 4242, "status": "busy",
+        self.agents({"sessionId": "cli-parser", "cwd": self.other, "kind": "interactive", "pid": NO_PROCESS, "status": "busy",
                      "name": "The parser keeps every comment and every blank l"},
-                    {"sessionId": "cli-terminal", "cwd": self.main, "kind": "interactive", "pid": 4243, "status": "idle",
+                    {"sessionId": "cli-terminal", "cwd": self.main, "kind": "interactive", "pid": NO_PROCESS + 1, "status": "idle",
                      "name": "a session in a terminal"})
         self.record(PARSER, "cli-parser", "The parser keeps every comment and every blank line it reads", self.other)
         write(os.path.join(self.desktop, "account-1", "organization-1", "local_broken.json"), "not a record\n")

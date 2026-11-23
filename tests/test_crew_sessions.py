@@ -12,7 +12,7 @@ import time
 import unittest
 from unittest import mock
 
-from support import SCRIPTS, ScratchRepo, git, write
+from support import NO_PROCESS, SCRIPTS, ScratchRepo, git, write
 
 import common  # noqa: E402 - support puts the scripts on the path
 import crew  # noqa: E402
@@ -153,14 +153,14 @@ class SessionTests(ScratchRepo):
         now = int(time.time() * 1000)
         self.agents(
             {"sessionId": "sess-parser", "cwd": self.other["path"], "kind": "interactive", "name": "the parser",
-             "pid": 4242, "status": "busy", "startedAt": now},
+             "pid": NO_PROCESS, "status": "busy", "startedAt": now},
             {"sessionId": "sess-docs", "cwd": os.path.join(self.other["path"], "docs"), "kind": "interactive",
              "name": "the docs", "status": "busy", "startedAt": now},
             {"sessionId": "sess-release", "cwd": self.main["path"], "kind": "interactive", "name": "the release",
              "status": "idle", "startedAt": now},
             # A background session whose process runs is listed with its pid; without one it is offline.
-            {"sessionId": "sess-nightly", "cwd": self.main["path"], "kind": "background", "name": "nightly", "pid": 4343,
-             "state": "blocked"},
+            {"sessionId": "sess-nightly", "cwd": self.main["path"], "kind": "background", "name": "nightly",
+             "pid": NO_PROCESS + 1, "state": "blocked"},
             {"sessionId": "sess-elsewhere", "cwd": self.root, "kind": "interactive", "name": "elsewhere", "status": "busy"})
         self.transcript(self.main["path"], "sess-release", minutes_ago=5)
         code, out, err = self.crew()
@@ -177,7 +177,7 @@ class SessionTests(ScratchRepo):
         self.assertNotIn("could not be asked", out)
         kept = crew.cached_sessions(self.repo)                                   # kept for the hooks, which never ask claude
         self.assertEqual(len(kept), 5)
-        self.assertEqual(crew.sessions_by_tree(crew.worktrees(self.repo), kept)[crew.same(self.other["path"])][0]["pid"], 4242)
+        self.assertEqual(crew.sessions_by_tree(crew.worktrees(self.repo), kept)[crew.same(self.other["path"])][0]["pid"], NO_PROCESS)
 
     def test_without_claude_a_transcripts_title_names_the_session(self):
         self.configure({"claude": "bowline-test-no-such-program"})
