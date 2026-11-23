@@ -1,6 +1,7 @@
 """The memory backup on a scratch Claude Code configuration folder: a new machine, a first backup, an empty remote, both
 sides with content, no project folder, status, and the push with and without --hook."""
 
+import datetime
 import json
 import os
 import re
@@ -160,6 +161,26 @@ class MemoryTests(ScratchRepo):
     def backups(self, bare):
         """Every commit message the remote holds, the newest first, as one text."""
         return subprocess.run(["git", "-C", bare, "log", "--format=%B", "main"], capture_output=True, text=True, check=True).stdout
+
+    def test_a_push_that_fails_says_so_to_a_person_and_nothing_as_a_hook(self):
+        folder, _ = self.backed_up(self.repo, "m")
+        git(folder, "remote", "set-url", "origin", os.path.join(self.root, "gone.git"))
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        self.reply_ends(os.path.dirname(folder), self.repo)
+        code, out, err = self.bowline("push")
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("bowline memory: nothing new; the push failed, so 1 commit waits for the backup. git said:", out)
+        self.assertIn("gone.git", out)
+
+    def test_status_says_from_when_the_oldest_change_waits(self):
+        folder, _ = self.backed_up(self.repo, "m")
+        code, out, _ = self.bowline("status")
+        self.assertIn("uncommitted changes: 0 file(s)\n", out)
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        os.utime(os.path.join(folder, "n.md"), (1700000000, 1700000000))
+        code, out, _ = self.bowline("status")
+        stamp = datetime.datetime.fromtimestamp(1700000000).strftime("%Y-%m-%d %H:%M")
+        self.assertIn(f"uncommitted changes: 1 file(s); the oldest change waits since {stamp}\n", out)
 
     def test_a_session_in_a_worktree_backs_up_the_notes_of_the_main_checkout(self):
         folder, bare = self.backed_up(self.repo, "m")

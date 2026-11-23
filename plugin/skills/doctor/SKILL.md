@@ -39,6 +39,9 @@ means for this repository, in plain words, and name the skill that fixes it:
 - A memory note that names many commits, so it keeps finished work like a log: `/bowline:curate-memory`, whose
   TRIM verdict cuts each finished item the repository records down to a pointer and its last commit.
 - The memory not backed up, or no hook pushing it: `/bowline:memory-backup`.
+- The memory's backup behind: run `bowline memory push` with the person's word, and read what it says. When it pushed,
+  look again after the next reply: a change that waits again means that the hook does not back this folder up. When
+  the push failed, what git said is the reason, such as a remote that is gone or a sign-in that ended.
 - A split that autosplit prepared in the background, ready on its branch: `/bowline:split-instructions review <file>`.
   One that failed: read its log with the person, then `/bowline:split-instructions` by hand, or
   `bowline autosplit discard --file <file>` to let autosplit try again. One that stopped without recording how it

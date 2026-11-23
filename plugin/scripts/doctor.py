@@ -13,8 +13,9 @@ For each finding it prints three lines: what it found, why it matters, what to d
   repository (the budget check);
 - the memory folder Claude Code keeps for this repository on this machine: its index against the cap, each note
   against the commits it names (a note that keeps finished work like a log), whether the folder is a git repository
-  with a remote, whether the push hook is installed, and lines that one session added to a note and another session
-  removed soon after (the memory is one folder for every worktree, so a note saved whole from an older copy loses them);
+  with a remote, whether the push hook is installed, a change that has waited for the backup longer than a day, and
+  lines that one session added to a note and another session removed soon after (the memory is one folder for every
+  worktree, so a note saved whole from an older copy loses them);
 - for a repository that names them in its .claude/bowline.json (crew): a number that appears twice in a numbered list
   such as a roadmap, and a stamp that names a commit the branch no longer holds, both of which a rebase leaves behind;
 - as a note, a repository that has several worktrees and no rule about working beside other sessions;
@@ -57,6 +58,7 @@ import os
 import re
 import sys
 import threading
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autosplit  # noqa: E402
@@ -186,8 +188,28 @@ def memory_findings(root, config):
                 "warning", "No hook pushes the memory folder after a reply.",
                 "Without the hook the backup is only as fresh as the last push someone remembered to make.",
                 "/bowline:memory-backup setup <remote> installs it for this machine."))
+        if remote:
+            findings.extend(waiting_findings(folder, config))
         findings.extend(loss_findings(folder, config))
     return findings
+
+
+def waiting_findings(folder, config):
+    """Notes that have waited for the backup longer than the repository allows. The hook that backs them up prints
+    nothing, whatever happens, so this is where a person learns that it stopped or that its push fails. The words hold
+    no noun that changes with a number, so a backup that falls further behind is one reminder."""
+    hours = config["limits"].get("memoryBackupHours")
+    if not hours:
+        return []
+    notes, commits, since = memory.waiting(folder)
+    if since is None or time.time() - since <= hours * 3600:
+        return []
+    return [common.Finding(
+        "warning", f"The memory's backup is behind: the oldest change that waits for it is from {memory.stamp(since)}. "
+                   f"Notes not committed: {notes}. Commits not pushed: {commits}.",
+        config["limitsWhy"]["memoryBackupHours"],
+        "Back the notes up now with: bowline memory push. When the push fails, it says what git said. When a change "
+        "still waits after the next reply, the hook does not back this folder up: /bowline:memory-backup.")]
 
 
 def loss_findings(folder, config):

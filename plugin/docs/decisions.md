@@ -1256,3 +1256,34 @@ more reason why a finding of `memory losses` is a warning that can be wrong.
 **Left for later.** A warning from the doctor when notes have waited longer than, say, a day. It would have shown
 this fault on its first day, whatever its cause, and it is a finding with a limit of its own, so it is a round of its
 own.
+
+## 2026-11-23: the doctor says when the memory's backup is behind
+
+**The question.** The entry above ends with it. The doctor warned about a memory folder with no backup, no remote or no
+hook, and called the rest backed up. A hook that runs and does nothing, or a push that fails every time, passed. The
+first user, told of the gap: "yes it sounds good".
+
+**The decision.** The doctor warns when the oldest change that waits for the backup is older than `memoryBackupHours`,
+24 by default. A change waits while a note is not committed, and while a commit is on no remote branch. The warning
+gives the time of the oldest, the two counts, and the command that backs the notes up. `memory status` gives the same
+time.
+
+**How old a change is.** A note not committed is as old as its last write, a removed one as its folder's, and a commit
+as its own time. The oldest of them decides, because the backup takes all or nothing, so one old change means that
+every backup since was missed. A note that is written again every hour always looks new. While nothing else waits, the
+warning then comes late, never early. On a copy of the first user's notes as they were that morning, with their real
+times, it names the first note that was missed.
+
+**Why not the time since the last backup.** A person who comes back after three days and changes a note would be
+warned in the middle of their first reply, before the hook had its turn.
+
+**Why a warning, and one reminder.** Nothing is lost while the machine stands, so it is not a problem; and a note
+reaches no person at a session's start. The counts are written as "Notes not committed: 5" and not as "5 notes", so
+that the words do not change with the number and a backup that falls further behind stays one reminder.
+
+**What `memory push` says.** The warning sends a person to it, and it answered "nothing to push" for a push that
+failed. It now says that the push failed and what git said, with exit code 1. The hook stays silent, because a failed
+push must never interrupt a session; the doctor is where it is said.
+
+**Not chosen.** A message from the hook itself when its push fails: a laptop without a network would show it after
+every reply. Letting the doctor push: the doctor changes nothing.

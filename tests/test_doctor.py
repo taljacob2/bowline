@@ -1,9 +1,11 @@
 """The doctor on a scratch repository and a scratch Claude Code configuration folder."""
 
+import datetime
 import json
 import os
 import re
 import subprocess
+import time
 import unittest
 
 from support import ScratchRepo, git, write
@@ -123,6 +125,93 @@ class DoctorTests(ScratchRepo):
         self.assertIn("/bowline:curate-memory", out)
         code, out, _ = self.run_script("doctor", "--brief")
         self.assertIn("progress.md names 10 commits", out)
+
+    BEHIND = "The memory's backup is behind"
+
+    def backed_up_memory(self):
+        """A memory folder with a hook and a first backup on a remote: nothing waits."""
+        write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n")
+        write(os.path.join(self.config_dir, "settings.json"), json.dumps(
+            {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python", "args": ["-I", "x/push-memory.py"]}]}]}}))
+        folder = self.project_memory()
+        bare = os.path.join(self.root, "notes.git")
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", bare], check=True)
+        git(folder, "init", "-q", "-b", "main")
+        for key, value in (("user.email", "t@example.invalid"), ("user.name", "Test"), ("core.autocrlf", "false")):
+            git(folder, "config", key, value)
+        for name in ("MEMORY.md", "one.md", "two.md"):
+            write(os.path.join(folder, name), "- a note\n")
+        git(folder, "add", "-A")
+        git(folder, "commit", "-q", "-m", "first backup")
+        git(folder, "remote", "add", "origin", bare)
+        git(folder, "push", "-q", "-u", "origin", "main")
+        return folder
+
+    def age(self, path, hours):
+        stamp = time.time() - hours * 3600
+        os.utime(path, (stamp, stamp))
+
+    def test_a_note_that_waits_for_the_backup_longer_than_a_day_is_a_warning_that_reaches_the_session_start(self):
+        folder = self.backed_up_memory()
+        self.assertNotIn(self.BEHIND, self.run_script("doctor")[1])
+        write(os.path.join(folder, "one.md"), "- a note, changed\n")
+        self.age(os.path.join(folder, "one.md"), 23)
+        self.assertNotIn(self.BEHIND, self.run_script("doctor")[1])                 # not a day yet
+        self.age(os.path.join(folder, "one.md"), 25)
+        write(os.path.join(folder, "two.md"), "- changed just now\n")               # the oldest change is what counts
+        code, out, _ = self.run_script("doctor")
+        self.assertEqual(code, 0, out)
+        stamp = datetime.datetime.fromtimestamp(os.path.getmtime(os.path.join(folder, "one.md"))).strftime("%Y-%m-%d %H:%M")
+        self.assertIn(f"WARNING  {self.BEHIND}: the oldest change that waits for it is from {stamp}. "
+                      "Notes not committed: 2. Commits not pushed: 0.", out)
+        self.assertIn("bowline memory push", out)
+        self.assertIn("/bowline:memory-backup", out)
+        self.assertIn(self.BEHIND, self.run_script("doctor", "--brief")[1])
+        git(folder, "add", "-A")
+        git(folder, "commit", "-q", "-m", "a backup")
+        git(folder, "push", "-q")
+        self.assertNotIn(self.BEHIND, self.run_script("doctor")[1])                 # backed up: quiet again
+
+    def test_a_commit_that_waits_for_its_push_longer_than_a_day_is_the_same_warning(self):
+        folder = self.backed_up_memory()
+        write(os.path.join(folder, "one.md"), "- a note, changed\n")
+        git(folder, "add", "-A")
+        old = str(int(time.time()) - 25 * 3600) + " +0000"
+        subprocess.run(["git", "-C", folder, "commit", "-q", "-m", "Memory as of then"], check=True,
+                       env=dict(os.environ, GIT_AUTHOR_DATE=old, GIT_COMMITTER_DATE=old))
+        self.assertIn("Notes not committed: 0. Commits not pushed: 1.", self.run_script("doctor")[1])
+
+    def test_a_new_note_and_a_removed_one_wait_too_whatever_their_names(self):
+        folder = self.backed_up_memory()
+        new = os.path.join(folder, "a note " + chr(0xe9) + ".md")                   # a space and a letter outside ASCII
+        write(new, "- new\n")
+        os.remove(os.path.join(folder, "two.md"))
+        self.age(new, 30)
+        self.assertIn("Notes not committed: 2. Commits not pushed: 0.", self.run_script("doctor")[1])
+        os.remove(new)
+        self.age(folder, 30)                                                        # a removed note is as old as its folder says
+        self.assertIn("Notes not committed: 1. Commits not pushed: 0.", self.run_script("doctor")[1])
+
+    def test_the_repository_sets_the_hours_and_can_turn_the_warning_off(self):
+        folder = self.backed_up_memory()
+        write(os.path.join(folder, "one.md"), "- a note, changed\n")
+        self.age(os.path.join(folder, "one.md"), 30)
+        for hours, said in ((24, True), (48, False), (0, False)):
+            write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"limits": {"memoryBackupHours": hours}}))
+            self.assertEqual(self.BEHIND in self.run_script("doctor")[1], said, hours)
+
+    def test_a_backup_that_falls_further_behind_is_one_reminder(self):
+        import doctor
+        folder = self.backed_up_memory()
+        config = {"limits": {"memoryBackupHours": 24}, "limitsWhy": {"memoryBackupHours": "why"}}
+        keys = set()
+        for name, hours in (("one.md", 30), ("two.md", 50)):
+            write(os.path.join(folder, name), "- changed\n")
+            self.age(os.path.join(folder, name), hours)
+            found = doctor.waiting_findings(folder, config)
+            self.assertEqual(len(found), 1)
+            keys.add(doctor.finding_key(found[0]))
+        self.assertEqual(len(keys), 1, keys)
 
     def test_entry_point_dispatches(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n")

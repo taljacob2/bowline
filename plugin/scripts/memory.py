@@ -20,7 +20,10 @@ and always exits 0, so a failed push never interrupts a session. A project whose
 repository is left alone. As a hook, it backs up the notes beside the session's transcript, and when none are backed
 up there, as for a session in a worktree, the notes of the main checkout of the folder the session works in. The
 commit's message also names the session whose reply it follows, in a line "Session: <id>", the identifier Claude Code
-gives the hook.
+gives the hook. Without --hook it says what it did, and when the push fails what git said, with exit code 1.
+
+status says what waits for the backup and since when: the notes not committed and the commits not pushed. The doctor
+warns when the oldest of them has waited longer than limits.memoryBackupHours.
 
 losses reads that line. Every worktree of a repository shares one memory folder, so a session that writes a note whole
 from the copy it read earlier erases what another session added in between. losses lists, from the backup's history
@@ -51,6 +54,13 @@ def git(folder, *args, capture=False):
     result = subprocess.run(["git", "-C", folder, *args], stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
                             stderr=subprocess.PIPE if capture else subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=60)
     return (result.returncode, result.stdout.decode("utf-8", "replace") if capture else "")
+
+
+def git_said(folder, *args):
+    """Runs git and returns its exit code and what it said on standard error, for a failure a person has to understand."""
+    result = subprocess.run(["git", "-C", folder, *args], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, timeout=60)
+    return result.returncode, result.stderr.decode("utf-8", "replace").strip()
 
 
 def folder_has_files(folder):
@@ -165,6 +175,37 @@ def do_setup(options, words):
     return 0
 
 
+def written(memory, note):
+    """When a changed note was last written, in seconds; for a note that was removed, when the folder it was in was."""
+    path = os.path.join(memory, note)
+    while not os.path.lexists(path) and len(path) > len(memory):
+        path = os.path.dirname(path)
+    return os.path.getmtime(path)
+
+
+def waiting(memory):
+    """What the backup has not taken yet: (the notes not committed, the commits not pushed, when the oldest of them was
+    written or made, in seconds, or None when nothing waits). A note that is written again and again is as old as its
+    last write, so the time is never earlier than the change that has waited longest."""
+    times = []
+    # --no-optional-locks: a look must not hold the index that the backup of another session's reply needs.
+    code, out = git(memory, "--no-optional-locks", "status", "--porcelain", "-z", "--no-renames", "--untracked-files=all", capture=True)
+    notes = [entry[3:] for entry in out.split("\0") if len(entry) > 3] if code == 0 else []
+    for note in notes:
+        try:
+            times.append(written(memory, note))
+        except OSError:
+            pass
+    code, out = git(memory, "log", "--no-show-signature", "--format=%ct", "HEAD", "--not", "--remotes", capture=True)
+    commits = [int(line) for line in out.split() if line.isdigit()] if code == 0 else []
+    times += commits
+    return len(notes), len(commits), min(times) if times else None
+
+
+def stamp(seconds):
+    return datetime.datetime.fromtimestamp(seconds).strftime("%Y-%m-%d %H:%M")
+
+
 def do_status(options):
     repo = options.repo or os.getcwd()
     checkout, memory = memory_for(repo)
@@ -190,11 +231,11 @@ def do_status(options):
         return 1
     _, remote = git(memory, "remote", "get-url", "origin", capture=True)
     _, last = git(memory, "log", "-1", "--no-show-signature", "--format=%ci %s", capture=True)
-    _, ahead = git(memory, "rev-list", "--count", "@{u}..HEAD", capture=True)
-    _, dirty = git(memory, "status", "--porcelain", capture=True)
+    notes, commits, since = waiting(memory)
     print(f"remote: {remote.strip() or 'none'}")
     print(f"last commit: {last.strip() or 'none'}")
-    print(f"not yet pushed: {ahead.strip() or '0'} commit(s); uncommitted changes: {len(dirty.strip().splitlines())} file(s)")
+    print(f"not yet pushed: {commits} commit(s); uncommitted changes: {notes} file(s)"
+          + (f"; the oldest change waits since {stamp(since)}" if since is not None else ""))
     print(f"hook on this machine: {'installed' if hook_installed() else 'not installed (the plugin hook may cover it)'}")
     return 0
 
@@ -233,22 +274,28 @@ def do_push(options):
     git(memory, "add", "-A")
     committed = False
     if git(memory, "diff", "--cached", "--quiet")[0] != 0:
-        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        git(memory, "commit", "-q", "-m", "Memory as of " + stamp, *(["-m", SESSION_LINE + session] if session else []))
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        git(memory, "commit", "-q", "-m", "Memory as of " + now, *(["-m", SESSION_LINE + session] if session else []))
         committed = True
     if git(memory, "rev-parse", "--verify", "-q", "HEAD")[0] != 0:
         return 0
-    pushed = False
+    push = None
     if git(memory, "rev-parse", "--abbrev-ref", "@{u}")[0] != 0:
         if git(memory, "remote", "get-url", "origin")[0] == 0:
-            pushed = git(memory, "push", "-q", "-u", "origin", "HEAD")[0] == 0
+            push = ("push", "-q", "-u", "origin", "HEAD")
     else:
         _, ahead = git(memory, "rev-list", "--count", "@{u}..HEAD", capture=True)
         if (ahead.strip() or "0") != "0":
-            pushed = git(memory, "push", "-q")[0] == 0
+            push = ("push", "-q")
+    code, said = git_said(memory, *push) if push else (0, "")
     if not options.hook:
-        print(f"bowline memory: {'committed' if committed else 'nothing new'}; {'pushed' if pushed else 'nothing to push'}.")
-    return 0
+        outcome = "nothing to push." if push is None else "pushed."
+        if code != 0:
+            waits = waiting(memory)[1]
+            outcome = (f"the push failed, so {common.count(waits, 'commit waits', 'commits wait')} for the backup. "
+                       f"git said: {said or 'nothing'}")
+        print(f"bowline memory: {'committed' if committed else 'nothing new'}; {outcome}")
+    return 0 if options.hook or code == 0 else 1
 
 
 def meant_path(memory):

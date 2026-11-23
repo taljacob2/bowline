@@ -4,6 +4,18 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- **The doctor says when the memory's backup is behind.** It checked that a backup exists and that a hook is installed,
+  never that the notes arrive. The hook prints nothing, so a backup that stopped showed nowhere: the fault that 0.16.3
+  put right hid for more than a day. The doctor now warns when a note not committed, or a commit not pushed, has waited
+  longer than `memoryBackupHours` (24 by default, 0 turns it off, a new setting): from when the oldest change waits,
+  how many notes and commits wait, and what to do. The warning reaches a person at a session's start and as the one
+  reminder after a reply. `memory status` says from when the oldest change waits.
+- **`memory push` says when a push failed.** Run by hand, it said "nothing to push" for a push that failed, with exit
+  code 0. It now says that it failed, how many commits wait and what git said, with exit code 1. As a hook it stays
+  silent, with exit code 0.
+
 ## 0.16.3 (2026-11-23)
 
 The memory backup, put right for sessions that run in a worktree, where it did nothing in silence. No Claude Code
