@@ -1225,3 +1225,34 @@ hand take no such care.
 **Not chosen.** A refusal by bowline of a link at the moment it is made: bowline sees no command that makes one, and a
 person may make a link on purpose. Moving a worktree with a link into WAITS FOR YOU: a link waits on no answer until
 a removal comes, and the warning already stands in every group.
+
+## 2026-11-23: the memory is backed up after a reply in a worktree
+
+**What happened.** The first user asked for two commits to be added to their notes, and the session that added them
+looked whether the backup had taken them. The last backup was more than a day old and five notes waited, although
+sessions had replied all day. `memory status` said so, and nobody had asked it.
+
+**Why.** The hook looked for the notes in the folder beside the session's transcript. Claude Code gives each worktree a
+project folder of its own for transcripts, and one memory folder to the whole repository, in the main checkout's
+project folder. So for a session in a worktree the hook found no backup and left the project alone, which is also what
+it does, on purpose, in a project that has none. It was right for as long as sessions ran in the main checkout, and
+it stopped being right when they moved to worktrees, which bowline itself takes as the usual case. Nothing said so,
+because the hook prints nothing.
+
+**The decision.** The hook takes the notes beside the transcript when they are backed up there, and otherwise those of
+the main checkout of `cwd`, the folder the session works in, found the way `memory status` and `memory push` find it.
+A session in a worktree, or in a folder inside one, now backs up the notes it reads and writes.
+
+**Why the transcript still comes first.** The folder a session works in can change to another repository in the
+middle of a session. The notes beside the transcript are those of the project the session started in, so for a session
+in a main checkout nothing changes.
+
+**What it does not do.** A worktree that is gone when its session ends names no repository any more; the notes are
+then pushed after the next reply of any other session. A commit after one session's reply holds whatever the folder
+holds at that moment, the edits of a session in the middle of its turn included, and is written under the name of the
+session that replied. That was so before; with every worktree's sessions pushing it is more frequent, and it is one
+more reason why a finding of `memory losses` is a warning that can be wrong.
+
+**Left for later.** A warning from the doctor when notes have waited longer than, say, a day. It would have shown
+this fault on its first day, whatever its cause, and it is a finding with a limit of its own, so it is a round of its
+own.

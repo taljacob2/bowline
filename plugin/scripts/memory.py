@@ -17,8 +17,10 @@ installed; pass --no-hook then.
 
 push commits what changed as "Memory as of <date>" and pushes when the branch is ahead; with --hook it prints nothing
 and always exits 0, so a failed push never interrupts a session. A project whose memory folder is not a git
-repository is left alone. As a hook, the commit's message also names the session whose reply it follows, in a line
-"Session: <id>", the identifier Claude Code gives the hook.
+repository is left alone. As a hook, it backs up the notes beside the session's transcript, and when none are backed
+up there, as for a session in a worktree, the notes of the main checkout of the folder the session works in. The
+commit's message also names the session whose reply it follows, in a line "Session: <id>", the identifier Claude Code
+gives the hook.
 
 losses reads that line. Every worktree of a repository shares one memory folder, so a session that writes a note whole
 from the copy it read earlier erases what another session added in between. losses lists, from the backup's history
@@ -200,12 +202,19 @@ def do_status(options):
 def do_push(options):
     memory = None
     session = ""
+    folder = ""
     if options.hook:
         try:
             facts = json.load(sys.stdin)
             transcript = facts.get("transcript_path") or ""
-            if transcript:
-                memory = os.path.join(os.path.dirname(transcript), "memory")
+            # The notes beside the transcript, when they are backed up: those of the project the session started in,
+            # wherever its folder has changed to since. A session in a worktree has its transcript in the worktree's
+            # own project folder, and its notes in the main checkout's, which every worktree shares; so without a
+            # backup beside the transcript, the folder the session works in says which repository's notes these are.
+            beside = os.path.join(os.path.dirname(transcript), "memory") if transcript else ""
+            if beside and os.path.isdir(os.path.join(beside, ".git")):
+                memory = beside
+            folder = str(facts.get("cwd") or "")
             # The session whose reply this commit follows, so that `memory losses` can tell one session's lines from
             # another's. Only an identifier made of letters, digits and dashes is written into a commit message.
             session = str(facts.get("session_id") or "")
@@ -214,7 +223,7 @@ def do_push(options):
             memory = None
     if memory is None:
         try:
-            _, memory = memory_for(options.repo or os.getcwd())
+            _, memory = memory_for(options.repo or folder or os.getcwd())
         except SystemExit:
             return 0 if options.hook else 2
     if not os.path.isdir(os.path.join(memory, ".git")):

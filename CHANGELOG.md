@@ -4,6 +4,17 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- **The memory backup works for a session in a worktree.** The hook after a reply looked for the notes beside the
+  session's transcript. A session in a worktree has its transcript in the worktree's own project folder, while the
+  notes are in the main checkout's, which every worktree shares, so the hook found no backup there and did nothing, in
+  silence. Where every session works in a worktree, nothing was backed up: the first user's notes waited more than a
+  day, until a person asked. The hook now takes the notes beside the transcript when they are backed up, as before,
+  and otherwise those of the main checkout of the folder the session works in, the folder `memory status` names.
+  Notes that waited are pushed after the next reply; nothing has to be done by hand. A machine that has the hook of
+  its own from `memory setup` without `--no-hook` runs the same code, so it is put right too.
+
 ## 0.16.2 (2026-11-22)
 
 A warning about a link inside a worktree, given before anything removes the worktree, where 0.16.1 gave it only when

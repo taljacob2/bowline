@@ -132,6 +132,96 @@ class MemoryTests(ScratchRepo):
         self.assertEqual((code, out, err), (0, "", ""))
         self.assertFalse(os.path.isdir(os.path.join(folder, ".git")))
 
+    def backed_up(self, repo, name):
+        """The memory folder of a repository, tied to a bare remote of its own with a first backup: (folder, remote)."""
+        folder = self.project_memory(repo)
+        bare = self.bare(name, seeded=True)
+        subprocess.run(["git", "clone", "-q", bare, folder], check=True, capture_output=True)
+        git(folder, "config", "user.email", "t@example.invalid")
+        git(folder, "config", "user.name", "Test")
+        return folder, bare
+
+    def worktree(self, name="side"):
+        """A worktree of the scratch repository where Claude Desktop makes them, and the project folder Claude Code
+        writes the transcripts of its sessions in: (the worktree, the project folder)."""
+        tree = os.path.join(self.repo, ".claude", "worktrees", name)
+        git(self.repo, "worktree", "add", "-q", tree, "-b", name)
+        return tree, os.path.dirname(self.project_memory(tree))
+
+    def reply_ends(self, project, cwd, session="session-one", started_in=None):
+        """The Stop hook after a reply, with the facts Claude Code hands it. The hook's own process runs outside every
+        repository unless started_in says otherwise, so that only the facts can tell it where the notes are."""
+        facts = {"hook_event_name": "Stop", "session_id": session, "transcript_path": os.path.join(project, session + ".jsonl")}
+        if cwd:
+            facts["cwd"] = cwd
+        result = self.bowline("push", "--hook", stdin=json.dumps(facts), cwd=started_in or self.root)
+        self.assertEqual(result, (0, "", ""))
+
+    def backups(self, bare):
+        """Every commit message the remote holds, the newest first, as one text."""
+        return subprocess.run(["git", "-C", bare, "log", "--format=%B", "main"], capture_output=True, text=True, check=True).stdout
+
+    def test_a_session_in_a_worktree_backs_up_the_notes_of_the_main_checkout(self):
+        folder, bare = self.backed_up(self.repo, "m")
+        tree, project = self.worktree()
+        write(os.path.join(folder, "from-a-worktree.md"), "a fact\n")
+        self.reply_ends(project, tree)
+        self.assertIn("Memory as of", self.backups(bare))
+        self.assertIn("Session: session-one", self.backups(bare))
+        self.assertFalse(os.path.exists(os.path.join(project, "memory")))          # nothing is made beside the transcript
+
+    def test_a_session_in_a_subfolder_of_a_worktree_backs_them_up_too(self):
+        folder, bare = self.backed_up(self.repo, "m")
+        tree, project = self.worktree()
+        os.makedirs(os.path.join(tree, "src", "deep"))
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        self.reply_ends(project, os.path.join(tree, "src", "deep"))
+        self.assertIn("Memory as of", self.backups(bare))
+
+    def test_a_memory_folder_without_a_backup_beside_the_transcript_does_not_hide_the_notes(self):
+        folder, bare = self.backed_up(self.repo, "m")
+        tree, project = self.worktree()
+        write(os.path.join(project, "memory", "MEMORY.md"), "- left by something else\n")
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        self.reply_ends(project, tree)
+        self.assertIn("Memory as of", self.backups(bare))
+        self.assertFalse(os.path.isdir(os.path.join(project, "memory", ".git")))
+
+    def test_a_worktree_session_without_a_cwd_goes_by_the_folder_the_hook_runs_in(self):
+        folder, bare = self.backed_up(self.repo, "m")
+        tree, project = self.worktree()
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        self.reply_ends(project, None, started_in=tree)
+        self.assertIn("Memory as of", self.backups(bare))
+
+    def test_a_session_whose_folder_changed_to_another_repository_backs_up_its_own_notes(self):
+        folder, bare = self.backed_up(self.repo, "m")
+        other = os.path.join(self.root, "other")
+        os.makedirs(other)
+        git(other, "init", "-q", "-b", "main")
+        other_folder, other_bare = self.backed_up(other, "o")
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        write(os.path.join(other_folder, "n.md"), "a fact of the other repository\n")
+        self.reply_ends(os.path.dirname(folder), other)
+        self.assertIn("Memory as of", self.backups(bare))
+        self.assertNotIn("Memory as of", self.backups(other_bare))
+
+    def test_a_worktree_of_a_repository_with_no_backup_is_left_alone(self):
+        folder = self.project_memory(self.repo)
+        write(os.path.join(folder, "MEMORY.md"), "- note\n")
+        tree, project = self.worktree()
+        self.reply_ends(project, tree)
+        self.assertFalse(os.path.isdir(os.path.join(folder, ".git")))
+
+    def test_a_worktree_that_is_gone_when_its_session_ends_says_nothing(self):
+        folder, bare = self.backed_up(self.repo, "m")
+        tree, project = self.worktree()
+        git(self.repo, "worktree", "remove", tree)
+        write(os.path.join(folder, "n.md"), "a fact\n")
+        self.reply_ends(project, tree)                                              # quiet and exit 0, as for any failure
+        self.reply_ends(os.path.dirname(folder), self.repo)                         # and the next reply catches up
+        self.assertIn("Memory as of", self.backups(bare))
+
 
 if __name__ == "__main__":
     unittest.main()
