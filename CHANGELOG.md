@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.17.1 (2026-11-24)
 
 A rule for a decision that reaches the wrong session. No Claude Code limit moved, and no command, hook or setting is
 new.
