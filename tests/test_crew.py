@@ -347,6 +347,7 @@ class CrewTests(ScratchRepo):
                       ".claude/worktrees/other.", out)
         self.assertIn("follow /bowline:crew", out)
         self.assertIn("work with it as a team: /bowline:collaborate.", out)
+        self.assertIn("send that session the person's words with SendMessage, as /bowline:collaborate says", out)
         # A repository without a rule gets the rule's main points and where the setup is; one with a rule does not.
         self.assertIn("This repository has no rule about working beside other sessions", out)
         self.assertIn("The last section of /bowline:crew sets the repository up", out)
@@ -354,6 +355,7 @@ class CrewTests(ScratchRepo):
         write(rule, read(os.path.join(os.path.dirname(SCRIPTS), "templates", "crew", "beside-other-sessions.md")))
         code, out, _ = self.brief(payload)
         self.assertIn("work with it as a team: /bowline:collaborate.", out)
+        self.assertIn("send that session the person's words with SendMessage, as /bowline:collaborate says", out)
         self.assertNotIn("no rule about working beside other sessions", out)
         self.assertNotIn("sets the repository up", out)
         os.remove(rule)
@@ -380,6 +382,7 @@ class CrewTests(ScratchRepo):
                       "told: in .claude/worktrees/other.", out)
         self.assertIn("/bowline:crew before your next edit", out)
         self.assertIn("/bowline:collaborate", out)
+        self.assertIn("send that session the person's words with SendMessage, as /bowline:collaborate says", out)
         self.assertEqual(self.brief(prompt, "--pending"), (0, "", ""))           # named once
         self.transcript(self.repo, "a-second-session-in-this-folder")
         code, out, _ = self.brief(prompt, "--pending")

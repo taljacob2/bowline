@@ -13,7 +13,8 @@ new.
   person decides, in it, something about work another session holds: it does not edit that work, it sends that session
   the person's own words with what is still open, it tells the person whether the message was delivered or only
   queued, and it sends a later answer as a correction. This holds above all for a fork that shares its parent's
-  worktree. The `crew` skill and the rule template point to it, and the skill gives the template's size as it is now.
+  worktree. The line at every session's start says the rule itself, as does the line before a prompt when another
+  session appears, and the skill's description names it. The `crew` skill and the rule template point to it, and the skill gives the template's size as it is now.
 
 ## 0.17.0 (2026-11-24)
 

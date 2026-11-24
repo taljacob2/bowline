@@ -513,10 +513,17 @@ WITHOUT_A_RULE = (
     "section of /bowline:crew sets the repository up, its settings and the rule; offer that to the person.")
 
 
+# In the line itself, because a session that does not know the rule has no reason to open the skill that holds it.
+DECIDED_HERE = (
+    "When the person decides something here about work another session holds, do not edit that work: send that session "
+    "the person's words with SendMessage, as /bowline:collaborate says, and tell the person whether the message was "
+    "delivered or only queued.")
+
+
 BESIDE_OTHERS = (
     "Before you take a roadmap number or a note, edit a file the sessions share such as the memory, run a heavy check, "
     "rebase or push, follow /bowline:crew. When another session has your subject or your files, work with it as a team: "
-    "/bowline:collaborate.")
+    "/bowline:collaborate. " + DECIDED_HERE)
 
 
 def others_line(root, places=None):
@@ -561,7 +568,7 @@ def arrived_line(root, watch, transcript):
     return (f"bowline: {common.count(count, 'other Claude Code session has', 'other Claude Code sessions have')} started "
             f"to work in this repository since you were last told: {where}. Look who holds what with "
             "/bowline:crew before your next edit, and before you take a number, run a heavy check, rebase or push; when it "
-            "has your subject or your files, work with it as a team: /bowline:collaborate."), True
+            f"has your subject or your files, work with it as a team: /bowline:collaborate. {DECIDED_HERE}"), True
 
 
 def do_watch(options):

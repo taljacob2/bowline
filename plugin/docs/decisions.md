@@ -1316,6 +1316,13 @@ that holds the work carries the decision out, and the other one sends the person
 is where a decision changes. It says how far the message got, because a person who believes it was read would wait for
 nothing. The rule template has one line of it, because a fork may never load the skill.
 
+**Where a session meets the rule.** Claude opens a skill on its own, when the skill's description fits the moment, and
+nothing forces it to. The first user: "if it is not used then it would be just skipped and no body would know that it
+exists in the first place to check it. i think it should be mentioned to begin with". So the rule stands in the line
+every session's start gets, not only in the skill, with or without a rule in the repository; also in the line before a
+prompt that says another session appeared; and the skill's description names the moment. It costs about 250 characters
+more at each start.
+
 **What does not change.** A relayed decision is still information. The session that receives it acts on it only for
 work already its own, and asks the person before anything that leaves the machine or cannot be undone.
 
