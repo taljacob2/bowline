@@ -624,7 +624,8 @@ worker spends money, up to `autosplit.maxBudgetUsd` for a split, and makes a bra
 person's whole account would then start paid runs in every repository they open, their own or not. The session that
 passed the words on proposed that `init` write `"autosplit": {"enabled": true}` into the repository's own
 `.claude/bowline.json` and name the cost in its plan. That is a decision about the person's money, so it waits for
-their word in the session that would build it, not for a word passed on.
+their word in the session that would build it, not for a word passed on. Decided on 2026-11-24: it stays off, in
+the last entry of this page.
 
 **Left for later**, each a concrete piece of work this round did not do:
 
@@ -1287,3 +1288,17 @@ push must never interrupt a session; the doctor is where it is said.
 
 **Not chosen.** A message from the hook itself when its push fails: a laptop without a network would show it after
 every reply. Letting the doctor push: the doctor changes nothing.
+
+## 2026-11-24: autosplit stays off by default
+
+**The question.** The entry "several sessions in one repository is the usual case" left it open. The first user had
+written that autosplit "should be default to true 'branch'", and it waited for their word because it spends their
+money.
+
+**The decision.** `autosplit.enabled` stays false in `defaults.json`. The first user, asked: "you said it costs a lot
+so probably we should leave it off by default?" A plugin is installed for a person's whole account, so a default of
+true would start paid runs, up to `autosplit.maxBudgetUsd` for one split, in every repository that the person opens. A
+repository that wants it says so in its own `.claude/bowline.json`.
+
+**What stays open.** Whether `init` offers it for the repository it sets up, naming the cost, is still the first point
+of that entry's list of later work.
