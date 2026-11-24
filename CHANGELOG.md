@@ -4,7 +4,10 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.17.0 (2026-11-24)
+
+The doctor watches whether the memory's backup arrives, not only whether it is set up. One setting is new,
+`limits.memoryBackupHours`. No Claude Code limit moved, and no command or hook is new.
 
 - **The doctor says when the memory's backup is behind.** It checked that a backup exists and that a hook is installed,
   never that the notes arrive. The hook prints nothing, so a backup that stopped showed nowhere: the fault that 0.16.3
