@@ -1302,3 +1302,22 @@ repository that wants it says so in its own `.claude/bowline.json`.
 
 **What stays open.** Whether `init` offers it for the repository it sets up, naming the cost, is still the first point
 of that entry's list of later work.
+
+## 2026-11-24: a decision goes to the session that holds the work
+
+**The question.** The collaborate skill said what a relayed decision is worth to the session that receives it, and
+nothing about the session in which the person decides. That day, in another repository, the first user forked a
+session for a side question and decided there something about uncommitted work its parent held in the same worktree.
+The fork edited nothing: it sent the parent the user's words and what was still open, and told the user that its
+second message was only queued. The user: "i like that you messaged the session".
+
+**The decision.** The skill says so, in a section of its own before what another session's word is worth. The session
+that holds the work carries the decision out, and the other one sends the person's words, quoted, because a paraphrase
+is where a decision changes. It says how far the message got, because a person who believes it was read would wait for
+nothing. The rule template has one line of it, because a fork may never load the skill.
+
+**What does not change.** A relayed decision is still information. The session that receives it acts on it only for
+work already its own, and asks the person before anything that leaves the machine or cannot be undone.
+
+**Not chosen.** A check in code: bowline's scripts cannot see that the person has decided something. Its warning
+before an edit names a file that another worktree holds, not one that another session in the same worktree changed.

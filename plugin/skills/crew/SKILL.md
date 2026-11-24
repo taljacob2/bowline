@@ -103,7 +103,8 @@ Before you pass the look on to the person, read it as a measurement, not as the 
   idle or quiet, and the session that does the most is never the one you mention least.
 - **List a side session under the session it belongs to.** A fork, a "btw" question or a session started from
   another works in that session's folder and often holds nothing of its own. Name it under the session it came from,
-  not as one more session working on its own.
+  not as one more session working on its own. When you are the side session and the person decides something about
+  the other session's work, `/bowline:collaborate` says how to send it on.
 - **When the person needs memory back**, go through every idle session that holds nothing of its own, one by one,
   including one in a worktree whose other session holds work. The IDLE, HOLDING NOTHING group is decided per
   worktree, so a side session idle beside work is not in it, and closing it gives its memory back too. Say which
@@ -317,7 +318,7 @@ keys and their reasons are in `${CLAUDE_PLUGIN_ROOT}/defaults.json`:
 Then offer the rule in `${CLAUDE_PLUGIN_ROOT}/templates/crew/beside-other-sessions.md`: show it, adapt its words to
 the repository, and with the person's yes write it to `.claude/rules/beside-other-sessions.md`. It holds both halves,
 keeping apart and giving work a session of its own, because a repository should have one rule about this and not
-two. It has no `paths:`, so every session reads it at its start, and it takes about 4,000 of the 10,000 characters the
+two. It has no `paths:`, so every session reads it at its start, and it takes about 5,000 of the 10,000 characters the
 unscoped rules may use; drop the rules the repository does not need. Keep its sentence that says `bowline crew` is
 the plugin's script: a session that types the name as a command finds no such program. A repository that already has
 such a rule keeps its own: fill its names into the template's words, or leave it. Offer the settings and the rule in

@@ -24,6 +24,9 @@ the skill gives its full command.
 - **On one subject, work as a team.** When another session has your subject or your files, follow
   `/bowline:collaborate`: say your subject before you design, and exchange file lists before either of you edits.
   Keep a short status with `bowline crew say`, which every session sees in `bowline crew`.
+- **A decision goes to the session that holds the work.** When the person decides in your session something about
+  another session's work, do not edit that work: send that session the person's own words, as `/bowline:collaborate`
+  says. A fork that shares its parent's worktree does the same.
 - **Claim before you work.** A new number of <the roadmap> comes from `bowline crew claim <list> --new`, never from
   reading the file: two sessions that each add one take the same number. Claim a note or a file the same way, and
   tell the sessions concerned with `SendMessage`.

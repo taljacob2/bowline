@@ -4,6 +4,17 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+A rule for a decision that reaches the wrong session. No Claude Code limit moved, and no command, hook or setting is
+new.
+
+- **A decision goes to the session that holds the work.** The `collaborate` skill now says what a session does when the
+  person decides, in it, something about work another session holds: it does not edit that work, it sends that session
+  the person's own words with what is still open, it tells the person whether the message was delivered or only
+  queued, and it sends a later answer as a correction. This holds above all for a fork that shares its parent's
+  worktree. The `crew` skill and the rule template point to it, and the skill gives the template's size as it is now.
+
 ## 0.17.0 (2026-11-24)
 
 The doctor watches whether the memory's backup arrives, not only whether it is set up. One setting is new,

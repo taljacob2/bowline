@@ -119,6 +119,7 @@ class SayTests(ScratchRepo):
         self.assertIn("crew claim waits:", text)                                  # a wait is written down, where the pusher's check finds it
         self.assertIn("A message that stops being true needs a correction.", text)
         self.assertIn("The record is one repository's.", text)
+        self.assertIn("**Send the decision, and do not edit the work.**", text)
         self.assertLess(text.count("\n"), 500)
 
 
