@@ -4,7 +4,7 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.18.0 (2026-11-28)
 
 Autosplit is offered with its cost, where a person meets it. One option is new, `init --autosplit`. No Claude Code
 limit moved, and no hook or setting is new.
