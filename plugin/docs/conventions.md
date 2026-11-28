@@ -19,7 +19,26 @@ The loss it prevents: a single growing `CLAUDE.md` that the tool reads less of e
 
 When a design question settles in conversation, it gets an entry with its reasoning in the same round, without being
 asked. The loss: the same question re-argued later, and the reasoning gone with the conversation that held it. The
-entry's shape is the decision, the why in the words the question was asked in, and what was not chosen when that helps.
+entry's shape is the decision in a sentence that stands alone, the person's own words when they decided it, the why in
+the words the question was asked in, what it covers and leaves open, where it shows, and what was not chosen when that
+helps.
+
+## Looking a decision up before a question
+
+Before a design question goes to the person, or a session settles one itself, it reads what was decided about the
+subject: the decisions section, the roadmap, the commit that brought the behaviour, and the comments and tests that
+name it. The loss, as it happened once: a program and three written records disagreed about one word that a person
+reads. A session changed a record to match the program, asked the person a question with two choices, and repeated its
+own recommendation five times from its notes. When the person asked why, it read the records at last and found a third
+choice, the word the product already used in the nearest similar case, and the person chose it.
+
+Four habits come out of it. When a record and the program disagree, neither is the truth until someone finds which one
+is the mistake, so the session edits neither and tells the person what disagrees. The nearest existing case is always
+one of the choices. An entry holds the decision's own sentence and the person's own words, because "approved as
+recommended" keeps a label and loses the recommendation with the conversation that held it. And an open question is
+kept with its choices and what was read for it, never as a recommendation alone, so that after a summary it is worked
+out again and not only repeated. The `decide` skill is the procedure, and `bowline decisions find` lists the places
+where a subject appears.
 
 ## A roadmap with numbered slots for scope cuts
 

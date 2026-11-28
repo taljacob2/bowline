@@ -12,6 +12,10 @@
     "heavy": [],
     "keepPorts": []
   },
+  "_decisions": "Name the files that record decisions (records), as paths or patterns from the repository's top: the design document, the roadmap, a folder of decision records. bowline decisions find lists them first when a session looks a subject up before it asks you a question. With none named, bowline takes the documents whose name says so; bowline decisions records prints which.",
+  "decisions": {
+    "records": []
+  },
   "_autosplit": "Set enabled to true to let bowline prepare the split of a CLAUDE.md that outgrew the limits in the background, on a branch for you to review and merge. A headless Claude Code session does it on your account, and one split may spend up to maxBudgetUsd, 20 dollars by default; the other keys and their reasons are in bowline's defaults.json.",
   "autosplit": {
     "enabled": false,

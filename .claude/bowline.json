@@ -4,6 +4,9 @@
     "acceptedCharacters": []
   },
   "skillsDir": [".claude/skills", "plugin/skills"],
+  "decisions": {
+    "records": ["plugin/docs/decisions.md", "CHANGELOG.md"]
+  },
   "_autosplit": "On here: when a CLAUDE.md outgrows the limits and is committed clean, bowline prepares its split in the background, on a branch for you to review and merge. A headless Claude Code session does it on your account, and one split may spend up to maxBudgetUsd, 20 dollars by default; the other keys and their reasons are in bowline's defaults.json.",
   "autosplit": {
     "enabled": true

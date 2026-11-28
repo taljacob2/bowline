@@ -1,0 +1,441 @@
+"""Decisions: where a subject was decided, so that a session reads it before it asks the person or decides itself.
+
+    python -I scripts/decisions.py find <word>... [--repo <path>] [--verbose] [--seconds <n>] [--no-memory]
+    python -I scripts/decisions.py records [--repo <path>]
+
+find lists every place in the repository where the words stand close together, in any case: the records of decisions
+first, then the other documents, the tests, the code, and the commit messages. A place is one where every word appears
+within a few lines of the others (decisions.within, 3 by default), because a sentence in a document is wrapped over
+two or three lines. In the records, the places that say decided, agreed or approved come first. For a line of a test
+or of the code, it names the commit that last wrote the line. For a comment that cites a decision by its date, it
+names the record that holds that date, or says that none does. For a record's entry that approves a number of things
+by reference, such as "all three as recommended", it says that the entry names a recommendation without saying it. It
+ends with what it did not search: a page outside the repository, the conversation, and the memory's notes, of which it
+gives only the names of those that hold the words.
+
+It is a list of places, never an answer. It cannot see that two lines disagree, and it cannot find the nearest similar
+case in a product; the decide skill asks Claude for both.
+
+records prints the files taken as records of decisions: those named in .claude/bowline.json (decisions.records), or,
+when none is named, the documents whose name says so: a roadmap, a design document, a decisions page, a changelog, or
+a file in a folder named adr or decisions. A file under .claude is an instruction, never a record.
+
+The files are found by git grep, over the files git tracks and the ones it would add, and only those that hold every
+word are read. The documents are searched first and the tests and the code after them, because on a disk that was not
+read lately the search of every file can take a minute or more: on the first repository it was measured on, about 80
+seconds the first time and 0.2 seconds after that. The search has a time limit (decisions.seconds); when it runs out,
+the list says which parts were not searched, and a second run is fast, because the first one read the files.
+Exit codes: 0 when the search ran, whatever it found; 2 when the script could not run.
+"""
+
+import argparse
+import concurrent.futures
+import os
+import re
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import common  # noqa: E402
+
+DOCUMENT = (".md", ".markdown", ".txt", ".rst", ".adoc")
+# A document whose name says that it records decisions, and a folder that holds such documents.
+RECORD_NAME = re.compile(r"(?<![a-z])(decisions?|adrs?|roadmap|design|changelog)(?![a-z])", re.IGNORECASE)
+RECORD_FOLDER = ("adr", "adrs", "decisions")
+TEST = re.compile(r"(^|[/_.-])(tests?|specs?|__tests__|e2e)([/_.-]|$)", re.IGNORECASE)
+DATE = re.compile(r"(?<![0-9])\d{4}-\d{2}-\d{2}(?![0-9])")
+CITES = re.compile(r"\b(decision|decided|agreed|approved)\b", re.IGNORECASE)
+# What a place in a record says when it is where the subject was settled, or left open.
+DECIDES = re.compile(r"\b(decided|decision|agreed|approved)\b|\bopen\s*[:(]", re.IGNORECASE)
+# Where an entry of a document starts: a heading, a numbered item, or a list item that opens in bold.
+LEAD = re.compile(r"^(#{1,6}\s|\d+[.)]\s|[-*]\s+\*\*)")
+# How many lines after a place still belong to it, when no blank line ends the paragraph sooner: a record names what
+# was asked over a few lines and says "all seven as recommended" at the end of them.
+FOLLOWS = 8
+WIDTH = 100
+PARTS = (("records", "RECORDS OF DECISIONS"), ("documents", "OTHER DOCUMENTS"), ("tests", "TESTS"), ("code", "CODE"))
+BLAMES_AT_ONCE = 8
+
+
+def settings(config):
+    return config.get("decisions") or {}
+
+
+def is_document(path):
+    return path.lower().endswith(DOCUMENT)
+
+
+def record_files(files, config):
+    """The files of a listing that are records of decisions: those the repository names (decisions.records, as paths or
+    patterns from its top), or, when it names none, the documents whose name or folder says so. An instruction file
+    under .claude is never one: a rule about recording decisions is not a record of them."""
+    named = [str(pattern).replace("\\", "/") for pattern in settings(config).get("records") or []]
+    if named:
+        return sorted({path for pattern in named for path in common.matching(files, pattern)})
+    found = []
+    for path in files:
+        parts = path.split("/")
+        if not is_document(path) or parts[0] == ".claude":
+            continue
+        stem = os.path.splitext(parts[-1])[0]
+        if RECORD_NAME.search(stem) or any(part.lower() in RECORD_FOLDER for part in parts[:-1]):
+            found.append(path)
+    return sorted(found)
+
+
+def part_of(path, records):
+    """Which part of the list a file belongs to: records, documents, tests or code."""
+    if path in records:
+        return "records"
+    if is_document(path):
+        return "documents"
+    return "tests" if TEST.search(path) else "code"
+
+
+def holding_every_word(root, words, documents, deadline):
+    """The files that hold every word somewhere, in any case, among the files git tracks and the ones it would add: one
+    git grep, so that only those files are read. documents chooses the documents alone, or every other file. None when
+    git did not answer before the deadline."""
+    left = deadline - time.monotonic()
+    if left <= 0:
+        return None
+    command = ["git", "-C", root, "--no-optional-locks", "grep", "-l", "-z", "-I", "-i", "-F", "--untracked", "--all-match"]
+    for word in words:
+        command += ["-e", word]
+    command += ["--"] + ([] if documents else ["."])
+    command += [(":(glob)**/*" if documents else ":(exclude,glob)**/*") + suffix for suffix in DOCUMENT]
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=left)
+    except subprocess.TimeoutExpired:
+        return None
+    return sorted(path for path in result.stdout.decode("utf-8", "replace").split("\0") if path)
+
+
+def places(lines, words, within):
+    """The places in a text's lines where every word appears within `within` consecutive lines, as the indexes of each
+    place's first line. A place takes only the lines it needs to hold every word, so a line that holds them all is a
+    place of its own, and a sentence wrapped over two lines is one place and not two. The words are given in lower
+    case."""
+    lowered = [line.lower() for line in lines]
+    found, taken = [], -1
+    for index, line in enumerate(lowered):
+        if index <= taken or not any(word in line for word in words):
+            continue
+        for more in range(within):
+            stretch = "\n".join(lowered[index:index + more + 1])
+            if all(word in stretch for word in words):
+                found.append(index)
+                taken = index + more
+                break
+    return found
+
+
+def paragraph_from(lines, index):
+    """The lines of a place and the ones that follow it in the same paragraph, as (index, line) pairs: up to FOLLOWS
+    lines, ending sooner at a blank line."""
+    out = []
+    for at in range(index, min(len(lines), index + FOLLOWS)):
+        if at > index and not lines[at].strip():
+            break
+        out.append((at, lines[at]))
+    return out
+
+
+def lead_of(lines, index):
+    """The line that opens the entry a line belongs to, for a line deep inside a long entry of a document: the nearest
+    heading, numbered item or bold list item above it. None when the line opens its own entry or nothing does."""
+    if LEAD.match(lines[index]):
+        return None
+    for above in range(index - 1, max(-1, index - 400), -1):
+        if LEAD.match(lines[above]):
+            return above
+    return None
+
+
+def cut(text, room):
+    """A line as the list shows it: its spaces folded, and cut with three dots when it is longer than the room."""
+    text = " ".join(text.split())
+    return text if len(text) <= room else text[:max(room - 3, 1)].rstrip() + "..."
+
+
+def last_written(root, path, numbers, deadline):
+    """The commit that last wrote each of some lines of one file, as {line number: words}: one git blame for the file.
+    git refuses a file that no commit holds, and such a file's lines are said to be not committed yet. A line the time
+    limit left unanswered is left out."""
+    left = deadline - time.monotonic()
+    if left <= 0:
+        return {}
+    command = ["git", "-C", root, "--no-optional-locks", "blame", "--porcelain"]
+    for number in sorted(set(numbers)):
+        command += ["-L", f"{number},{number}"]
+    try:
+        result = subprocess.run(command + ["--", path], capture_output=True, timeout=left)
+    except subprocess.TimeoutExpired:
+        return {}
+    if result.returncode != 0:
+        return {number: "not committed yet" for number in numbers}
+    days, lines_of, commit = {}, {}, None
+    for line in result.stdout.decode("utf-8", "replace").split("\n"):
+        head = re.match(r"^([0-9a-f]{40}) \d+ (\d+)", line)
+        if head:
+            commit = head.group(1)
+            lines_of[int(head.group(2))] = commit
+        elif commit and line.startswith("author-time "):
+            when = line.split(" ", 1)[1].strip()
+            if when.isdigit():
+                days[commit] = time.strftime("%Y-%m-%d", time.gmtime(int(when)))
+    out = {}
+    for number, commit in lines_of.items():
+        if not commit.strip("0"):
+            out[number] = "not committed yet"
+        else:
+            out[number] = f"last written in {commit[:7]}, {days.get(commit, 'on an unknown day')}"
+    return out
+
+
+def commit_messages(root, words, limit):
+    """The commits of the current branch whose message holds every word, newest first, as (hash, day, subject)."""
+    command = ["git", "-C", root, "--no-optional-locks", "log", "--no-show-signature", "-i", "-F", "--all-match",
+               "--format=%h%x09%ad%x09%s", "--date=short", "-n", str(limit)]
+    for word in words:
+        command += ["--grep", word]
+    result = subprocess.run(command, capture_output=True)
+    if result.returncode != 0:
+        return []
+    return [tuple(line.split("\t", 2)) for line in result.stdout.decode("utf-8", "replace").split("\n") if line.count("\t") >= 2]
+
+
+def notes_holding(root, words):
+    """The names of the memory's notes that hold every word. Only the names: a note's words are shown to a person who
+    asks for them, and a note is working notes, never the record."""
+    folder = common.memory_folder(common.main_checkout(root))
+    if not os.path.isdir(folder):
+        return []
+    found = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".md") or name == "MEMORY.md":
+            continue
+        try:
+            text = common.read_text(os.path.join(folder, name)).lower()
+        except OSError:
+            continue
+        if all(word in text for word in words):
+            found.append(name)
+    return found
+
+
+class Search:
+    """One lookup: the files read, the places found in each part, and what the time limit left out. A place is
+    (path, line number, the line, the notes under it), and a note is its words."""
+
+    def __init__(self, root, config, words, seconds):
+        self.root, self.words = root, [word.lower() for word in words]
+        chosen = settings(config)
+        self.within = max(1, int(chosen.get("within") or 3))
+        self.by_reference = re.compile(chosen.get("byReference") or r"(?!)", re.IGNORECASE)
+        self.records = record_files(common.listed_files(root), config)
+        self.texts = {}
+        self.found = {name: [] for name, _ in PARTS}
+        self.deadline = time.monotonic() + seconds
+        documents = holding_every_word(root, self.words, True, self.deadline)
+        rest = holding_every_word(root, self.words, False, self.deadline) if documents is not None else None
+        self.searched = {"documents": documents is not None, "tests": rest is not None, "code": rest is not None}
+        # The records are read whatever git said: they are few, and they are what the lookup is for.
+        for path in sorted(set(self.records) | set(documents or []) | set(rest or [])):
+            self.read(path)
+        # Where the subject was settled comes before where it is only mentioned.
+        self.found["records"].sort(key=lambda place: not place[4])
+        self.found = {name: [place[:4] for place in found] for name, found in self.found.items()}
+
+    def lines_of(self, path):
+        if path not in self.texts:
+            try:
+                self.texts[path] = common.read_text(os.path.join(self.root, path)).replace("\r\n", "\n").split("\n")
+            except OSError:
+                self.texts[path] = []
+        return self.texts[path]
+
+    def read(self, path):
+        lines = self.lines_of(path)
+        part = part_of(path, self.records)
+        for index in places(lines, self.words, self.within):
+            notes, decides = [], False
+            if part in ("records", "documents"):
+                lead = lead_of(lines, index)
+                if lead is not None:
+                    notes.append(f"in the entry at line {lead + 1}: {lines[lead]}")
+            if part == "records":
+                paragraph = paragraph_from(lines, index)
+                decides = any(DECIDES.search(line) for _, line in paragraph)
+                for at, line in paragraph:
+                    label = self.by_reference.search(line)
+                    if label:
+                        notes.append(f"line {at + 1} says \"{label.group(0)}\": it names a recommendation without saying "
+                                     "it, so this entry cannot tell you what was decided")
+                        break
+            if part in ("tests", "code"):
+                stretch = " ".join(lines[index:index + self.within])
+                if CITES.search(stretch):
+                    for day in sorted(set(DATE.findall(stretch))):
+                        notes.append(self.record_of(day))
+            self.found[part].append((path, index + 1, lines[index], notes, decides))
+
+    def record_of(self, day):
+        """Where the records hold a date that a comment cites, in words."""
+        held = []
+        for path in self.records:
+            for index, line in enumerate(self.lines_of(path)):
+                if day in line:
+                    held.append(f"{path}:{index + 1}")
+        if not held:
+            return f"it cites {day}, and no record of decisions holds that date"
+        more = f" and {len(held) - 2} more" if len(held) > 2 else ""
+        return f"it cites {day}; a record holds that date at {', '.join(held[:2])}{more}"
+
+    def written(self, shown):
+        """For the places of the tests and the code that are shown: the commit that last wrote each line, asked of git
+        once per file and for several files at once, as {(path, line number): words}."""
+        by_file = {}
+        for name in ("tests", "code"):
+            for path, number, _, _ in shown[name]:
+                by_file.setdefault(path, []).append(number)
+        out = {}
+        if not by_file:
+            return out
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(BLAMES_AT_ONCE, len(by_file))) as pool:
+            futures = {path: pool.submit(last_written, self.root, path, numbers, self.deadline) for path, numbers in by_file.items()}
+            for path, future in futures.items():
+                for number, words in future.result().items():
+                    out[(path, number)] = words
+        return out
+
+
+def print_wrapped(text, indent="      "):
+    """Prints words under a place, folded at the list's width, so that a note is read whole."""
+    words, line = " ".join(text.split()).split(" "), indent
+    for word in words:
+        if len(line) + len(word) + 1 > WIDTH and line.strip():
+            print(line.rstrip())
+            line = indent
+        line += word + " "
+    if line.strip():
+        print(line.rstrip())
+
+
+def show(search, limit, verbose, memory, seconds):
+    one = len(search.words) == 1
+    words = " with ".join(f'"{word}"' for word in search.words)
+    print(f"bowline decisions: {words}, in the repository at")
+    print(f"  {search.root}")
+    print("A place is listed where " + ("the word appears" if one else
+                                         f"the words appear within {search.within} lines of each other") + ", in any case.")
+    shown = {name: (found if verbose else found[:limit]) for name, found in search.found.items()}
+    written = search.written(shown)
+    for name, title in PARTS:
+        print()
+        found = search.found[name]
+        if name == "records":
+            if not search.records:
+                print(f"{title}  none found. Name them in {common.CONFIG_FILE} (decisions.records).")
+                continue
+            files = ", ".join(search.records)
+            if len(title) + 2 + len(files) > WIDTH:
+                files = f"{len(search.records)} files, which `bowline decisions records` lists"
+            print(f"{title}  {files}")
+        elif not search.searched[name]:
+            print(f"{title}  not searched: git did not answer within {seconds} seconds. Run it again: the files are read")
+            print("  now, so the second search is fast.")
+            continue
+        else:
+            print(title)
+        if not found:
+            print("  nothing")
+            continue
+        for path, number, line, notes in shown[name]:
+            where = f"{path}:{number}"
+            if len(where) > WIDTH // 2:
+                print(f"  {where}")
+                print(f"      {cut(line, WIDTH - 6)}")
+            else:
+                print(f"  {where}  {cut(line, WIDTH - 4 - len(where))}")
+            for note in notes:
+                if note.startswith("in the entry"):
+                    print("      " + cut(note, WIDTH - 6))
+                else:
+                    print_wrapped(note)
+            if (path, number) in written:
+                print(f"      {written[(path, number)]}")
+        if len(found) > len(shown[name]):
+            first = "; the places that say decided, agreed or approved are listed first" if name == "records" else ""
+            print_wrapped(f"and {len(found) - len(shown[name])} more (--verbose lists every one{first})", "  ")
+    print()
+    messages = commit_messages(search.root, search.words, 200)
+    print("COMMIT MESSAGES")
+    if not messages:
+        print("  nothing")
+    for commit, day, subject in messages if verbose else messages[:limit]:
+        print(f"  {commit}  {day}  {cut(subject, WIDTH - 6 - len(commit) - len(day))}")
+    if not verbose and len(messages) > limit:
+        print(f"  and {len(messages) - limit} more (--verbose lists every one)")
+    print()
+    print("NOT SEARCHED  a page outside this repository that a record points to; this conversation; and the")
+    print("  memory's notes, which are working notes and never the record.")
+    if memory:
+        notes = notes_holding(search.root, search.words)
+        if notes:
+            print_wrapped(f"Notes that hold the {'word' if one else 'words'}: {common.names(notes, verbose, 6)}.", "  ")
+    print("This is a list of places, not an answer. Read each line in its file before you rely on it.")
+
+
+def root_or_exit(start):
+    root = common.repo_root(start)
+    if root:
+        return root
+    workspace, roots = common.roots_for(start)
+    if roots:
+        print("bowline decisions: this is a folder of repositories. Name the one the subject belongs to: "
+              f"--repo {os.path.basename(roots[0])}", file=sys.stderr)
+    else:
+        print("bowline decisions: not inside a git repository.", file=sys.stderr)
+    sys.exit(2)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Lists where a subject was decided, before a question goes to the person.")
+    commands = parser.add_subparsers(dest="command")
+    find = commands.add_parser("find", help="every place where the words stand close together: records, documents, tests, code, commits")
+    find.add_argument("words", nargs="+", help="the words of the subject, such as: export failed")
+    find.add_argument("--verbose", action="store_true", help="list every place, not only the first ones of each part")
+    find.add_argument("--seconds", type=int, help="how long the search of the files may take (default: decisions.seconds)")
+    find.add_argument("--no-memory", action="store_true", help="do not name the memory's notes that hold the words")
+    records = commands.add_parser("records", help="the files taken as records of decisions")
+    for command in (find, records):
+        command.add_argument("--repo", help="a path inside the repository (default: the current folder)")
+    options = parser.parse_args(argv)
+    if not options.command:
+        parser.print_help()
+        return 2
+    root = root_or_exit(options.repo)
+    config = common.load_config(root)
+    if options.command == "records":
+        found = record_files(common.listed_files(root), config)
+        named = bool(settings(config).get("records"))
+        how = f"named in {common.CONFIG_FILE} (decisions.records)" if named else "found by their names, because decisions.records names none"
+        print(f"bowline decisions: {common.count(len(found), 'file is', 'files are')} taken as records of decisions, {how}.")
+        for path in found:
+            print(f"  {path}")
+        return 0
+    words = [word for word in (w.strip() for w in options.words) if word]
+    if not words:
+        print("bowline decisions: give at least one word of the subject.", file=sys.stderr)
+        return 2
+    chosen = settings(config)
+    seconds = max(1, options.seconds if options.seconds is not None else int(chosen.get("seconds") or 60))
+    search = Search(root, config, words, seconds)
+    show(search, max(1, int(chosen.get("shown") or 8)), options.verbose, not options.no_memory, seconds)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

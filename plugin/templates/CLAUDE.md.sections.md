@@ -18,7 +18,9 @@ the work stopped. When you summarize this conversation, keep these, and prefer t
 - **The work in progress**: what is being built, in three parts: what is committed and pushed, with each commit's
   hash; what is built but not yet checked, naming the checks still to run; and what is only designed or agreed.
 - **The user's decisions and open questions**: every decision made in this conversation, in the user's own words where
-  they gave a rule, and every question still open to them, including anything that waits on them.
+  they gave a rule, and every question still open to them, including anything that waits on them. For an open
+  question, keep each choice with its reason, the records and files that were read for it with their paths, and what
+  was not checked. Never keep a recommendation without its reasons, and mark an inference as Claude's, not the user's.
 - **Rules about what must never be written**: every rule about what must never be documented, printed, logged or
   committed, word for word, and every check that must stop a commit or a push when it fails.
 - **Standing requests about replies**: anything the user asked to see in every reply or at the end of every summary.
@@ -42,6 +44,9 @@ loaded, and only its first 200 lines or 25 KB, whichever comes first; the files 
   warns when one note names many commits.
 - **Write the state before the closing reply.** The state of the work goes to memory before the reply that closes a
   round, so that a compaction or a fresh session at any moment finds it.
+- **A note about an open question holds its evidence.** Write the question, the choices, what was read for it and
+  what was not checked. A note that keeps only "I recommended this" is repeated later without its reasons; asked
+  again, work the question out again from the record.
 - **The repository is the record; the memory is the working notes.** The memory folder is not part of the repository
   and is not backed up with it. A decision is durable only once it is in the repository's documents; a memory note
   points at that record, it does not replace it. Back the folder up to a private repository of your own (`bowline memory

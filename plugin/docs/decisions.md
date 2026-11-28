@@ -1355,3 +1355,111 @@ set up under a folder that had turned it on.
 **Not chosen.** An `autosplit on` and `autosplit off` command: it would edit the person's file for them, which a
 one-line edit, by hand or by Claude with their yes, already does. Offering autosplit in the budget check: its copy
 runs in CI and for contributors without the plugin, where autosplit cannot run.
+
+## 2026-11-28: a decision is looked up before a question goes to the person
+
+**The question.** In another repository of the first user's, a session found that the program and three written
+records disagreed about one word that a person reads: a manual, the name of a test, and a comment that cited a
+decision by its date all said one word, and the program showed another. The session changed the manual to match the
+program, asked the first user a question with two choices, and repeated its own recommendation five times over
+several turns, from its notes and from a summary of the conversation. When the first user asked why it recommended
+that, it read the records at last. It found a third choice it had never offered, the word the product already used in
+the nearest similar case, and the first user chose it. The record of the earlier decision had a gap of its own: it
+said "all seven as recommended", with the first user's approving words, and what had been recommended was on a page
+outside the repository. The first user asked for a plan: "how to update the bowline plugin with it so it could be as a
+standard so for next opportunities you would have a better picture and understanding of the decisions made and how to
+make decisions better. and so that it would be a standard every user of the bowline plugin could have plug-and-play
+from the get-go".
+
+**What bowline itself did to make it easier.** Three things, each read in the files. The starter rule said "A line in
+a document about what the code does today is a claim, not a fact" and "When the document was wrong, correct it with a
+dated note". It was written against another loss, rebuilding something that exists; read at that moment, it says that
+the program is the fact and the document is to be corrected, which is what the session did. That the rule played a
+part is this entry's reading, not something the first user said. The template for a decision's entry asked for "what
+was decided, in one or two sentences", and nothing in it stopped a label. And the Compact Instructions told a summary
+to keep "every question still open", not the choices or what was read for it.
+
+**The decision.** A plan in seven steps, built in this order: the rule text, the entry's shape and what a summary
+keeps; a lookup, `bowline decisions find`; a skill, `decide`; a replay of the incident on a made-up repository with
+Claude Code's own `claude plugin eval`, with and without the plugin; one doctor check and the way a repository that
+already has its rules takes the new lines; three reminders; and the release. The plan put five questions to the first
+user, each with a pick: a skill of its own named `decide`; the short form of the rule; a sentence at a session's
+start where a repository has no such rule; a cap of 15 dollars for the first replay; and leaving out a check for
+comments that cite a decision. Asked "Shall I build the plan with my pick for each of the five questions?", the first
+user answered: "Yes, build it" (2026-11-28). This round builds the first three steps. The replay comes next and
+before the rest, because the session that made the mistake had a rule file loaded and the records in reach: text did
+not stop it, and most of this plan is text. If the replay shows no difference between a session with the plugin and
+one without, the remaining steps are thought over before they are built.
+
+**Why the rule gained two bullets and not four.** The two say what must be known before the moment and cannot arrive
+at it: look the subject up first, with the nearest case the product already handles as one of the choices; and when
+a record and the program disagree, find which one is the mistake before editing either. The second replaces the
+"claim, not a fact" bullet, so the rule points neither way. The file grew from 1,618 to 2,107 characters. A longer
+form with four bullets was drafted at 2,790. A repository with bowline's three starter rules stands at 8,791 of the
+10,000 characters its unscoped rules may use with the short form, and would stand at 9,474 with the long one; the
+repository where this happened stood at 9,504 before either. What the long form held went to where it loads at its
+own moment: the entry's shape into the header of the decisions section, which is read with the record; what an open
+question keeps into the Compact Instructions and the memory section; and the rest into the skill.
+
+**Why a skill of its own.** The `conventions` skill offers a repository its conventions once, after `init`, and its
+description says so; a session about to ask a question would not open it. As with `collaborate`, the moment is
+another one, and one description cannot name both. The description costs about 890 characters at the start of every
+session where the plugin is installed.
+
+**What the lookup lists, and what it leaves to Claude.** A place is where every word of the subject appears within
+three lines of the others, because a sentence in a document is wrapped over two or three lines: one line alone
+misses a decision whose words fall on two, and a whole entry would list a roadmap item of three hundred lines for any
+two common words. The records of decisions come first, and in them the places that say decided, agreed or approved.
+For a line of a test or of the code the list names the commit that last wrote it; for a comment that cites a decision
+by its date, the record that holds the date. It ends with what it did not search. It never concludes: it cannot see
+that two lines disagree, and it cannot find the nearest similar case, so the skill asks Claude for both. The memory's
+notes are named and never quoted, as the doctor does: a note is working notes, and in the incident the note held the
+recommendation without its reasons.
+
+**What counts as an approval by reference.** A count of things approved without saying them: "all seven as
+recommended", "both as proposed", "each of the four, as suggested". The phrase "as recommended" alone was measured on
+the repository where this happened: it matched eight lines in four documents, and seven of them said the decision in
+the same sentence, as in "one connection for each page, as recommended". The shape bowline uses matched one line of
+its 44 documents, the incident's. It is a setting, `decisions.byReference`.
+
+**What a trial on two real repositories changed.** The first version was run on bowline and, read only, on the
+repository where this happened, with about 4,000 tracked files. Four things changed. The search of the files ran past
+its 60 seconds on a disk that had not been read for an hour, and took 0.2 seconds a minute later; so the documents
+are searched first and the tests and the code after them, the limit covers both, and the list says which parts were
+not searched and that a second run is fast. The entry that said "all seven as recommended" was not flagged, because
+the phrase stood five lines below the words of the subject; a place now reads the lines that follow it in its
+paragraph. The files taken as records by their names included a rule about recording decisions; a file under
+`.claude` is now never a record. And a line that held every word was swallowed by the place two lines above it, so
+the entry under another entry was not listed; a place now takes only the lines it needs.
+
+**Not chosen.** A reminder at the moment of asking: Claude Code's documentation, read on 2026-11-28, places a hook's
+words for a tool call "next to the tool result", which for a question is the person's answer, and a hook after a
+reply runs when the person already sees the question, so only text read before the moment reaches it. Keeping a turn
+going after a question so that Claude checks itself: that is the one hook that blocks, and the person would see a
+second reply after every question. A warning before an edit of a record: every round edits the roadmap by rule, so
+it would speak in every session, and its words arrive after the edit. A section of the `conventions` skill in place
+of a skill, for the reason above.
+
+**Still to build, in this order**, each approved with the plan:
+
+1. The replay, with three cases: the made-up repository with the starter rule in it; the same without the rule,
+   whose run without the plugin is what Claude does today; and a conversation that starts from a summary which keeps
+   only a recommendation.
+2. The doctor's warning about a record's entry that approves by reference, its note for a repository whose rules
+   have no section about looking a decision up, the sixth convention in the `conventions` skill, which merges the
+   section into a rule file that exists and never writes a second one, and the sentence at a session's start where
+   there is no such section.
+3. The three reminders: when the person's answer arrives after a reply that ended with a question and held a
+   recommendation; after a compaction; and the words given to a summary before one. What they rest on was read in
+   the documentation and not tried, so each is tried on a live session before it ships.
+4. The release, as 0.19.0.
+
+**Left for later**, each a concrete piece of work this plan does not hold:
+
+1. A check for a code comment that cites a decision no record holds. Measured on the repository where this
+   happened: 37 comments cite a dated decision, they name 4 dates, and each of the 4 is in a record, so the check
+   would find nothing there and would not have caught the incident. In its place the lookup names, for such a
+   comment, the record that holds its date.
+2. From a folder of repositories, the lookup asks which repository the subject belongs to; it could search each one.
+3. The lookup reads the commit messages of the current branch only, and the files as they are in the working folder;
+   a decision that lives on another branch is not found.

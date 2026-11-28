@@ -4,6 +4,19 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+- **A decision is looked up before a question goes to the person.** A new command, `bowline decisions find <words>`,
+  lists where a subject appears: the records of decisions first, then the other documents, the tests, the code and
+  the commit messages, with the commit that last wrote each line of a test or of the code, the record a comment's
+  date points to, and a mark on an entry that approves by reference, such as "all three as recommended".
+  `decisions records` prints the files taken as records, and a new section of settings, `decisions`, names them. A
+  new skill, `/bowline:decide`, is the procedure before a design question goes to the person. The starter rule
+  `recording-decisions.md` loses "a line in a document is a claim, not a fact" and gains a section, "Before a question
+  goes to the person"; the template of a decisions section asks for the decision's own sentence and the person's own
+  words; and the Compact Instructions and the memory section say what an open question keeps. A repository that
+  already has these files keeps its own; the way to take the new lines into them is not built yet.
+
 ## 0.18.0 (2026-11-28)
 
 Autosplit is offered with its cost, where a person meets it. One option is new, `init --autosplit`. No Claude Code

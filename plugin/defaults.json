@@ -124,6 +124,20 @@
     "oldUntrackedHours": "How long untracked files must have gone unwritten before they stop putting a worktree whose sessions are idle under WAITS FOR YOU. A tool's cache or an editor's settings that git does not ignore stay untracked for weeks, and on 2026-11-22 three such files from October put the first user's main checkout first in the look, as idle with work not committed. Such a worktree is listed under IDLE with how many untracked files it holds and the date of the newest. A change to a tracked file, or an untracked file written within this many hours, is still work that waits. crew prune still refuses every untracked file, because git worktree remove does.",
     "desktop": "The folder where Claude Desktop keeps a record of each of its Code sessions, one file per session; null is the app's own folder on this system (claude-code-sessions in %APPDATA%\\Claude on Windows, in ~/Library/Application Support/Claude on macOS, in ~/.config/Claude elsewhere), and false reads no record. The record is the only place on the machine that holds a session's id in the app, by which a reply there links the session, and its full title, which claude agents cuts at 50 characters. Of each record only the ids, the title, whether it is archived, its folder, its worktree and its last activity are read."
   },
+  "decisions": {
+    "records": [],
+    "within": 3,
+    "shown": 8,
+    "seconds": 60,
+    "byReference": "\\b(?:all|both|each|every one)(?:\\s+of)?(?:\\s+(?:them|these|those|the))?(?:\\s+(?:\\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?:\\s+\\w+){0,2})?(?:\\s+of\\s+them)?,?\\s+as\\s+(?:recommended|proposed|suggested)\\b"
+  },
+  "decisionsWhy": {
+    "records": "The files that record decisions, as paths or patterns from the repository's top: a design document's decisions section, a roadmap, a folder of decision records. bowline decisions find lists them first, apart from every other document. With none named, the documents whose name says so are taken: a roadmap, a design document, a decisions page, a changelog, or a file in a folder named adr or decisions. bowline decisions records prints which files those are.",
+    "within": "A place is listed where every word of the subject appears within this many lines of the others. A sentence in a document is wrapped over two or three lines, so one line alone would miss a decision whose words fall on two; a whole entry would list a roadmap item of three hundred lines for any two common words.",
+    "shown": "How many places each part of the list shows before it counts the rest; --verbose lists every one. The list goes into a session's context, and a subject with fifty places is read from its records first.",
+    "seconds": "How long the search of the files may take before the list says that the documents, tests and code were not searched. On the first repository it was measured on, with about 4,000 tracked files, two plain words took 0.3 seconds once the disk had been read, and a search with a pattern took 81 seconds the first time; a tool call ends after two minutes.",
+    "byReference": "A regular expression for an entry that approves a number of things by reference, such as \"all seven as recommended\" or \"both as proposed\". Such an entry holds a label: what was recommended stayed in a conversation, so a later reader cannot tell what was decided. The phrase \"as recommended\" alone is not enough to tell: on the first repository it matched eight lines, seven of which said the decision in the same sentence, and this shape matched the one that did not."
+  },
   "outsidePaths": [
     "scratchpad['`\\\\/]",
     "AppData",

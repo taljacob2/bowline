@@ -196,7 +196,8 @@ branch of its own, and leaves the merge to you.
 1. `claude plugin marketplace add taljacob2/bowline` and `claude plugin install bowline@bowline`.
 2. In a repository, `/bowline:doctor`. Read the report; each finding names the skill that fixes it.
 3. `/bowline:init` for the layout, `/bowline:memory-backup` for the backup, and `/bowline:split-instructions` when a
-   `CLAUDE.md` is over the line. `/bowline:conventions` when decisions keep getting lost.
+   `CLAUDE.md` is over the line. `/bowline:conventions` when decisions keep getting lost, and `/bowline:decide`
+   before a design question goes to you: it has Claude read what was already decided first.
 4. `/bowline:crew` when more than one session works in the repository at once, each in its own worktree: who is here,
    who took which roadmap number, how a shared file is changed, and when a heavy check may run. `/bowline:collaborate`
    when those sessions should work as a team: who has which subject, a trial of each other's work, a status each one

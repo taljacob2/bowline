@@ -38,6 +38,9 @@ demand.
   warns when one note names many commits.
 - **Write the state before the closing reply.** The state of the work goes to memory before the reply that closes a
   round, so that a compaction or a fresh session at any moment finds it.
+- **A note about an open question holds its evidence.** Write the question, the choices, what was read for it and
+  what was not checked. A note that keeps only "I recommended this" is repeated later without its reasons; asked
+  again, work the question out again from the record.
 - **The repositories are the record; the memory is the working notes.** The memory folder is not part of any repository
   and is not backed up with them. A decision is durable only once it is in a repository's documents; a memory note
   points at that record, it does not replace it. Back the folder up to a private repository of your own (`bowline memory
