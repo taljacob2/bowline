@@ -15,7 +15,25 @@ bowline measures against are Claude Code's, not bowline's. When a limit moves, `
   `recording-decisions.md` loses "a line in a document is a claim, not a fact" and gains a section, "Before a question
   goes to the person"; the template of a decisions section asks for the decision's own sentence and the person's own
   words; and the Compact Instructions and the memory section say what an open question keeps. A repository that
-  already has these files keeps its own; the way to take the new lines into them is not built yet.
+  already has these files keeps its own, and takes the new section as the next entry says.
+- **A repository that already has its rule file takes the section.** The doctor notes a repository whose
+  instructions have no section about looking a decision up. Until it has one, the line at a session's start says
+  in one sentence what to do before a question and names `/bowline:decide`; a new setting, `decisions.atStart`,
+  turns the sentence off. Tried on live sessions: with the sentence first and the action first in it, 5 of 5
+  sessions used the skill; said last and as a description, 2 of 5. `bowline decisions section` prints where the section goes, how many characters it adds
+  to the rules every session loads, the earlier bullet it replaces and the text, and changes no file. The
+  `conventions` skill has a sixth convention that makes the edit with the person, in the rule file that exists.
+- **The doctor warns of an entry that approves by reference.** An entry of the records of decisions that says
+  "all three as recommended" keeps the approval and loses what was decided. The doctor names each such line, at
+  a session's start and in its report, and when one is written during a session it tells the person once, after
+  the reply. A phrase inside quotation marks is not counted, by the doctor or by `decisions find`, and an empty
+  `decisions.byReference` turns the mark and the warning off.
+- **What was measured.** A replay of the round this answers, on a made-up repository, with Claude Code's own
+  `claude plugin eval`: 61 sessions on 2026-11-28. Claude Code alone edited nothing and asked in 6 of 13 runs
+  when a record and the program disagreed, and went back to the records in 0 of 6 when asked again after a
+  summary. With the rule's two bullets in front of it: 5 of 5 and 5 of 5. With the plugin and no rule: 12 of 13
+  and 6 of 6. With both: 5 of 5 and 5 of 5. The sessions were fresh and short, and five runs is a small number;
+  `docs/decisions.md` has the limits, and the replay itself is in the repository's `evals/`, which does not ship.
 
 ## 0.18.0 (2026-11-28)
 

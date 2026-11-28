@@ -162,6 +162,8 @@ def command(target, options, results):
         out += ["--model", options.model]
     if options.keep_temp:
         out.append("--keep-temp")
+    if options.with_only:
+        out += ["--ablation", "none"]
     return out
 
 
@@ -232,16 +234,22 @@ def read_result(folder):
         checks, passes = [], {}
         for arm in arms:
             for number, run in enumerate(case["arms"][arm], 1):
-                reply, failed = "", []
+                reply, failed, skipped = "", [], []
                 for grader in run["graders"]:
                     if grader["name"] not in checks:
                         checks.append(grader["name"])
-                    passes.setdefault((grader["name"], arm), []).append(bool(grader["passed"]))
+                    passes.setdefault((grader["name"], arm), [])
+                    # A check the cost cap skipped judged nothing: it is neither a pass nor a miss.
+                    if str(grader.get("explanation") or "").startswith("skipped"):
+                        skipped.append(grader["name"])
+                        continue
+                    passes[(grader["name"], arm)].append(bool(grader["passed"]))
                     if not grader["passed"]:
                         failed.append(grader["name"])
                     reply = grader.get("evidence") or reply
+                left = f" Skipped at the cost cap: {', '.join(skipped)}." if skipped else ""
                 head = (f"{case['name']}, {arm} the plugin, run {number}: score {run['score']:.2f}, {run['turns']} turns, "
-                        f"{run['costUsd']:.2f} dollars.\nFailed: {', '.join(failed) or 'nothing'}.\n\n")
+                        f"{run['costUsd']:.2f} dollars.\nFailed: {', '.join(failed) or 'nothing'}.{left}\n\n")
                 with open(os.path.join(replies, f"{case['name']}.{arm}.{number}.md"), "w", encoding="utf-8", newline="\n") as handle:
                     handle.write(head + (reply or "(The result holds no reply for this run.)") + "\n")
         print()
@@ -252,7 +260,7 @@ def read_result(folder):
             cells = []
             for arm in arms:
                 marks = passes.get((check, arm))
-                cells.append(("-" if marks is None else f"{sum(marks)} of {len(marks)}").ljust(10))
+                cells.append(("-" if not marks else f"{sum(marks)} of {len(marks)}").ljust(10))
             print("  " + check.ljust(width) + "".join(cells).rstrip())
     print()
     print(f"Each session's reply is a file in {replies}. Read them: a check is a first pass, and only a person can say "
@@ -275,6 +283,9 @@ def main(argv=None):
     parser.add_argument("--keep-temp", action="store_true",
                         help="keep each session's temporary folder, to read in its out/trace.jsonl what the session was "
                              "given and what it did; remove the folders afterwards, as the command's own lines say")
+    parser.add_argument("--with-only", action="store_true",
+                        help="run each case with the plugin only, and not without it: half the sessions, to try a change "
+                             "to the plugin against a result that already has the runs without it")
     options = parser.parse_args(argv)
     if options.read is not None:
         folder = os.path.abspath(options.read) if options.read else newest_result()
@@ -286,9 +297,10 @@ def main(argv=None):
     names = build(target)
     results = os.path.join(HERE, "results", time.strftime("%Y-%m-%d-%H%M%S"))
     parts = command(target, options, results)
-    runs = len(names) * options.runs * 2
+    runs = len(names) * options.runs * (1 if options.with_only else 2)
     print(f"bowline replay: {len(names)} cases built in {target}: {', '.join(names)}.")
-    print(f"The command starts about {runs} Claude Code sessions on your account, half of them without the plugin, and "
+    arms = "every one with the plugin" if options.with_only else "half of them without the plugin"
+    print(f"The command starts about {runs} Claude Code sessions on your account, {arms}, and "
           f"starts no new one after {options.max_cost_usd:g} dollars. Its report goes to {results}.")
     print("The first time, it asks whether you trust the folder it was built in; that answer is yours.")
     print()

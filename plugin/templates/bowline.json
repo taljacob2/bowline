@@ -12,7 +12,7 @@
     "heavy": [],
     "keepPorts": []
   },
-  "_decisions": "Name the files that record decisions (records), as paths or patterns from the repository's top: the design document, the roadmap, a folder of decision records. bowline decisions find lists them first when a session looks a subject up before it asks you a question. With none named, bowline takes the documents whose name says so; bowline decisions records prints which.",
+  "_decisions": "Name the files that record decisions (records), as paths or patterns from the repository's top: the design document, the roadmap, a folder of decision records. bowline decisions find lists them first when a session looks a subject up before it asks you a question. With none named, bowline takes the documents whose name says so; bowline decisions records prints which. The doctor warns of an entry of these records that approves by reference, such as 'all three as recommended'.",
   "decisions": {
     "records": []
   },

@@ -36,6 +36,11 @@ means for this repository, in plain words, and name the skill that fixes it:
 - A rules file or an area over its budget: `/bowline:split-instructions` for the move, then shorten the rules.
 - A path outside the repository in an instruction file: fix the pointer by hand; a contributor cannot follow it.
 - No `Compact Instructions` or `Memory between sessions` section, no `.claude/bowline.json`, no gate: `/bowline:init`.
+- An entry of the records of decisions that approves by reference, such as "all three as recommended": the entry
+  keeps the approval and loses what was decided. `/bowline:decide` says how an entry is written; where what was
+  recommended can no longer be found, the person is the one to ask. Never fill such an entry in from a guess.
+- No section about looking a decision up before a question goes to the person: `/bowline:conventions`, its sixth
+  convention, which adds two bullets to the rule file that exists; `/bowline:init` where there is no rule at all.
 - The memory index near or over its cap: `/bowline:curate-memory`.
 - A memory note that names many commits, so it keeps finished work like a log: `/bowline:curate-memory`, whose
   TRIM verdict cuts each finished item the repository records down to a pointer and its last commit.

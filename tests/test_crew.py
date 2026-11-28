@@ -42,9 +42,11 @@ class CrewTests(ScratchRepo):
         self.other = [tree["path"] for tree in crew.worktrees(self.repo) if not tree["main"]][0]
 
     def configure(self, settings):
-        """Writes the crew's settings, with the stand-in for claude unless they name another program."""
+        """Writes the crew's settings, with the stand-in for claude unless they name another program. The sentence a
+        session's start gets about looking a decision up is turned off with them, so that a test which turns the line
+        about other sessions off sees a start that says nothing."""
         write(os.path.join(self.repo, ".claude", "bowline.json"),
-              json.dumps({"crew": dict({"claude": FAKE_CLAUDE}, **settings)}) + "\n")
+              json.dumps({"crew": dict({"claude": FAKE_CLAUDE}, **settings), "decisions": {"atStart": False}}) + "\n")
 
     def agents(self, *rows):
         """What `claude agents --json` lists from now on."""

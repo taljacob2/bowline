@@ -42,7 +42,8 @@ Without `--run` it builds and prints the command, and starts nothing.
   `python -I evals/replay.py --read` prints, for the newest result, how many runs passed each check with the plugin
   and without it, and writes each session's reply to a file under the result's `replies/`. `--keep-temp` keeps each
   session's temporary folder, whose `out/trace.jsonl` holds what the session was given and each tool it used; remove
-  those folders afterwards, as the command's own lines say.
+  those folders afterwards, as the command's own lines say. `--with-only` runs each case with the plugin and not
+  without it, half the sessions, to try a change to the plugin against a result that already has the other half.
 - **On Windows, start it with `--run`, and do not copy the printed command.** Claude Code starts each case's bash
   script with the first `bash` on the search path and hands it the script's path with its backslashes. Where that bash
   is the one that starts WSL, the backslashes are lost and every run ends with "scaffold failed (exit 127)" before a
@@ -52,8 +53,8 @@ Without `--run` it builds and prints the command, and starts nothing.
 
 A script decides most of a run's score: whether the manual, the code and the test are as they were when the reply
 ends; whether the reply names both words, the record and the nearest case, the import; whether it holds the word
-that case would give, "Export failed", written as the page would show it; and, in the third case, whether a file was
-read before the answer. The last two of the reply's checks were one at first, and it passed a reply that only said
+that case would give, "Export failed", written as the page would show it; and, in the third case, whether the files
+were read or searched before the answer. The last two of the reply's checks were one at first, and it passed a reply that only said
 "a job whose export failed", so the first two sessions scored the same while only one of them offered the word. A model decides one thing in each case, as a first pass: in the first two,
 whether the reply reports the disagreement and asks; in the third, whether it works the question out again. Whether the choices are complete and fair, whether
 the reasons are honest, and whether a first-time reader understands the question, only a person can judge: read the
@@ -69,8 +70,9 @@ a stand-in, at the end of the system prompt and not among the project's instruct
 four things: Claude Code alone, with the rule's text, with the plugin, and with both. It never measures a
 `CLAUDE.md`, a long session, or a real compaction; the third case's summary is a paragraph in the prompt.
 
-One check is narrower than its name: `a-file-was-read-before-the-answer` counts the Read tool only, so a session
-that found the records with a search and quoted them fails it. Read the reply before you count such a run as a miss.
+The check that a session went back to the files before it answered reads the session's trace for the Read tool or
+the Grep tool. At first it counted the Read tool only, and two sessions that found the records with a search failed
+it; a one-turn control showed that the changed check still fails a session that opens nothing.
 
 On Windows a case cannot be given a shell without WSL, so a session in the replay reads and searches with Claude
 Code's own tools and never runs `bowline decisions find`. The lookup is tested apart, in `tests/test_decisions.py`, and

@@ -40,6 +40,15 @@ kept with its choices and what was read for it, never as a recommendation alone,
 out again and not only repeated. The `decide` skill is the procedure, and `bowline decisions find` lists the places
 where a subject appears.
 
+bowline brings these to a session in three places. The starter rule about recording decisions ends with a section,
+"Before a question goes to the person", of two bullets, which every session has in front of it. Where a
+repository's instructions have no such section, because its rule file is older or it never had one, the line at a
+session's start says in one sentence what to do before a question and names the skill, and the doctor notes it;
+`bowline decisions section` prints the section, where it goes and what it costs, and the `conventions` skill adds
+it to the rule file that exists. And the doctor warns of an entry of the records that approves by reference, such as
+"all three as recommended": at a session's start, and once, after the reply, when such a line is written during a
+session. A phrase inside quotation marks is spoken about and not used, so it is not counted.
+
 ## A roadmap with numbered slots for scope cuts
 
 The Next list is in the order the work should run. When a round deliberately leaves out a concrete, understood piece

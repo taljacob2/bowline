@@ -431,6 +431,9 @@ class Finding:
         self.fix_many = None    # the fix with <repository> for the name, when the fix names the repository
         self.names = None       # for a grouped finding: the repositories it is found in, as a reader takes them in
         self.topic = None       # "links" for a link inside a worktree, which a session's start gives on its own line
+        # For a finding that holds several things of one kind, each thing's own words: the reminders during a session
+        # (doctor --watch) then speak when one of them is new, and stay quiet when one of them is gone.
+        self.keys = None
 
     def lines(self):
         head = {"problem": "PROBLEM", "warning": "WARNING", "note": "NOTE"}[self.level]

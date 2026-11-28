@@ -38,11 +38,14 @@ class DoctorTests(ScratchRepo):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\n## Compact Instructions\n\nKeep.\n\n## Memory between sessions\n\nShort.\n")
         code, out, err = self.run_script("doctor", "--brief", "--no-memory")
         self.assertEqual((code, err), (0, ""))
-        # Clean: no finding, and the one line every session's start gets about working beside other sessions.
+        # Clean: no finding, and the two lines a session's start gets here: the one about working beside other
+        # sessions, and, because this repository has no rule about looking a decision up, what to do before a question.
         self.assertNotIn("bowline found", out)
-        self.assertEqual(len(out.splitlines()), 1, out)
+        self.assertEqual(len(out.splitlines()), 2, out)
         self.assertIn("bowline: no other Claude Code session shows a sign of work in this repository right now.", out)
-        write(os.path.join(self.repo, ".claude", "bowline.json"), '{"crew": {"assumeOthers": false}}\n')
+        self.assertIn("This repository's instructions have no rule about looking a decision up", out)
+        write(os.path.join(self.repo, ".claude", "bowline.json"),
+              '{"crew": {"assumeOthers": false}, "decisions": {"atStart": false}}\n')
         self.assertEqual(self.run_script("doctor", "--brief", "--no-memory"), (0, "", ""))
         os.remove(os.path.join(self.repo, ".claude", "bowline.json"))
         write(os.path.join(self.repo, "sub", "CLAUDE.md"), "# Sub\n\n## First\n\n" + ("words " * 20 + "\n") * 400 + "## Second\n\nx\n")
@@ -50,7 +53,7 @@ class DoctorTests(ScratchRepo):
         self.assertEqual(code, 0, out + err)
         self.assertIn("run /bowline:doctor", out)
         self.assertIn("sub/CLAUDE.md is cut at line", out)
-        self.assertLessEqual(len(out.strip().splitlines()), 4)
+        self.assertLessEqual(len(out.strip().splitlines()), 5)
 
     def test_a_small_repository_gets_notes_not_problems(self):
         write(os.path.join(self.repo, "CLAUDE.md"), "# Root\n\nShort.\n")

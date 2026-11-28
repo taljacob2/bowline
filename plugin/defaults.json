@@ -129,6 +129,7 @@
     "within": 3,
     "shown": 8,
     "seconds": 60,
+    "atStart": true,
     "byReference": "\\b(?:all|both|each|every one)(?:\\s+of)?(?:\\s+(?:them|these|those|the))?(?:\\s+(?:\\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?:\\s+\\w+){0,2})?(?:\\s+of\\s+them)?,?\\s+as\\s+(?:recommended|proposed|suggested)\\b"
   },
   "decisionsWhy": {
@@ -136,7 +137,8 @@
     "within": "A place is listed where every word of the subject appears within this many lines of the others. A sentence in a document is wrapped over two or three lines, so one line alone would miss a decision whose words fall on two; a whole entry would list a roadmap item of three hundred lines for any two common words.",
     "shown": "How many places each part of the list shows before it counts the rest; --verbose lists every one. The list goes into a session's context, and a subject with fifty places is read from its records first.",
     "seconds": "How long the search of the files may take before the list says that the documents, tests and code were not searched. On the first repository it was measured on, with about 4,000 tracked files, two plain words took 0.3 seconds once the disk had been read, and a search with a pattern took 81 seconds the first time; a tool call ends after two minutes.",
-    "byReference": "A regular expression for an entry that approves a number of things by reference, such as \"all seven as recommended\" or \"both as proposed\". Such an entry holds a label: what was recommended stayed in a conversation, so a later reader cannot tell what was decided. The phrase \"as recommended\" alone is not enough to tell: on the first repository it matched eight lines, seven of which said the decision in the same sentence, and this shape matched the one that did not."
+    "atStart": "In a repository whose instructions have no section about looking a decision up, a session's start gets one sentence that says what to do before a question goes to the person and names /bowline:decide; false gives none. In the replay of 2026-11-28, with the plugin and no such rule in front of the session, the skill was left unused in 5 of 13 runs; with the rule's text, which names the skill, in none of 10. The sentence carries the rule's main point until the repository has the rule. Tried on live sessions the same day: said last and as a description, 2 of 5 sessions used the skill; said before the line about other sessions and as the action to take, 5 of 5.",
+    "byReference": "A regular expression for an entry that approves a number of things by reference, such as \"all seven as recommended\" or \"both as proposed\". Such an entry holds a label: what was recommended stayed in a conversation, so a later reader cannot tell what was decided. The phrase \"as recommended\" alone is not enough to tell: on the first repository it matched eight lines, seven of which said the decision in the same sentence, and this shape matched the one that did not. The doctor warns of each such line of the records, outside quotation marks; an empty pattern turns the mark and the warning off."
   },
   "outsidePaths": [
     "scratchpad['`\\\\/]",

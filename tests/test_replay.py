@@ -84,8 +84,12 @@ class ReplayTests(ScratchRepo):
         self.assertEqual(code, 0, out + err)
         self.assertIn("--runs 2", out)
         self.assertIn(" --keep-temp", out)
+        self.assertNotIn("--ablation", out)
         self.assertIn("--max-cost-usd 4 ", out)
         self.assertIn("--case asked-*", out)
+        code, out, err = self.build("--with-only")
+        self.assertIn(" --ablation none", out)
+        self.assertIn("about 15 Claude Code sessions on your account, every one with the plugin,", out)
 
     def test_a_folder_that_is_not_an_earlier_build_is_left_alone(self):
         write(os.path.join(self.root, "build", "mine.txt"), "not a build\n")
@@ -128,6 +132,9 @@ class ReplayTests(ScratchRepo):
             "with": [run(1, "I have changed nothing.", **{"the-skill-was-used": True, "the-program-is-as-it-was": True}),
                      run(1, "Nothing is edited yet.", **{"the-skill-was-used": False, "the-program-is-as-it-was": True})],
             "without": [run(0.5, "I changed the code.", **{"the-program-is-as-it-was": False})]}}
+        # The cost cap stopped the judge of one run: that run is not counted for the check.
+        case["arms"]["with"][1]["graders"][-1] = {"name": "the-reply-reports-and-asks", "passed": False,
+                                                "explanation": "skipped: cost ceiling"}
         write(os.path.join(result, "aggregate-result.json"), json.dumps({"costUsd": 0.6, "cases": [case]}))
         done = subprocess.run([sys.executable, "-I", REPLAY, "--read", result], cwd=self.root, capture_output=True,
                               text=True, encoding="utf-8")
@@ -137,13 +144,14 @@ class ReplayTests(ScratchRepo):
         self.assertIn("check with without", lines)
         self.assertIn("the-skill-was-used 1 of 2 -", lines)
         self.assertIn("the-program-is-as-it-was 2 of 2 0 of 1", lines)
-        self.assertIn("the-reply-reports-and-asks 2 of 2 1 of 1", lines)
+        self.assertIn("the-reply-reports-and-asks 1 of 1 1 of 1", lines)
         reply = read(os.path.join(result, "replies", "a-record-and-the-program-disagree.without.1.md"))
         self.assertIn("without the plugin, run 1: score 0.50, 7 turns, 0.20 dollars.", reply)
         self.assertIn("Failed: the-program-is-as-it-was.", reply)
         self.assertTrue(reply.endswith("I changed the code.\n"), reply)
-        self.assertIn("Failed: the-skill-was-used.",
-                      read(os.path.join(result, "replies", "a-record-and-the-program-disagree.with.2.md")))
+        second = read(os.path.join(result, "replies", "a-record-and-the-program-disagree.with.2.md"))
+        self.assertIn("Failed: the-skill-was-used. Skipped at the cost cap: the-reply-reports-and-asks.", second)
+        self.assertIn("(The result holds no reply for this run.)", second)
         # No command was printed: reading a result builds and starts nothing.
         self.assertNotIn("claude plugin eval", done.stdout)
 

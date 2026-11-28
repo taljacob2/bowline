@@ -19,6 +19,9 @@ For each finding it prints three lines: what it found, why it matters, what to d
 - for a repository that names them in its .claude/bowline.json (crew): a number that appears twice in a numbered list
   such as a roadmap, and a stamp that names a commit the branch no longer holds, both of which a rebase leaves behind;
 - as a note, a repository that has several worktrees and no rule about working beside other sessions;
+- as a warning, an entry of the records of decisions that approves by reference, such as "all three as
+  recommended", and so does not say what was decided; and as a note, a repository whose instructions have no section
+  about looking a decision up before a question goes to the person;
 - as a warning, each worktree but the main checkout that holds, in its top level or one level down, a junction, a
   symbolic link or a mount point to a folder outside it: where it points, why it matters (Git for Windows' git
   worktree remove deletes what a junction points to, and Claude Desktop's own clean-up of worktrees never asks
@@ -39,7 +42,10 @@ own folder, or says that none shows now, and points to /bowline:crew and /bowlin
 transcript files in Claude Code's project folders were written, and of what they hold only the session's title from the
 file's end; the names come first from what the last `bowline crew` heard from `claude agents`. In a repository that has no rule about working beside other sessions, the line also
 carries the rule's main points and says that /bowline:crew sets the repository up. --pending, before a prompt, names
-each place where another session started to work since this one was last told, once.
+each place where another session started to work since this one was last told, once. In a repository whose
+instructions have no section about looking a decision up, --brief gives one sentence that says what to do before a
+question goes to the person and names /bowline:decide, before the line about other sessions (decisions.atStart
+false gives none).
 Exit codes: 0 when nothing is a problem (warnings and notes allowed), 1 when at least one problem was found, 2 when the
 script could not run. The three hook modes always exit 0.
 
@@ -66,6 +72,7 @@ import budget  # noqa: E402
 import common  # noqa: E402
 import crew  # noqa: E402
 import crew_edit  # noqa: E402
+import decisions  # noqa: E402
 import memory  # noqa: E402
 
 HEADING = re.compile(r"^#{1,3} (.+)$", re.MULTILINE)
@@ -381,6 +388,7 @@ def repository_findings(root, config):
     findings += crew.findings(root, config)
     findings += crew.link_findings(root)
     findings += crew_edit.findings(root, config)
+    findings += decisions.findings(root, config)
     autosplit.adjust(findings, root, config, facts)
     return findings, facts
 
@@ -436,6 +444,15 @@ def grouped(findings, verbose=False, folder=None):
 def finding_key(finding):
     """A finding's identity across replies: its words with every number blanked, so a file that keeps growing is one."""
     return re.sub(r"\d[\d,.]*", "#", finding.what)
+
+
+def finding_keys(finding):
+    """The identities a finding has across replies: its own, or, for a finding that holds several things of one kind,
+    one for each of them, with the repository's name in front in a folder of repositories. Such a finding is new when
+    one of its things is: a second entry that approves by reference is told, and the first one is not told again."""
+    if not finding.keys:
+        return [finding_key(finding)]
+    return [(f"{finding.where}: " if finding.where else "") + key for key in finding.keys]
 
 
 def watch_file(workspace, roots):
@@ -601,13 +618,13 @@ def do_watch(options):
                 save_watch(path, watch)
         return 0
     urgent = Survey(start, options.no_memory).urgent()
-    keys = [finding_key(f) for f in urgent]
+    keys = [key for f in urgent for key in finding_keys(f)]
     if watch is None:
         # No record yet: the session's start said whatever was there, so nothing counts as new this time.
         save_watch(path, {"told": keys, "pending": [], "others": []})
         return 0
     told = set(watch["told"])
-    new = [f for f, key in zip(urgent, keys) if key not in told]
+    new = [f for f in urgent if any(key not in told for key in finding_keys(f))]
     watch["told"] = keys
     if new:
         lines = [f"{f.what} Fix: {f.fix or 'run /bowline:doctor'}" for f in new]
@@ -649,7 +666,7 @@ def main(argv=None):
             line, names = None, []
         try:
             save_watch(watch_file(survey.workspace, survey.roots),
-                       {"told": [finding_key(f) for f in urgent], "pending": [], "others": names})
+                       {"told": [key for f in urgent for key in finding_keys(f)], "pending": [], "others": names})
         except Exception:
             return 0
         # A link inside a worktree comes first and whole, why included, on a line of its own: a removal that follows it
@@ -666,6 +683,13 @@ def main(argv=None):
             print(f"bowline found {len(rest)} thing(s) worth a look about {whose}; run /bowline:doctor for the report. The first:")
             for finding in rest[:3]:
                 print(f"- {finding.what} Fix: {finding.fix or 'see the doctor'}")
+        # Before the line about other sessions, which is long and speaks of what may never happen in this session.
+        try:
+            sentence = None if survey.workspace else decisions.start_line(survey.roots[0], survey.parts[0][3])
+        except Exception:  # noqa: BLE001 - a hook must never fail a session's start
+            sentence = None
+        if sentence:
+            print(sentence)
         if line:
             print(line)
         return 0

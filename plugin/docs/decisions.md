@@ -1489,9 +1489,13 @@ long session, after a summary; five runs is a small number; the rule's text reac
 system prompt, which is a stand-in for a rule that Claude Code loads; and the rule's earlier text, which pointed
 toward correcting the document, was not played.
 
-**Open: when the release comes.** The plan as approved releases once, after the reminders. Put to the first user on
-2026-11-28, with two choices. One: build the doctor's check and the way an existing repository takes the new lines,
-release that as 0.19.0, and build the three reminders as a round of their own. For it: the replay shows the rule
+**When the release comes: after the doctor's check, before the reminders.** Decided 2026-11-28. Asked "Release
+0.19.0 after the doctor check, with the reminders as a round of their own?", the first user answered: "Yes, release
+first". So 0.19.0 holds the rule's text, the lookup, the skill, the doctor's check and the way an existing repository
+takes the new lines, and the three reminders are a later round with a version of their own. This changes the order
+of the plan as it was approved, which released once, after the reminders; nothing of the plan is dropped. The
+question as it was put, with both choices. One: build the doctor's check and the way an existing repository takes
+the new lines, release that as 0.19.0, and build the three reminders as a round of their own. For it: the replay shows the rule
 and the skill at work, a repository that already uses bowline has neither bullet until that step ships, and the
 reminders rest on what a hook does, read in the documentation and not tried, so they may take several rounds.
 Against it, and the strongest argument: the reminders answer the long session, which is where the mistake happened
@@ -1508,20 +1512,46 @@ second reply after every question. A warning before an edit of a record: every r
 it would speak in every session, and its words arrive after the edit. A section of the `conventions` skill in place
 of a skill, for the reason above.
 
+**How an existing repository takes the section, and what the doctor says (built the same day, for 0.19.0).**
+`init` never overwrites a file, so a repository whose rule about recording decisions is older has neither bullet.
+Three things reach it. The doctor notes the missing section. The line at a session's start says in one sentence
+what to do before a question and names the skill, until the repository has the section, because the replay showed
+the skill unused in 5 of 13 runs where nothing named it; `decisions.atStart` turns the sentence off. The sentence
+was tried on live sessions before it shipped, with the replay's case that has no rule. Said last, after the long
+line about other sessions, and as a description, "this repository's instructions have no rule ..., so this holds
+until they have one: ...", all 5 sessions edited nothing and asked, and 2 of the 5 used the skill, as few as
+before. Said before that line, and with the action first, "... edit neither and run the skill /bowline:decide
+first", 5 of 5 used it, and all 5 offered the word of the nearest case. So where a sentence stands in a hook's
+words, and whether it opens with what to do, decided more than what it said. And
+`bowline decisions section` prints where the section goes, what it adds to the rules every session loads, the
+earlier bullet it replaces and the text; the sixth convention of the `conventions` skill makes the edit with the
+person, in the rule file that exists. The command changes no file, because the rule is the repository's own and may
+be in its own words: on the repository where this happened, the earlier bullet had been reworded, and it is found
+by its last words, "is a claim, not a fact". Measured there: the section is 759 characters, the rules every session
+loads stand at 9,504 of 10,000 and would stand at 10,264 with it, and at 9,996 once the earlier bullet of 268
+characters is taken out. A repository's own wording is recognised by a heading that says "Before a question" or by
+naming `/bowline:decide`.
+
+The doctor warns of an entry of the records that approves by reference, with the pattern the lookup uses. Each such
+line is one thing of its own to the reminders, so a line written during a session is told to the person once, after
+the reply, and a line that was there all along is said at a session's start and not again. A phrase inside
+quotation marks or backquotes is not counted, counting the marks from the start of its paragraph: the first run of
+the check on bowline's own records flagged this entry, where "both as proposed" is quoted on the line after the one
+that opens the quotation. Not chosen: a finding for each line, which in a record with thirty such lines would print
+thirty warnings; and a note in place of a warning, which a session's start never shows.
+
 **Still to build, in this order**, each approved with the plan:
 
-1. The doctor's warning about a record's entry that approves by reference, its note for a repository whose rules
-   have no section about looking a decision up, the sixth convention in the `conventions` skill, which merges the
-   section into a rule file that exists and never writes a second one, and the sentence at a session's start where
-   there is no such section.
-2. The three reminders: when the person's answer arrives after a reply that ended with a question and held a
+1. The three reminders: when the person's answer arrives after a reply that ended with a question and held a
    recommendation; after a compaction; and the words given to a summary before one. What they rest on was read in
-   the documentation and not tried, so each is tried on a live session before it ships.
-3. The release, as 0.19.0. Whether it comes after the first item or after the second is the open question above.
+   the documentation and not tried, so each is tried on a live session before it ships. They are a round of their
+   own, after 0.19.0, as the first user decided.
 
-The replay was the first item of this list, and it has run: its result is above. One fault of its own is left: the
-check that a file was read before the answer counts the Read tool only, so a session that found the records with a
-search fails it. It is corrected on the next run of the replay, because a changed check must be seen to work.
+The replay was the first item of this list, and it has run: its result is above. One fault of its own was left
+that day and corrected before the release: the check that a file was read before the answer counted the Read tool
+only, so a session that found the records with a search failed it. It now reads the session's trace for the Read
+tool or the Grep tool, and was seen to pass a session that searched and to fail one that opened nothing. All of the
+replay's runs, its controls and the trials of the sentence cost about 14.15 of the 15 dollars approved for it.
 
 **Left for later**, each a concrete piece of work this plan does not hold:
 
