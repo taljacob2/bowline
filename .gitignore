@@ -7,3 +7,7 @@ __pycache__/
 .claude/worktrees/
 
 # Scratch folders the tests make are under the system's temp folder, never here.
+
+# The replay's copy of the plugin with its cases, and the reports of its runs (evals/replay.py).
+evals/.build/
+evals/results/

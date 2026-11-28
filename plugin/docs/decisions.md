@@ -1432,6 +1432,23 @@ paragraph. The files taken as records by their names included a rule about recor
 `.claude` is now never a record. And a line that held every word was swallowed by the place two lines above it, so
 the entry under another entry was not listed; a place now takes only the lines it needs.
 
+**What the replay's made-up repository changed, the same day.** A test builds the repository the replay starts in and
+runs the lookup on it, and the first run failed twice. The manual's own sentence, "A job whose export failed reads
+Failed", was not listed: the line above it, which held one of the two words, was listed in its stead. So a line that
+holds every word is now always a place, and a stretch of several lines is one only when it reaches no such line. And
+the mark for "all three as recommended" was put on the item above the one it belongs to, because the two items of
+the list had no blank line between them; the lines that follow a place now end at the next item of a list.
+
+**How the replay is run, and by whom.** Claude Code loads an eval case only from inside the plugin it tests, and
+refused a case outside it that named the plugin by a path. bowline's plugin folder holds only what ships, so
+`evals/replay.py` copies it to a folder git ignores and puts the cases in the copy. `claude plugin eval` then asks
+whether that folder is trusted, and without a terminal it stops, naming `--trust-plugin` as the way past. The session
+that built this did not pass it: the first user had approved what the replay may spend, and whether a folder of code
+is trusted is a question put to the person, which a session does not answer for them. So the first run is one
+command the person runs in a terminal, `python -I evals/replay.py --run`. One limit was read in the documentation and not tried: on Windows a case cannot be
+given a shell without WSL, so a session in the replay never runs the lookup, and reads and searches with Claude
+Code's own tools.
+
 **Not chosen.** A reminder at the moment of asking: Claude Code's documentation, read on 2026-11-28, places a hook's
 words for a tool call "next to the tool result", which for a question is the person's answer, and a hook after a
 reply runs when the person already sees the question, so only text read before the moment reaches it. Keeping a turn
@@ -1442,9 +1459,9 @@ of a skill, for the reason above.
 
 **Still to build, in this order**, each approved with the plan:
 
-1. The replay, with three cases: the made-up repository with the starter rule in it; the same without the rule,
-   whose run without the plugin is what Claude does today; and a conversation that starts from a summary which keeps
-   only a recommendation.
+1. The replay's first run, by the person. Its three cases are written, in `evals/`: the made-up repository with the
+   starter rule in it; the same without the rule, whose run without the plugin is what Claude does today; and a
+   conversation that starts from a summary which keeps only a recommendation.
 2. The doctor's warning about a record's entry that approves by reference, its note for a repository whose rules
    have no section about looking a decision up, the sixth convention in the `conventions` skill, which merges the
    section into a rule file that exists and never writes a second one, and the sentence at a session's start where

@@ -39,3 +39,9 @@ into a test must be built with `chr()`; the Write tool of Claude Code turns the 
 A change to the launcher, to `plugin/hooks/hooks.json` or to how a hook reads its input is checked in a real Claude
 Code session started with `--plugin-dir <this folder>/plugin`: the memory push after a reply, and the gate blocking a
 `git commit` with a staged fake token, on Windows and on Linux (WSL).
+
+A change to what Claude is told about decisions (the `recording-decisions` rule, the `decide` skill, the reminders)
+is checked by the replay, `evals/README.md`: it plays a missed decision again on a made-up repository, with the plugin
+and without it. It starts paid sessions on the person's account, so run it only with their word and under their cap.
+The first time, it asks whether its folder is trusted; the person answers that in a terminal, and you never pass
+`--trust-plugin` for them. Say that it was not run when it was not.

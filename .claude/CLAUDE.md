@@ -11,7 +11,8 @@ The plugin, exactly as it ships, is the folder `plugin/`: `docs/facts.md` holds 
 `defaults.json` the same as settings, `scripts/` the tools (`doctor`, `gate`, `budget`, `memory`, `init`, `move`,
 `autosplit`, `crew`, `decisions`) and `run.mjs`, the Node launcher the hooks and skills start, `skills/` the procedures Claude runs
 them through, `hooks/hooks.json` the plugin's hooks, and `templates/` what `init` writes into a repository. Outside it are
-what does not ship: `tests/`, the tests on scratch repositories; this folder; CI; and the marketplace file. bowline is
+what does not ship: `tests/`, the tests on scratch repositories; `evals/`, a replay that needs paid Claude Code
+sessions and that only a person starts; this folder; CI; and the marketplace file. bowline is
 its own first user: this file and `.claude/` were written by `bowline init`. Every file here is ASCII only, written for
 a stranger, Python 3.8 standard library only (and the launcher Node's built-in modules only), with no dependency and no
 server. Before a push: `python -I -m unittest discover -s tests -p "test_*.py"`, then

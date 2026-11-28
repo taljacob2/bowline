@@ -50,6 +50,8 @@ CITES = re.compile(r"\b(decision|decided|agreed|approved)\b", re.IGNORECASE)
 DECIDES = re.compile(r"\b(decided|decision|agreed|approved)\b|\bopen\s*[:(]", re.IGNORECASE)
 # Where an entry of a document starts: a heading, a numbered item, or a list item that opens in bold.
 LEAD = re.compile(r"^(#{1,6}\s|\d+[.)]\s|[-*]\s+\*\*)")
+# Where the next entry starts, for the lines that follow a place: a heading or any item of a list, at the margin.
+NEXT = re.compile(r"^(#{1,6}\s|\d+[.)]\s|[-*+]\s)")
 # How many lines after a place still belong to it, when no blank line ends the paragraph sooner: a record names what
 # was asked over a few lines and says "all seven as recommended" at the end of them.
 FOLLOWS = 8
@@ -114,29 +116,33 @@ def holding_every_word(root, words, documents, deadline):
 
 def places(lines, words, within):
     """The places in a text's lines where every word appears within `within` consecutive lines, as the indexes of each
-    place's first line. A place takes only the lines it needs to hold every word, so a line that holds them all is a
-    place of its own, and a sentence wrapped over two lines is one place and not two. The words are given in lower
-    case."""
+    place's first line. A line that holds every word is a place of its own, always. A stretch of two or more lines is
+    a place only when it reaches no line that is one already, because that line says it better: without this, the
+    line above a sentence was listed in the sentence's stead. A place takes only the lines it needs, so a sentence
+    wrapped over two lines is one place and not two. The words are given in lower case."""
     lowered = [line.lower() for line in lines]
-    found, taken = [], -1
+    found = {index for index, line in enumerate(lowered) if all(word in line for word in words)}
+    taken = set(found)
     for index, line in enumerate(lowered):
-        if index <= taken or not any(word in line for word in words):
+        if index in taken or not any(word in line for word in words):
             continue
-        for more in range(within):
-            stretch = "\n".join(lowered[index:index + more + 1])
-            if all(word in stretch for word in words):
-                found.append(index)
-                taken = index + more
+        for more in range(1, within):
+            stretch = range(index, min(len(lowered), index + more + 1))
+            if any(at in taken for at in stretch):
                 break
-    return found
+            if all(word in "\n".join(lowered[at] for at in stretch) for word in words):
+                found.add(index)
+                taken.update(stretch)
+                break
+    return sorted(found)
 
 
 def paragraph_from(lines, index):
-    """The lines of a place and the ones that follow it in the same paragraph, as (index, line) pairs: up to FOLLOWS
-    lines, ending sooner at a blank line."""
+    """The lines of a place and the ones that follow it in the same entry, as (index, line) pairs: up to FOLLOWS
+    lines, ending sooner at a blank line, a heading or the next item of a list, which belongs to another entry."""
     out = []
     for at in range(index, min(len(lines), index + FOLLOWS)):
-        if at > index and not lines[at].strip():
+        if at > index and (not lines[at].strip() or NEXT.match(lines[at])):
             break
         out.append((at, lines[at]))
     return out
@@ -260,14 +266,16 @@ class Search:
         lines = self.lines_of(path)
         part = part_of(path, self.records)
         for index in places(lines, self.words, self.within):
-            notes, decides = [], False
+            notes, decides, lead = [], False, None
             if part in ("records", "documents"):
                 lead = lead_of(lines, index)
                 if lead is not None:
                     notes.append(f"in the entry at line {lead + 1}: {lines[lead]}")
             if part == "records":
                 paragraph = paragraph_from(lines, index)
-                decides = any(DECIDES.search(line) for _, line in paragraph)
+                # The word that says so is often in the entry's first line: "Open: ..." above the lines of the question.
+                opening = lines[lead] if lead is not None else ""
+                decides = any(DECIDES.search(line) for line in [opening] + [line for _, line in paragraph])
                 for at, line in paragraph:
                     label = self.by_reference.search(line)
                     if label:

@@ -84,8 +84,11 @@ class DecisionsTests(ScratchRepo):
         self.assertIn("within 3 lines of each other", out)
         records = self.part(out, "RECORDS OF DECISIONS")
         self.assertIn("RECORDS OF DECISIONS  docs/DESIGN.md, docs/ROADMAP.md", records)
-        self.assertIn("docs/DESIGN.md:5  - **Open: what a job reads after one export fails (2026-02-20).**", records)
-        self.assertIn("docs/ROADMAP.md:5  1. **The job page.** Three answers still wait", records)
+        self.assertIn("docs/DESIGN.md:6  export failed and a retry can still finish it", records)
+        self.assertIn("in the entry at line 5: - **Open: what a job reads after one export fails (2026-02-20).**", records)
+        # The line that holds the words is the place, and the line above it, which opens the entry, is named under it.
+        self.assertIn("docs/ROADMAP.md:6  job whose export failed; and the order of the exports on the page.", records)
+        self.assertIn("in the entry at line 5: 1. **The job page.** Three answers still wait", records)
         self.assertIn('line 7 says "all three as recommended": it names a recommendation without saying it', records)
         documents = self.part(out, "OTHER DOCUMENTS")
         self.assertIn("docs/MANUAL.md:5  A job whose export failed reads Failed until someone retries it.", documents)
@@ -118,6 +121,8 @@ class DecisionsTests(ScratchRepo):
         self.assertEqual(decisions.places(["export failed"] * 3, ["export", "failed"], 3), [0, 1, 2])
         # A sentence wrapped over two lines is one place, though its second line starts a stretch with the third.
         self.assertEqual(decisions.places(["an export", "that failed", "an export again"], ["export", "failed"], 3), [0])
+        # The line above a sentence is never listed in the sentence's stead.
+        self.assertEqual(decisions.places(["when every export arrives", "the export failed here"], ["export", "failed"], 3), [1])
         write(os.path.join(self.repo, "docs", "NOTES.md"), "The export\nis slow.\n\n\n\n\nIt never failed.\n")
         self.assertNotIn("docs/NOTES.md", self.find("export", "failed"))
 
@@ -157,7 +162,7 @@ class DecisionsTests(ScratchRepo):
         self.assertIn("1 file is taken as records of decisions, named in .claude/bowline.json (decisions.records)", out)
         out = self.find("export", "failed")
         self.assertIn("notes/choices.md:3", self.part(out, "RECORDS OF DECISIONS"))
-        self.assertIn("docs/ROADMAP.md:5", self.part(out, "OTHER DOCUMENTS"))
+        self.assertIn("docs/ROADMAP.md:6", self.part(out, "OTHER DOCUMENTS"))
 
     def test_no_record_at_all_says_where_to_name_one(self):
         git(self.repo, "rm", "-q", "docs/DESIGN.md", "docs/ROADMAP.md")
@@ -192,7 +197,7 @@ class DecisionsTests(ScratchRepo):
             code = decisions.main(["find", "export", "failed", "--repo", self.repo, "--seconds", "5", "--no-memory"])
         self.assertEqual(code, 0)
         out = out.getvalue()
-        self.assertIn("docs/ROADMAP.md:5", self.part(out, "RECORDS OF DECISIONS"))
+        self.assertIn("docs/ROADMAP.md:6", self.part(out, "RECORDS OF DECISIONS"))
         for title in ("OTHER DOCUMENTS", "TESTS", "CODE"):
             self.assertIn("not searched: git did not answer within 5 seconds", self.part(out, title))
         self.assertNotIn("docs/MANUAL.md", out)
