@@ -4,7 +4,11 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
-## Unreleased
+## 0.19.0 (2026-11-28)
+
+A session looks up what was already decided before a design question goes to the person. New: the command
+`bowline decisions` (`find`, `records`, `section`), the skill `/bowline:decide`, a section of settings, `decisions`,
+and two findings of the doctor. No Claude Code limit moved, and no hook is new.
 
 - **A decision is looked up before a question goes to the person.** A new command, `bowline decisions find <words>`,
   lists where a subject appears: the records of decisions first, then the other documents, the tests, the code and
