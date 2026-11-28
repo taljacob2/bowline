@@ -1449,6 +1449,57 @@ command the person runs in a terminal, `python -I evals/replay.py --run`. One li
 given a shell without WSL, so a session in the replay never runs the lookup, and reads and searches with Claude
 Code's own tools.
 
+**What the replay showed, the same day.** The person started the first run, and it stopped before a session began:
+on Windows, Claude Code starts a case's script with the first `bash` on the search path, and in their terminal that
+was the one that starts WSL, which lost the backslashes of the script's path. `replay.py --run` now puts the bash
+that comes with Git first. The session that built this then ran the replay: 61 sessions, and with three single
+calls made as a check, about 10.80 dollars of the 15 approved, every session on the model `claude-opus-5-5`.
+
+Three things in the replay itself were wrong, and each was found by reading replies and traces, not scores. One
+check passed any reply that said "a job whose export failed", so the first two sessions scored the same while only
+one of them offered the word "Export failed"; it is now two checks. A judge passed five replies that had read
+nothing, because they named the one file the summary names; its text is stricter. And a session of the replay never
+has the made-up repository's rule in front of it: Claude Code starts it with the user's settings only, so in the
+first full run the rule was a file on the session's disk in every case. A case that has the rule now hands its text
+to the session, and those two cases were run again.
+
+The numbers are runs in which the session did the careful thing, of the runs made. For "a record and the program
+disagree", that is: it edited nothing and asked. For "asked again after a summary": it went back to the records
+before it answered.
+
+- **Claude Code alone:** 6 of 13, and 0 of 6. The 7 that edited changed the program to match the manual on their
+  own reading of "all three as recommended". All 6 that were asked again answered in one turn and defended the
+  summary's recommendation.
+- **With the rule's text in front of the session:** 5 of 5, and 5 of 5. One of the second 5 read the records and
+  kept its recommendation, taking "as recommended" for a decision in its favour.
+- **With the plugin, and no rule:** 12 of 13, and 6 of 6. The `decide` skill was used in 8 of the 13 and in all 6.
+  No session that used it edited anything; the one session that edited had not used it.
+- **With the plugin and the rule's text:** 5 of 5, and 5 of 5. The skill was used in all 10.
+
+The word of the nearest case, "Export failed", was offered as a choice when a record and the program disagreed by
+4 of 13 sessions of Claude Code alone, 3 of 5 with the rule's text, 9 of 13 with the plugin, and 5 of 5 with both.
+
+What this means, as the session that ran it reads it, and not yet as anything the first user said: the rule's two
+bullets do most of the work wherever they are in front of a session, and the skill adds the third choice and is
+used every time when the rule names it. Without the rule, the plugin left the skill unused in 5 of 13 runs. So of
+what is still to build, the part that brings the two bullets to a repository that already has its rule file, and
+the sentence at a session's start where a repository has no such section, are the parts this result speaks for.
+What the replay cannot say: its sessions are fresh and short, and the mistake this plan answers happened late in a
+long session, after a summary; five runs is a small number; the rule's text reached the session at the end of its
+system prompt, which is a stand-in for a rule that Claude Code loads; and the rule's earlier text, which pointed
+toward correcting the document, was not played.
+
+**Open: when the release comes.** The plan as approved releases once, after the reminders. Put to the first user on
+2026-11-28, with two choices. One: build the doctor's check and the way an existing repository takes the new lines,
+release that as 0.19.0, and build the three reminders as a round of their own. For it: the replay shows the rule
+and the skill at work, a repository that already uses bowline has neither bullet until that step ships, and the
+reminders rest on what a hook does, read in the documentation and not tried, so they may take several rounds.
+Against it, and the strongest argument: the reminders answer the long session, which is where the mistake happened
+and what the replay cannot play, so such a release ships the part that was measured and not the part aimed at the
+moment of the mistake. Two: build both and release once, as approved. Read for this: the five results of
+2026-11-28 under `evals/results/` on the machine that ran them, which git ignores, and each of their replies. Not
+checked: a long session, a real compaction, the rule's earlier text, and Linux and macOS.
+
 **Not chosen.** A reminder at the moment of asking: Claude Code's documentation, read on 2026-11-28, places a hook's
 words for a tool call "next to the tool result", which for a question is the person's answer, and a hook after a
 reply runs when the person already sees the question, so only text read before the moment reaches it. Keeping a turn
@@ -1459,17 +1510,18 @@ of a skill, for the reason above.
 
 **Still to build, in this order**, each approved with the plan:
 
-1. The replay's first run, by the person. Its three cases are written, in `evals/`: the made-up repository with the
-   starter rule in it; the same without the rule, whose run without the plugin is what Claude does today; and a
-   conversation that starts from a summary which keeps only a recommendation.
-2. The doctor's warning about a record's entry that approves by reference, its note for a repository whose rules
+1. The doctor's warning about a record's entry that approves by reference, its note for a repository whose rules
    have no section about looking a decision up, the sixth convention in the `conventions` skill, which merges the
    section into a rule file that exists and never writes a second one, and the sentence at a session's start where
    there is no such section.
-3. The three reminders: when the person's answer arrives after a reply that ended with a question and held a
+2. The three reminders: when the person's answer arrives after a reply that ended with a question and held a
    recommendation; after a compaction; and the words given to a summary before one. What they rest on was read in
    the documentation and not tried, so each is tried on a live session before it ships.
-4. The release, as 0.19.0.
+3. The release, as 0.19.0. Whether it comes after the first item or after the second is the open question above.
+
+The replay was the first item of this list, and it has run: its result is above. One fault of its own is left: the
+check that a file was read before the answer counts the Read tool only, so a session that found the records with a
+search fails it. It is corrected on the next run of the replay, because a changed check must be seen to work.
 
 **Left for later**, each a concrete piece of work this plan does not hold:
 
