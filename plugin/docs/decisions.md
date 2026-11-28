@@ -630,6 +630,7 @@ the last entry of this page.
 **Left for later**, each a concrete piece of work this round did not do:
 
 1. `init` offers autosplit for the repository it sets up, naming the cost, once the person has decided the default.
+   Done on 2026-11-28, with the doctor's offer beside it: the last entry of this page.
 2. The setup could propose settings it can see: a roadmap file with numbered items, a test runner the repository's
    own files name. A runner in watch mode never goes quiet and must not be proposed as a heavy process.
 3. After a commit, when other sessions are at work and this worktree's status is older than the commit, the hook
@@ -1328,3 +1329,29 @@ work already its own, and asks the person before anything that leaves the machin
 
 **Not chosen.** A check in code: bowline's scripts cannot see that the person has decided something. Its warning
 before an edit names a file that another worktree holds, not one that another session in the same worktree changed.
+
+## 2026-11-28: autosplit is offered where a person meets it, not by a skill of its own
+
+**The question.** The first user asked whether autosplit should get a skill of its own, a command that turns it on
+and off, and how to turn it on or off today.
+
+**The decision.** No skill. Turning autosplit on or off is one key, `autosplit.enabled` in a repository's
+`.claude/bowline.json`, and a skill's description is read at the start of every session, which is the cost bowline
+exists to keep down; the review, `done` and `discard` are already in the split-instructions skill, where the doctor
+sends a person when a split is ready. What was missing is that nobody heard of autosplit while it was off: the doctor
+said nothing about it, and `init` wrote the key as false without a word. So the offer now comes in two places, each
+with what one split may spend. `init`, wherever it plans the config item, says whether autosplit is on, what it does
+and its cost, and `--autosplit` writes it on into the `.claude/bowline.json` it creates. And while autosplit is off,
+the doctor's finding about a `CLAUDE.md` that autosplit would split ends its fix with the same offer, so it reaches
+the line at a session's start too. The first user, asked whether to build these two offers instead of a skill:
+"Yes, build it" (2026-11-28). The `--autosplit` option, and a new file that keeps the folder's value, are this
+round's own choices.
+
+**Why init does not edit an existing file for it.** `init` never edits what exists, and one key is not a reason to
+start: where the file exists, the plan names the key to set. A new repository file also takes the folder's value
+now, not the template's false, which used to turn autosplit off silently in each repository that `init --each`
+set up under a folder that had turned it on.
+
+**Not chosen.** An `autosplit on` and `autosplit off` command: it would edit the person's file for them, which a
+one-line edit, by hand or by Claude with their yes, already does. Offering autosplit in the budget check: its copy
+runs in CI and for contributors without the plugin, where autosplit cannot run.

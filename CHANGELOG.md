@@ -4,6 +4,21 @@ Every version names the date its facts were last checked against the Claude Code
 bowline measures against are Claude Code's, not bowline's. When a limit moves, `plugin/defaults.json` and
 `plugin/docs/facts.md` change together and the entry here says which.
 
+## Unreleased
+
+Autosplit is offered with its cost, where a person meets it. One option is new, `init --autosplit`. No Claude Code
+limit moved, and no hook or setting is new.
+
+- **The doctor offers autosplit while it is off.** A finding about a `CLAUDE.md` that autosplit would split ends
+  its fix with how to turn autosplit on, what it does, and what one split may spend (`autosplit.maxBudgetUsd`, $20
+  by default). The fix is in the line at a session's start too, so a person who never runs the doctor hears of it.
+- **`init` says whether autosplit is on and what it costs.** Wherever it plans the config item, an `autosplit` line
+  gives the state and a sentence after the plan says what autosplit does and spends. `--autosplit` turns it on in
+  the `.claude/bowline.json` that init creates; where the file exists, init still never edits it and names the key
+  to set. The init skill asks once, naming the cost.
+- **A repository's new `.claude/bowline.json` keeps the folder's autosplit.** It took the template's `false`, which
+  turned autosplit off in each repository that `init --each` set up under a folder that had turned it on.
+
 ## 0.17.1 (2026-11-24)
 
 A rule for a decision that reaches the wrong session. No Claude Code limit moved, and no command, hook or setting is

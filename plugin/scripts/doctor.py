@@ -329,7 +329,7 @@ class Survey:
         if common.is_repository(self.workspace):
             # A folder that is its own git repository: its own files are committed, gated and split like a repository's.
             own += autosplit.findings(self.workspace, shared, facts) + layout_findings(self.workspace)
-            autosplit.adjust(own, self.workspace)
+            autosplit.adjust(own, self.workspace, shared, facts)
         self.findings += label(own, os.path.basename(self.workspace))
         self.parts.append((os.path.basename(self.workspace), self.workspace, facts, shared))
         if on_part:
@@ -381,7 +381,7 @@ def repository_findings(root, config):
     findings += crew.findings(root, config)
     findings += crew.link_findings(root)
     findings += crew_edit.findings(root, config)
-    autosplit.adjust(findings, root)
+    autosplit.adjust(findings, root, config, facts)
     return findings, facts
 
 

@@ -625,13 +625,42 @@ def state_finding(state, root=None):
         f"Read the log, then split by hand with /bowline:split-instructions, or run 'bowline autosplit discard --file {path}' to let autosplit try again after the next reply.")
 
 
-def adjust(findings_list, root):
-    """Points the doctor's own split findings at the review once a split is ready."""
-    ready = {s["file"]: s for s in all_states(root) if s.get("state") == "ready"}
+def adjust(findings_list, root, config=None, facts=None):
+    """Points the doctor's own split findings at the review once a split is ready. While autosplit is off, a split
+    finding about a file autosplit would take also says that autosplit could prepare the split, and what it may spend:
+    otherwise a person whose file has outgrown the limits never hears that autosplit exists."""
+    states = {s["file"]: s for s in all_states(root)}
+    ready = {path: s for path, s in states.items() if s.get("state") == "ready"}
+    off = config is not None and not settings(config).get("enabled")
+    offered = {p for p, _, _, _ in oversized(root, config, facts)} - set(states) if off else set()
     for finding in findings_list:
         for path, state in ready.items():
             if finding.what.startswith(path + " ") and finding.fix and "split-instructions" in finding.fix and "review" not in finding.fix:
                 finding.fix = f"A split is ready on the branch {state['branch']}; review and merge it: /bowline:split-instructions review {path}."
+        for path in offered:
+            if finding.what.startswith(path + " ") and finding.fix and "split-instructions" in finding.fix and "autosplit" not in finding.fix:
+                finding.fix += " " + offer(config)
+
+
+# What autosplit does and costs, said wherever bowline offers it: the doctor's split findings and init's plan.
+DOES = ("after a reply in which a CLAUDE.md is over the limits and committed clean, a headless Claude Code session "
+        "prepares its split on a branch of its own for you to review")
+
+
+def cost(config):
+    """What one split may spend, in words: the cap the worker passes to the headless session as --max-budget-usd."""
+    cap = settings(config).get("maxBudgetUsd")
+    try:
+        if cap and float(cap) > 0:
+            return f"one split may spend up to ${float(cap):g} (autosplit.maxBudgetUsd)"
+    except (TypeError, ValueError):
+        pass
+    return "one split may spend without a cap, because autosplit.maxBudgetUsd is not set"
+
+
+def offer(config):
+    """The sentence a split finding ends with while autosplit is off."""
+    return f"Or turn on autosplit by setting autosplit.enabled to true in {common.CONFIG_FILE}: {DOES}, and {cost(config)}."
 
 
 # The commands a person runs

@@ -204,6 +204,23 @@ class WorkspaceTests(ScratchRepo):
         self.assertIn("this folder is not a git repository", err)
         self.assertIn("git init", err)
 
+    def test_init_turns_autosplit_on_for_the_folder_and_a_new_repository_file_keeps_it(self):
+        code, out, err = self.bowline("init", "--plan", "--only", "config")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("off; --autosplit turns it on for the folder and its repositories in the new file", out)
+        self.assertIn("unless the repository's own file turns it off", out)
+        code, out, err = self.bowline("init", "--write", "--only", "config", "--autosplit")
+        self.assertEqual(code, 0, out + err)
+        self.assertTrue(json.loads(read(os.path.join(self.workspace, ".claude", "bowline.json")))["autosplit"]["enabled"])
+        # A repository's new file copies the folder's value: the template's false would turn autosplit off there.
+        code, out, err = self.bowline("init", "--each", "--write", "--only", "config")
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(out.count("on in the new file, as the folder's file has it"), 2)
+        for repo in (self.repo1, self.repo2):
+            self.assertTrue(json.loads(read(os.path.join(repo, ".claude", "bowline.json")))["autosplit"]["enabled"], repo)
+        code, out, _ = self.bowline("autosplit", "status", cwd=self.repo1)
+        self.assertIn("autosplit: on", out)
+
 
 if __name__ == "__main__":
     unittest.main()

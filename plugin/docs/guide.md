@@ -144,7 +144,11 @@ and noticed by the hook that already runs after every reply, but not the silence
 work, on a branch of its own, and the one step left to you is the merge. A repository that wants the autocompact feel
 to the end sets `deliver` to `merge`, and the worker takes the two commits onto your branch itself when your tree is
 clean, and the doctor says what landed until you acknowledge it. Autosplit is off until a repository turns it on in
-`.claude/bowline.json`, and the doctor says at every stage what is happening and why.
+`.claude/bowline.json`, and the doctor says at every stage what is happening and why. It is off by default because
+one split may spend up to `autosplit.maxBudgetUsd`, $20 unless the repository says otherwise. So the offer comes where
+you meet the need: `init` says what autosplit does and costs, and `--autosplit` writes it on into a new
+`.claude/bowline.json`, and while it is off the doctor's finding about a `CLAUDE.md` over the limits ends with the
+same offer and the same cost.
 
 ## A folder of repositories
 

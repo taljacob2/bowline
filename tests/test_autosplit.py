@@ -208,6 +208,27 @@ class AutosplitTests(ScratchRepo):
         self.assertIn("it left no worktree", out)
         self.assertFalse(os.path.exists(self.state_file()))
 
+    def test_the_doctor_offers_autosplit_with_its_cost_while_it_is_off(self):
+        offer = "Or turn on autosplit by setting autosplit.enabled to true in .claude/bowline.json"
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertIn("sub/CLAUDE.md has 257 lines", out)
+        self.assertIn(offer, out)
+        self.assertIn("one split may spend up to $20 (autosplit.maxBudgetUsd)", out)
+        self.assertEqual(out.count(offer), 1)
+        # The line at a session's start carries the fix, so the offer reaches a person who never runs the doctor.
+        code, out, _ = self.bowline("doctor", "--brief", "--no-memory")
+        self.assertIn(offer, out)
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"autosplit": {"maxBudgetUsd": 7.5}}))
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertIn("one split may spend up to $7.5 (autosplit.maxBudgetUsd)", out)
+        write(os.path.join(self.repo, ".claude", "bowline.json"), json.dumps({"autosplit": {"maxBudgetUsd": None}}))
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertIn("without a cap, because autosplit.maxBudgetUsd is not set", out)
+        self.enable()
+        code, out, _ = self.bowline("doctor", "--no-memory")
+        self.assertNotIn("Or turn on autosplit", out)
+        self.assertIn("autosplit will start on sub/CLAUDE.md after the next reply", out)
+
     def test_hook_does_nothing_when_off_when_the_file_is_dirty_or_inside_the_worker(self):
         code, out, err = self.hook()
         self.assertEqual((code, out, err), (0, "", ""))

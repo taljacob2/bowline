@@ -31,7 +31,8 @@ Go through the findings in order, worst first: PROBLEM, then WARNING, then NOTE.
 means for this repository, in plain words, and name the skill that fixes it:
 
 - A `CLAUDE.md` over 200 lines, or a nested one cut at a line: `/bowline:split-instructions`. Say which sections are
-  never read today; that is the fact that convinces.
+  never read today; that is the fact that convinces. While autosplit is off, the fix also offers it, with what one
+  split may spend. Say the cost when you pass the offer on, and leave the choice to the person: it is their money.
 - A rules file or an area over its budget: `/bowline:split-instructions` for the move, then shorten the rules.
 - A path outside the repository in an instruction file: fix the pointer by hand; a contributor cannot follow it.
 - No `Compact Instructions` or `Memory between sessions` section, no `.claude/bowline.json`, no gate: `/bowline:init`.

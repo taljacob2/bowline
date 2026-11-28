@@ -1,8 +1,8 @@
 """Scaffolds the repository's side of the layout: the files a plugin cannot ship.
 
-    python -I scripts/bowline.py init [--repo <path>] [--plan | --write] [--only item,item]
+    python -I scripts/bowline.py init [--repo <path>] [--plan | --write] [--only item,item] [--autosplit]
     python -I scripts/bowline.py init [--each] [--plan | --write]        from a folder of repositories
-        [--leave-repositories] [--no-describe] [--verbose]
+        [--leave-repositories] [--no-describe] [--verbose] [--autosplit]
 
 Items, each a file or a set of files under the repository:
   claude-md      the root CLAUDE.md gets three sections (appended when missing, the file created when absent):
@@ -19,6 +19,12 @@ Items, each a file or a set of files under the repository:
 
 --plan prints what each item would do and changes nothing. --write does it: it creates what is missing and appends
 the missing sections, and never overwrites or edits what exists. Without a flag it behaves as --plan.
+
+Wherever the config item is planned, the plan also says whether autosplit is on, what it does and what one split may
+spend, because autosplit is off by default and a person who is never told about it never turns it on. --autosplit
+turns it on in the .claude/bowline.json that init creates; init never edits one that exists, so there the plan says
+which key to set. A new file otherwise keeps the value of the folder's file below it, so that init never turns
+autosplit off where a folder of repositories turned it on.
 
 From a folder that is not a repository but holds several, init scaffolds the folder itself: its own CLAUDE.md, the
 file that loads whole at the start of a session started there, as an index of the repositories (a table with a line
@@ -41,6 +47,7 @@ import sys
 import textwrap
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import autosplit  # noqa: E402
 import common  # noqa: E402
 
 TEMPLATES = os.path.join(common.PLUGIN_ROOT, "templates")
@@ -143,6 +150,7 @@ class Plan:
         self.config = config
         self.actions = []   # (item, path, verb, do) where do is a function that performs it
         self.rows = None    # for a folder's CLAUDE.md: where each row of the table came from
+        self.autosplit = None   # what the plan says about autosplit, when it plans the config item
 
     def add(self, item, path, verb, do=None):
         self.actions.append((item, path.replace("\\", "/"), verb, do))
@@ -159,7 +167,46 @@ class Plan:
         self.add(item, relative, "create" + note, do)
 
 
-def build(root, config, only):
+def repository_config(enabled):
+    """A repository's new .claude/bowline.json: the template as it is, with autosplit turned on when it should be."""
+    text = template("bowline.json")
+    if enabled:
+        off = '"autosplit": {\n    "enabled": false'
+        if off not in text:
+            raise RuntimeError("templates/bowline.json no longer holds autosplit's enabled key where init looks for it")
+        text = text.replace(off, '"autosplit": {\n    "enabled": true')
+    return text
+
+
+def autosplit_state(root, config, asked, below, folder=False):
+    """What the plan says about autosplit in the .claude/bowline.json it creates or keeps. config is what the layers say
+    today: the layers below the new file when there is none yet, the file with them when it exists."""
+    whom = " for the folder and its repositories" if folder else ""
+    if not os.path.exists(os.path.join(root, common.CONFIG_FILE)):
+        if asked:
+            return f"on{whom} in the new file (--autosplit)"
+        if below:
+            return "on in the new file, as the folder's file has it"
+        return f"off; --autosplit turns it on{whom} in the new file"
+    if autosplit.settings(config).get("enabled"):
+        return "on"
+    if asked:
+        return ("off: --autosplit changed nothing, because init never edits a file that exists; set autosplit.enabled "
+                "to true in it")
+    return "off; set autosplit.enabled to true in the file to turn it on"
+
+
+def about_autosplit(config, folder=False):
+    """The sentence after the plans that says what autosplit does and what it may spend, said once for all of them."""
+    text = (f"Autosplit, a setting in {common.CONFIG_FILE} and not an item: {autosplit.DOES}, and {autosplit.cost(config)}. "
+            "It is off by default because it spends money on your account.")
+    if folder:
+        text += (f" The folder's {common.CONFIG_FILE} lies under every repository's own, so turned on there it holds for "
+                 "each repository bowline may write into, unless the repository's own file turns it off.")
+    return text
+
+
+def build(root, config, only, asked=False):
     plan = Plan(root, config)
     wanted = set(only) if only else set(ITEMS)
 
@@ -199,7 +246,9 @@ def build(root, config, only):
     if "githook" in wanted:
         plan.file("githook", ".githooks/pre-commit", template("githooks/pre-commit"))
     if "config" in wanted:
-        plan.file("config", common.CONFIG_FILE, template("bowline.json"))
+        below = bool(autosplit.settings(config).get("enabled"))
+        plan.autosplit = autosplit_state(root, config, asked, below)
+        plan.file("config", common.CONFIG_FILE, repository_config(asked or below))
     if "gitignore" in wanted:
         path = os.path.join(root, ".gitignore")
         existing = common.read_text(path) if os.path.isfile(path) else ""
@@ -396,9 +445,12 @@ def rules_for_one(roots, setting):
             f"{', '.join(kept)} goes here, " + here.format(which="them") + ".")
 
 
-def folder_config(setting):
-    """The folder's .claude/bowline.json: the template, with the writeToRepositories choice and its reason."""
+def folder_config(setting, asked=False):
+    """The folder's .claude/bowline.json: the template, with the writeToRepositories choice and its reason, and
+    autosplit on when the person asked for it."""
     data = json.loads(template("bowline.json"))
+    if asked:
+        data["autosplit"]["enabled"] = True
     data["_writeToRepositories"] = ("Whether bowline writes into the repositories of this folder: true, false, or a list "
                                     "of the names it may write into. With false, init, move and autosplit write nothing into "
                                     "them, and what this folder needs about each one lives here.")
@@ -485,12 +537,12 @@ def folder_template(name, git_folder, gate_here, why):
     return fill(text, values, ("and_folder", "gate", "budget"))
 
 
-def build_folder(folder, roots, only, leave=False, described=True, verbose=False):
+def build_folder(folder, roots, only, leave=False, described=True, verbose=False, asked=False):
     """The scaffold for a folder of repositories: its own CLAUDE.md, an index of the repositories with the sections every
     root file needs, and the shared .claude/bowline.json; the .claude/README.md, starter rules and skills too when the
     folder keeps the files of repositories bowline leaves untouched; and, when the folder is a git repository of its
     own, the .gitignore lines that keep its repositories out of it. The repositories get their own scaffold with --each."""
-    plan = Plan(folder, None)
+    plan = Plan(folder, common.load_config(folder))
     setting = folder_setting(folder, leave)
     keeps = any(not common.allowed_by(setting, r) for r in roots)
     git_folder = common.is_repository(folder)
@@ -546,7 +598,8 @@ def build_folder(folder, roots, only, leave=False, described=True, verbose=False
     if "githook" in wanted:
         plan.file("githook", ".githooks/pre-commit", template("githooks/pre-commit"))
     if "config" in wanted:
-        plan.file("config", common.CONFIG_FILE, folder_config(setting))
+        plan.autosplit = autosplit_state(folder, plan.config, asked, False, folder=True)
+        plan.file("config", common.CONFIG_FILE, folder_config(setting, asked))
     if "gitignore" in wanted:
         path = os.path.join(folder, ".gitignore")
         existing = common.read_text(path) if os.path.isfile(path) else ""
@@ -608,6 +661,9 @@ def main(argv=None):
                         help="from a folder of repositories: leave every row of CLAUDE.md's table for you to fill, instead of "
                              "describing each repository from its README, its package description or its CLAUDE.md")
     parser.add_argument("--verbose", action="store_true", help="name every repository in a list, not the first ten and how many more")
+    parser.add_argument("--autosplit", action="store_true",
+                        help="turn autosplit on in the .claude/bowline.json init creates: a headless Claude Code session "
+                             "prepares the split of a CLAUDE.md that outgrew the limits, on a branch, and spends money")
     options = parser.parse_args(argv)
     workspace, roots = common.roots_for(options.repo)
     root = None if workspace else (roots[0] if roots else None)
@@ -618,6 +674,10 @@ def main(argv=None):
     only = [i.strip() for i in options.only.split(",")] if options.only else None
     if only and any(i not in items for i in only):
         print("bowline init: unknown item; the items are " + ", ".join(items), file=sys.stderr)
+        return 2
+    if options.autosplit and only and "config" not in only:
+        print(f"bowline init: --autosplit turns autosplit on in the {common.CONFIG_FILE} that the config item creates; "
+              "add config to --only.", file=sys.stderr)
         return 2
     git_folder = bool(workspace) and common.is_repository(workspace)
     if workspace and not options.each and only and not git_folder and any(i in GATE_ITEMS for i in only):
@@ -631,7 +691,7 @@ def main(argv=None):
               "files there.", file=sys.stderr)
         return 1
     if root:
-        plans = [(root, build(root, common.load_config(root), only))]
+        plans = [(root, build(root, common.load_config(root), only, options.autosplit))]
     elif options.each:
         allowed = [r for r in roots if common.writes_allowed(r)]
         for r in roots:
@@ -640,10 +700,11 @@ def main(argv=None):
         if not allowed:
             print("bowline init: nothing to do; the folder keeps the files of all its repositories. Run init without --each.")
             return 0
-        plans = [(r, build(r, common.load_config(r), only)) for r in allowed]
+        plans = [(r, build(r, common.load_config(r), only, options.autosplit)) for r in allowed]
     else:
         plans = [(workspace, build_folder(workspace, roots, only, options.leave_repositories,
-                                          described=not options.no_describe, verbose=options.verbose))]
+                                          described=not options.no_describe, verbose=options.verbose,
+                                          asked=options.autosplit))]
         setting = folder_setting(workspace, options.leave_repositories)
         if options.leave_repositories and setting is not False and os.path.isfile(os.path.join(workspace, common.CONFIG_FILE)):
             print(f"bowline init: the folder's {common.CONFIG_FILE} exists and init never edits it; to leave the repositories "
@@ -657,11 +718,16 @@ def main(argv=None):
             print(f"  {item:14} {path:40} {verb}")
             if item == "claude-md" and plan.rows and do is not None:
                 print(f"  {'':14} the table's rows: {plan.rows}")
+        if plan.autosplit:
+            print(f"  {'autosplit':14} {common.CONFIG_FILE:40} {plan.autosplit}")
         pending = [a for a in plan.actions if a[3] is not None]
         total += len(pending)
         if options.write:
             for item, path, verb, do in pending:
                 do()
+    offered = [plan for _, plan in plans if plan.autosplit]
+    if offered:
+        print("\n" + about_autosplit(offered[0].config, folder=bool(workspace) and not options.each))
     if workspace and not options.each:
         setting = folder_setting(workspace, options.leave_repositories)
         own = [os.path.basename(r) for r in roots if common.allowed_by(setting, r)]

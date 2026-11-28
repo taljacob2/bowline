@@ -1,6 +1,7 @@
 """The scaffolding on a scratch repository: the plan changes nothing, --write creates what is missing and appends the
 missing sections, never overwrites, and a second run keeps everything."""
 
+import json
 import os
 import unittest
 
@@ -62,6 +63,40 @@ class InitTests(ScratchRepo):
         self.assertTrue(text.startswith("# My project"))
         self.assertEqual(text.count("## Compact Instructions"), 1)
         self.assertIn("## Memory between sessions", text)
+
+    def test_the_plan_offers_autosplit_with_its_cost_and_turns_it_on_only_when_asked(self):
+        config = os.path.join(self.repo, ".claude", "bowline.json")
+        code, out, err = self.run_script("init", "--plan", "--only", "config")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("off; --autosplit turns it on in the new file", out)
+        self.assertIn("one split may spend up to $20 (autosplit.maxBudgetUsd)", out)
+        self.assertIn("off by default because it spends money", out)
+        code, out, err = self.run_script("init", "--write", "--only", "config")
+        self.assertEqual(code, 0, out + err)
+        self.assertFalse(json.loads(read(config))["autosplit"]["enabled"])
+
+        os.remove(config)
+        code, out, err = self.run_script("init", "--write", "--only", "config", "--autosplit")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("on in the new file (--autosplit)", out)
+        self.assertTrue(json.loads(read(config))["autosplit"]["enabled"])
+        # Only the one value differs from the template; its comments and its line breaks stay as they are.
+        import init
+        self.assertEqual(read(config), init.template("bowline.json").replace('"enabled": false', '"enabled": true'))
+        code, out, _ = self.run_script("init", "--plan", "--only", "config")
+        self.assertIn(".claude/bowline.json                     on\n", out)
+
+        write(config, json.dumps({"autosplit": {"enabled": False}}))
+        code, out, err = self.run_script("init", "--write", "--only", "config", "--autosplit")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("--autosplit changed nothing, because init never edits a file that exists", out)
+        self.assertFalse(json.loads(read(config))["autosplit"]["enabled"])
+
+        code, out, err = self.run_script("init", "--plan", "--only", "rules", "--autosplit")
+        self.assertEqual(code, 2)
+        self.assertIn("add config to --only", err)
+        code, out, err = self.run_script("init", "--plan", "--only", "rules")
+        self.assertNotIn("autosplit", out.lower())
 
     def test_local_copies_run_on_their_own(self):
         self.run_script("init", "--write", "--only", "scripts")

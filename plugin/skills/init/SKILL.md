@@ -32,13 +32,21 @@ person has not seen before, show them the text that would be written, read from 
 
 Say in one sentence per item what it is for. Ask which items they want; the default is all of them.
 
+When `config` is planned, the plan also has an `autosplit` line and, after the items, a sentence that says what
+autosplit does and what one split may spend. Autosplit is a setting, not an item, and it is off by default because it
+spends the person's money. Ask once whether they want it, naming the cost from that sentence: after a reply in which a
+`CLAUDE.md` is over the limits, a headless Claude Code session on their account prepares the split on a branch for
+them to review. On a yes, add `--autosplit` when you write. When `.claude/bowline.json` exists already, init never
+edits it, so the plan says to set `autosplit.enabled` to `true` in it; make that one edit with the person's yes.
+
 ## 3. Write
 
 ```
-node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" init --write --only <the items they chose, comma-separated>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs" init --write --only <the items they chose, comma-separated> [--autosplit]
 ```
 
-or without `--only` for all. Then show `git status` so they see exactly what appeared.
+or without `--only` for all. `--autosplit` needs `config` among the items. Then show `git status` so they see exactly
+what appeared.
 
 ## 4. Finish with them
 
@@ -77,7 +85,9 @@ The items for the folder, each with the template to show from `${CLAUDE_PLUGIN_R
   filled from the repository's README, its package description, or the first sentence of its `CLAUDE.md` that
   describes it, never a warning, a rule or a list item; the plan says which rows came from where, and the rest wait
   for the person. `--no-describe` leaves every row for the person.
-- `config`: the shared `.claude/bowline.json`, the layer every repository's own lies over.
+- `config`: the shared `.claude/bowline.json`, the layer every repository's own lies over. With `--autosplit` it turns
+  autosplit on for every repository bowline may write into, so name the cost as for one repository, and say that it
+  holds in each of them. A repository's new file from `--each` keeps the folder's value.
 - `claude-readme`, `rules`, `skills`: the folder's versions, `folder/claude-readme.md`, `folder/rules/` and
   `folder/skills/`, worded for a folder: a commit is made in a repository below it. Planned by default when the folder
   keeps the files of repositories bowline leaves untouched.
